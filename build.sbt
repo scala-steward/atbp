@@ -1,3 +1,5 @@
+import sbtdynver.DynVer
+
 ThisBuild / organization := "samson.ph"
 ThisBuild / scalaVersion := "3.5.2"
 ThisBuild / versionScheme := Some("semver-spec")
@@ -11,13 +13,30 @@ lazy val root = Project("atbp", file("."))
 
 lazy val cli = atbpModule("cli")
   .dependsOn(md2c, plate)
-  .enablePlugins(JavaAppPackaging)
+  .enablePlugins(
+    DockerPlugin,
+    JavaAppPackaging
+  )
   .settings(Dependencies.cli)
   .settings(
     // sbt-native-packager
     packageName := "atbp",
     maintainer := "edward@samson.ph",
-    executableScriptName := packageName.value
+    executableScriptName := packageName.value,
+    dockerBaseImage := "eclipse-temurin:21-jre-noble",
+    dockerRepository := Some("ghcr.io/esamson"),
+    Docker / version := (version.value)
+      .replace("+", ".")
+      .replace("-", ".")
+      .toLowerCase,
+    dockerUpdateLatest := !DynVer.isSnapshot(),
+    dockerAliases ++= {
+      if (DynVer.isSnapshot()) {
+        Seq(dockerAlias.value.withTag(Some("snapshot")))
+      } else {
+        Nil
+      }
+    }
   )
 
 lazy val confluence = atbpModule("confluence")
