@@ -39,6 +39,43 @@ object JiraOps {
           }
       }
     }
+
+    def getAncestors(keys: List[String]): Task[List[Issue]] = {
+      keys match {
+        case Nil => ZIO.succeed(Nil)
+        case children =>
+          ZIO.logSpan("getAncestors") {
+            for {
+              parents <- getParents(children)
+              parentKeys = parents.map(_.key)
+              ancestors <- getAncestors(parentKeys)
+            } yield {
+              parents ++ ancestors
+            }
+          }
+      }
+    }
+
+    def getParents(keys: List[String]): Task[List[Issue]] = {
+      keys match {
+        case Nil => ZIO.succeed(Nil)
+        case childKeys =>
+          ZIO.logSpan("getParents") {
+            for {
+              children <- client.search(issuesJql(childKeys))
+              parentKeys = children.map(_.fields.parent.map(_.key)).collect {
+                case Some(key) => key
+              }
+              parents <-
+                if (parentKeys.nonEmpty) {
+                  client.search(issuesJql(parentKeys))
+                } else {
+                  ZIO.succeed(Nil)
+                }
+            } yield parents
+          }
+      }
+    }
   }
 
   extension (issue: Issue) {
@@ -46,8 +83,21 @@ object JiraOps {
       issue.fields.status.statusCategory.name == "In Progress"
 
     def isDone: Boolean = issue.fields.status.statusCategory.name == "Done"
+
+    def projectKey: String = issue.key.substring(0, issue.key.indexOf('-'))
+
+    def webUrl = {
+      val base = issue.self.substring(
+        0,
+        issue.self.indexOf('/', "https://".length)
+      )
+      s"$base/browse/${issue.key}"
+    }
   }
 
   private def childrenJql(keys: List[String]) =
     s"parent IN (${keys.mkString(",")})"
+
+  private def issuesJql(keys: List[String]) =
+    s"key IN (${keys.mkString(",")})"
 }
