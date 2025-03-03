@@ -122,7 +122,17 @@ object RadarScanner {
       }
     }
 
-    doFormat(issues.sortBy(_.key), "", Nil)
+    doFormat(
+      issues.sortWith { case (left, right) =>
+        if (left.projectKey == right.projectKey) {
+          left.fields.updated.isBefore(right.fields.updated)
+        } else {
+          left.projectKey.compareTo(right.projectKey) < 0
+        }
+      },
+      "",
+      Nil
+    )
   }
 
   /** Reduce list of issues to only the top-level items */
