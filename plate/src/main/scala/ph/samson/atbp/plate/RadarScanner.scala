@@ -108,7 +108,7 @@ object RadarScanner {
               doFormat(
                 remaining,
                 head.projectKey,
-                s"## ${head.projectKey}" :: "" :: result
+                "" :: s"## ${head.projectKey}" :: result
               )
             } else {
               // Start of project section
