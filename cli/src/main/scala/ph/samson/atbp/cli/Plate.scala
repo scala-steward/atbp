@@ -6,6 +6,7 @@ import ph.samson.atbp.jira.Client
 import ph.samson.atbp.plate.Inspector
 import ph.samson.atbp.plate.Labeler
 import ph.samson.atbp.plate.RadarScanner
+import ph.samson.atbp.plate.Sorter
 import zio.ZIO
 import zio.cli.Args
 import zio.cli.Command
@@ -120,6 +121,30 @@ object Plate {
     }
   }
 
+  private case class Sort(source: File) extends Action {
+    override def run(conf: Conf): ZIO[Any, Throwable, Unit] = {
+      conf.jiraConf match {
+        case None => ZIO.fail(new Exception("No jira config."))
+        case Some(jira) =>
+          doRun().provide(ZClient.default, Client.layer(jira), Sorter.layer())
+      }
+    }
+
+    def doRun() = ZIO.logSpan("sort") {
+      for {
+        sorter <- ZIO.service[Sorter]
+        result <- sorter.sort(source)
+        _ <- ZIO.logInfo(s"sorted: $result")
+      } yield ()
+    }
+  }
+
+  private object Sort {
+    val command = Command("sort", source)
+      .map(s => Sort(s))
+      .withHelp("Sort Jira tickets according to their order in the Plate")
+  }
+
   val command: Command[Plate] =
     Command("plate")
       .withHelp(
@@ -128,6 +153,6 @@ object Plate {
           p("Tools for managing The Plate.")
         )
       )
-      .subcommands(Label.command, Check.command, Radar.command)
+      .subcommands(Label.command, Check.command, Radar.command, Sort.command)
       .map(Plate.apply)
 }
