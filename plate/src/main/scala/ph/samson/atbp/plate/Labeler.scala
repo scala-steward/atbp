@@ -2,7 +2,7 @@ package ph.samson.atbp.plate
 
 import better.files.File
 import ph.samson.atbp.jira.Client
-import ph.samson.atbp.plate.JiraOps.getDescendants
+import ph.samson.atbp.plate.JiraOps.*
 import zio.Task
 import zio.ZIO
 import zio.ZLayer
@@ -23,8 +23,12 @@ object Labeler {
 
           content <- ZIO.attemptBlockingIO(source.contentAsString)
           sourceKeys = JiraKey.findAllMatchIn(content).map(_.group(1)).toList
-          descendants <- client.getDescendants(sourceKeys)
-          localKeys = sourceKeys ++ descendants.map(_.key)
+          (ancestors, descendants) <-
+            client.getAncestors(sourceKeys) <&>
+              client.getDescendants(sourceKeys)
+          localKeys = sourceKeys ++
+            ancestors.map(_.key) ++
+            descendants.map(_.key)
 
           alreadyLabeled <- searchLabeled.join
           currentKeys = alreadyLabeled.map(_.key)
