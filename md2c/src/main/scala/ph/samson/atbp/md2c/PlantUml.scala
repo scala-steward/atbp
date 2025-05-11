@@ -3,9 +3,7 @@ package ph.samson.atbp.md2c
 import better.files.File
 import com.atlassian.adf.model.node.CodeBlock
 import com.atlassian.adf.model.node.Doc
-import com.atlassian.adf.model.node.Media
 import com.atlassian.adf.model.node.Media.externalMedia
-import com.atlassian.adf.model.node.MediaSingle
 import com.atlassian.adf.model.node.MediaSingle.mediaSingle
 import com.atlassian.adf.model.node.RichMedia
 import com.atlassian.adf.model.node.`type`.DocContent

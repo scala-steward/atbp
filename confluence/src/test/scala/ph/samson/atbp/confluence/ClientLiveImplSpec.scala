@@ -3,7 +3,6 @@ package ph.samson.atbp.confluence
 import better.files.File
 import better.files.Resource
 import com.atlassian.adf.jackson2.AdfJackson2
-import com.atlassian.adf.model.node.*
 import com.atlassian.adf.model.node.Doc.doc
 import com.atlassian.adf.model.node.Media.fileMedia
 import com.atlassian.adf.model.node.MediaSingle.mediaSingle

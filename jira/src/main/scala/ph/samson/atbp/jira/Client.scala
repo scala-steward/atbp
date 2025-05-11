@@ -7,7 +7,6 @@ import ph.samson.atbp.jira.model.RankIssuesRequest
 import ph.samson.atbp.jira.model.SearchRequest
 import ph.samson.atbp.jira.model.SearchResults
 import zio.LogLevel
-import zio.Scope
 import zio.Task
 import zio.ZIO
 import zio.ZLayer
@@ -21,7 +20,6 @@ import zio.http.Header.UserAgent
 import zio.http.Header.UserAgent.ProductOrComment
 import zio.http.Headers
 import zio.http.MediaType
-import zio.http.Response
 import zio.http.Status
 import zio.http.URL
 import zio.http.ZClient

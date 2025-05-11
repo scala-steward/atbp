@@ -10,11 +10,9 @@ import zio.ZIO
 import zio.config.magnolia.*
 import zio.config.yaml.*
 
-import java.nio.charset.StandardCharsets
 import java.nio.charset.StandardCharsets.UTF_8
 import java.security.MessageDigest
 import java.util.Base64
-import scala.jdk.CollectionConverters.*
 
 object Parser {
   val Descriptor: Config[FrontMatter] = deriveConfig[FrontMatter]

@@ -7,7 +7,6 @@ import zio.ZIO
 import zio.ZLayer
 import zio.cli.CliApp
 import zio.cli.Command
-import zio.cli.HelpDoc
 import zio.cli.HelpDoc.*
 import zio.cli.HelpDoc.Span.*
 import zio.cli.Options

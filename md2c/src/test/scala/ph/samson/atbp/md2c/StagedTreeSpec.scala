@@ -2,7 +2,6 @@ package ph.samson.atbp.md2c
 
 import ph.samson.atbp.md2c.Parser.FrontMatter
 import ph.samson.atbp.md2c.StagedTree.Page
-import zio.Scope
 import zio.test.*
 
 object StagedTreeSpec extends ZIOSpecDefault {
