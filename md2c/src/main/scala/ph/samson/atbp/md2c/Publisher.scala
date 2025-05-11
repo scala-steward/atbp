@@ -125,14 +125,14 @@ object Publisher {
         page: Page,
         parentId: String,
         currentPages: List[ChildPage]
-    )(using conf: Conf.Final, space: Space) = {
+    )(using space: Space) = {
       currentPages.find(_.title == page.title).map(_.id) match {
         case Some(id) => getPage(id)
         case None     => createDraft(page, parentId)
       }
     }
 
-    def getPage(id: String)(using conf: Conf.Final) = {
+    def getPage(id: String) = {
       for {
         result <- client.getPage(id)
       } yield result
