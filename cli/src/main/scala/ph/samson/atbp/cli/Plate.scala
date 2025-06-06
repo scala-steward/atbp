@@ -10,6 +10,7 @@ import ph.samson.atbp.plate.Sorter
 import zio.ZIO
 import zio.cli.Args
 import zio.cli.Command
+import zio.cli.Exists.Either
 import zio.cli.Exists.Yes
 import zio.cli.HelpDoc.blocks
 import zio.cli.HelpDoc.h2
@@ -25,7 +26,7 @@ object Plate {
   import ph.samson.atbp.cli.Plate.Check.Status
 
   private val source = Args.file("source", Yes)
-  private val target = Options.file("target", Yes).optional
+  private val target = Options.file("target", Either).optional
 
   sealed trait Action extends ToolCommand
 
