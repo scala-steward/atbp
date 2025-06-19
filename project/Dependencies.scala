@@ -59,7 +59,7 @@ object Dependencies {
     val zioLogging = "dev.zio" %% "zio-logging" % ZioLogging
     val zioLoggingSlf4j2 = "dev.zio" %% "zio-logging-slf4j2" % ZioLogging
 
-    val zioSchemaJson = "dev.zio" %% "zio-schema-json" % "1.7.2"
+    val zioSchemaJson = "dev.zio" %% "zio-schema-json" % "1.7.3"
 
     object TestLibs {
       val pprint = Libs.pprint % Test
