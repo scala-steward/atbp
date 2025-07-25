@@ -41,7 +41,7 @@ object Dependencies {
 
     val plantuml = "net.sourceforge.plantuml" % "plantuml" % "1.2025.4"
 
-    val pprint = "com.lihaoyi" %% "pprint" % "0.9.0"
+    val pprint = "com.lihaoyi" %% "pprint" % "0.9.1"
 
     val scalaCsv = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
