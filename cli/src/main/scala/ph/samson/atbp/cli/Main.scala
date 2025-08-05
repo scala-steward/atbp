@@ -39,6 +39,7 @@ object Main extends ZIOCliDefault {
       Markdown2Confluence.command,
       MarkdownMerge.command,
       Plate.command,
+      Retext.command,
       TraceViz.command
     )
     .withHelp(
