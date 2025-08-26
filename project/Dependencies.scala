@@ -37,7 +37,7 @@ object Dependencies {
 
     val commonsIo = "commons-io" % "commons-io" % "2.20.0"
 
-    val jsoup = "org.jsoup" % "jsoup" % "1.21.1"
+    val jsoup = "org.jsoup" % "jsoup" % "1.21.2"
 
     val plantuml = "net.sourceforge.plantuml" % "plantuml" % "1.2025.4"
 
