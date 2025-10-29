@@ -1,5 +1,6 @@
 package ph.samson.atbp.http
 
+import io.netty.channel.unix.Errors.NativeIoException
 import io.netty.handler.codec.PrematureChannelClosureException
 import zio.Clock
 import zio.Duration
@@ -121,10 +122,23 @@ object StatusCheck {
                             // no "Retry-After", just use exponential delay
                             ZIO.succeed(true)
                         }
-                      case _ => ZIO.succeed(false)
+                      case other =>
+                        ZIO.logWarning(
+                          s"not retrying other status: $other"
+                        ) *> ZIO.succeed(
+                          false
+                        )
                     }
                   case _: PrematureChannelClosureException => ZIO.succeed(true)
-                  case _                                   => ZIO.succeed(false)
+                  case nie: NativeIoException              =>
+                    ZIO.logWarning(s"retrying NativeIoException: $nie") *> ZIO
+                      .succeed(true)
+                  case other =>
+                    ZIO.logWarning(
+                      s"not retrying other exception: $other"
+                    ) *> ZIO.succeed(
+                      false
+                    )
                 }
             policy.tapOutput(o =>
               ZIO.logWarning(s"retrying $method $url after $o")
