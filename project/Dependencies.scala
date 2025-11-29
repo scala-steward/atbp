@@ -9,7 +9,7 @@ object Dependencies {
     val Zio = "2.1.23"
     val ZioConfig = "4.0.6"
     val ZioHttp = "3.7.0"
-    val ZioLogging = "2.5.1"
+    val ZioLogging = "2.5.2"
   }
 
   object Libs {
