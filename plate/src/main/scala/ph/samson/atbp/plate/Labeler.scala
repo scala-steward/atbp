@@ -3,6 +3,7 @@ package ph.samson.atbp.plate
 import better.files.File
 import ph.samson.atbp.jira.Client
 import ph.samson.atbp.plate.JiraOps.*
+import zio.Cause
 import zio.Task
 import zio.ZIO
 import zio.ZLayer
@@ -52,7 +53,11 @@ object Labeler {
             .logInfo(s"toAdd ${toAdd.length}: $toAdd")
             .when(toAdd.nonEmpty)
           add <- ZIO
-            .foreachParDiscard(toAdd)(key => client.addLabel(key, value))
+            .foreachParDiscard(toAdd)(key =>
+              client.addLabel(key, value).catchAll { error =>
+                ZIO.logWarningCause(s"Failed labeling $key", Cause.fail(error))
+              }
+            )
             .fork
 
           toRemove = currentKeys.filterNot(localKeys.contains)
