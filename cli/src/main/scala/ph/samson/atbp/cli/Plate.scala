@@ -30,7 +30,8 @@ object Plate {
 
   sealed trait Action extends ToolCommand
 
-  private case class Label(source: File, value: String) extends Action {
+  private case class Label(source: File, value: String, exclude: List[String])
+      extends Action {
     override def run(conf: Conf): ZIO[Any, Throwable, Unit] = {
       conf.jiraConf match {
         case None       => ZIO.fail(new Exception("No jira config."))
@@ -42,15 +43,21 @@ object Plate {
     def doRun() = ZIO.logSpan("label") {
       for {
         labeler <- ZIO.service[Labeler]
-        _ <- labeler.label(source, value)
+        _ <- labeler.label(source, value, exclude)
       } yield ()
     }
   }
 
   private object Label {
     val value = Options.text("value")
-    val command = Command("label", Label.value, source).map { (v, s) =>
-      Label(s, v)
+    val exclude = Options
+      .text("exclude")
+      .map(_.split(',').toList.map(_.trim))
+      .withDefault(Nil) ?? "Projects to exclude"
+
+    val command = Command("label", value ++ exclude, source).map {
+      case ((v, e), s) =>
+        Label(s, v, e)
     }
   }
 

@@ -8,7 +8,11 @@ import zio.ZIO
 import zio.ZLayer
 
 trait Labeler {
-  def label(source: File, value: String): Task[Int]
+  def label(
+      source: File,
+      value: String,
+      excludeProjects: List[String]
+  ): Task[Int]
 }
 
 object Labeler {
@@ -16,7 +20,15 @@ object Labeler {
   private val JiraKey = """\(https://.*/browse/([A-Z]+-\d+)\)""".r
 
   private class LiveImpl(client: Client) extends Labeler {
-    override def label(source: File, value: String): Task[Int] =
+    override def label(
+        source: File,
+        value: String,
+        excludeProjects: List[String]
+    ): Task[Int] = {
+
+      def excludeKey(key: String) =
+        excludeProjects.contains(key.substring(0, key.indexOf('-')))
+
       ZIO.logSpan(s"label $value") {
         for {
           searchLabeled <- client.search(s"labels = $value").fork
@@ -33,7 +45,9 @@ object Labeler {
           alreadyLabeled <- searchLabeled.join
           currentKeys = alreadyLabeled.map(_.key)
 
-          toAdd = localKeys.filterNot(currentKeys.contains)
+          toAdd = localKeys.filterNot(key =>
+            currentKeys.contains(key) || excludeKey(key)
+          )
           _ <- ZIO
             .logInfo(s"toAdd ${toAdd.length}: $toAdd")
             .when(toAdd.nonEmpty)
@@ -52,6 +66,7 @@ object Labeler {
           _ <- add.join
         } yield 1
       }
+    }
 
   }
 
