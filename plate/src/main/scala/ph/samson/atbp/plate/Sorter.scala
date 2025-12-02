@@ -50,6 +50,7 @@ object Sorter {
       val levels = sourceIssues.map(_.fields.issuetype.hierarchyLevel).distinct
       val lookup =
         (sourceIssues ++ ancestors ++ descendants).map(i => i.key -> i).toMap
+      val sourceProjects = sourceIssues.map(_.projectKey).toSet
 
       def getChildren(issue: Issue) =
         descendants.filter(_.fields.parent.exists(_.key == issue.key))
@@ -111,7 +112,9 @@ object Sorter {
       @tailrec
       def doSort(level: Int, sorts: List[Task[Unit]]): List[Task[Unit]] = {
         if (level <= levels.max) {
-          val issues = sourceAtLevel(level).filterNot(_.isDone)
+          val issues = sourceAtLevel(level)
+            .filterNot(_.isDone)
+            .filter(i => sourceProjects.contains(i.projectKey))
           val targetOrder = issues.map(_.key).distinct
 
           val levelSort = ZIO.logSpan(s"doSort $level") {
