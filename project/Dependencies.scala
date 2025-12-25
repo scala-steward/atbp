@@ -90,6 +90,8 @@ object Dependencies {
     zioConfigTypesafe,
     zioLogging
   )
+  // override needed until https://github.com/zio/zio-cli/pull/508
+  val cliOverrides = dependencyOverrides += zioJson
 
   val confluence = libraryDependencies ++= Seq(
     betterFiles,
