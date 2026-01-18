@@ -37,7 +37,11 @@ object Dependencies {
 
     val commonsIo = "commons-io" % "commons-io" % "2.21.0"
 
+    val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
+
     val jsoup = "org.jsoup" % "jsoup" % "1.22.1"
+
+    val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.6"
 
     val plantuml = "net.sourceforge.plantuml" % "plantuml" % "1.2026.1"
 
@@ -169,6 +173,14 @@ object Dependencies {
     zio,
     betterFiles,
     commonsIo
+  )
+
+  val stmt2csv = libraryDependencies ++= Seq(
+    zio,
+    betterFiles,
+    fastparse,
+    pdfbox,
+    scalaCsv
   )
 
   val traceviz = libraryDependencies ++= Seq(
