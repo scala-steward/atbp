@@ -266,7 +266,7 @@ object Inspector {
               .take(300)
               .replace("\n", "_n_")
             List(
-              s"* <small>📝</small> $updated comment by [${updateAuthor.displayName}]",
+              s"* <small>📝</small> $updated comment by [${updateAuthor.getOrElse(author).displayName}]",
               s"    * $body"
             )
         }

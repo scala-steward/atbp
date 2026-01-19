@@ -6,7 +6,7 @@ case class Comment(
     self: String,
     id: String,
     author: UserDetails,
-    updateAuthor: UserDetails,
+    updateAuthor: Option[UserDetails],
     created: ZonedDateTime,
     updated: ZonedDateTime,
     renderedBody: String,
