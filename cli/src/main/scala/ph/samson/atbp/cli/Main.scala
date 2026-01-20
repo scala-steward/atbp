@@ -88,13 +88,21 @@ object Main extends ZIOCliDefault {
     val exitHandler = run.catchSomeCause { case f @ Cause.Fail(throwable, _) =>
       throwable match {
         case _: IllegalArgumentException => logAndExit(f, ExitCode(1))
+        case _                           =>
+          for {
+            _ <- ZIO.logErrorCause(s"Unhandled $throwable", f)
+            u <- logAndExit(f, ExitCode(11))
+          } yield u
       }
     }
 
     exitHandler.provide(logger)
   }
 
-  def logAndExit(cause: Cause.Fail[Throwable], exitCode: ExitCode) =
+  def logAndExit(
+      cause: Cause.Fail[Throwable],
+      exitCode: ExitCode
+  ): ZIO[Any, Nothing, Unit] =
     for {
       - <- ZIO.logDebugCause(cause)
       _ <- ZIO.logError(cause.value.getMessage)
