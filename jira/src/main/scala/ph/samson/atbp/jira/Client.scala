@@ -15,7 +15,6 @@ import zio.Scope
 import zio.Task
 import zio.ZIO
 import zio.ZLayer
-import zio.http
 import zio.http.Body
 import zio.http.Client as HttpClient
 import zio.http.Header.Accept
