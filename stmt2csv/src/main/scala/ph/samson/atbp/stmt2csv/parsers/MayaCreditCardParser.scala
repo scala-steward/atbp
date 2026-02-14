@@ -21,7 +21,10 @@ object MayaCreditCardParser extends StatementParser {
   }
 
   override def validate(text: String): Task[String] =
-    if (text.contains("Maya Black Credit Card")) {
+    if (
+      text.contains("Maya Black Credit Card")
+      || text.contains("Landers CC")
+    ) {
       ZIO.succeed(text)
     } else {
       ZIO.fail(new IllegalArgumentException("Not a Maya Credit Card Statement"))
