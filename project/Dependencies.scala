@@ -183,6 +183,13 @@ object Dependencies {
     scalaCsv
   )
 
+  val stmt2csvIt = libraryDependencies ++= Seq(
+    basedir,
+    TestLibs.zioTest,
+    TestLibs.zioTestMagnolia,
+    TestLibs.zioTestSbt
+  )
+
   val traceviz = libraryDependencies ++= Seq(
     zio,
     betterFiles,

@@ -19,6 +19,7 @@ lazy val root = Project("atbp", file("."))
     plate,
     retext,
     stmt2csv,
+    stmt2csvIt,
     traceviz
   )
 
@@ -89,6 +90,10 @@ lazy val retext = atbpModule("retext")
 
 lazy val stmt2csv = atbpModule("stmt2csv")
   .settings(Dependencies.stmt2csv)
+
+lazy val stmt2csvIt = atbpModule("stmt2csv-it")
+  .dependsOn(stmt2csv)
+  .settings(Dependencies.stmt2csvIt)
 
 lazy val traceviz = atbpModule("traceviz")
   .settings(Dependencies.traceviz)
