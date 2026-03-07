@@ -1,6 +1,7 @@
 package ph.samson.atbp.cli
 
 import ph.samson.atbp.confluence.Conf as ConfluenceConf
+import ph.samson.atbp.hubad.Conf as HubadConf
 import ph.samson.atbp.jira.Conf as JiraConf
 import ph.samson.atbp.md2c.Conf as Md2cConf
 import ph.samson.xdg.basedir.*
@@ -13,6 +14,7 @@ import zio.config.typesafe.*
 
 case class Conf(
     confluence: Option[ConfluenceConf],
+    hubad: Option[HubadConf],
     jira: Option[JiraConf],
     md2c: Option[Md2cConf]
 ) {

@@ -14,6 +14,7 @@ lazy val root = Project("atbp", file("."))
     cli,
     confluence,
     http,
+    hubad,
     jira,
     md2c,
     plate,
@@ -24,7 +25,7 @@ lazy val root = Project("atbp", file("."))
   )
 
 lazy val cli = atbpModule("cli")
-  .dependsOn(md2c, plate, retext, stmt2csv, traceviz)
+  .dependsOn(hubad, md2c, plate, retext, stmt2csv, traceviz)
   .enablePlugins(
     DockerPlugin,
     JavaAppPackaging
@@ -97,6 +98,10 @@ lazy val stmt2csvIt = atbpModule("stmt2csv-it")
 
 lazy val traceviz = atbpModule("traceviz")
   .settings(Dependencies.traceviz)
+
+lazy val hubad = atbpModule("hubad")
+  .dependsOn(stmt2csvIt % "test->test")
+  .settings(Dependencies.hubad)
 
 // Pseudo-project to limit usage of Atlassian repo
 lazy val adfBuilder = atbpModule("adf-builder")

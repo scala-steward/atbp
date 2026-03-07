@@ -36,6 +36,7 @@ object Main extends ZIOCliDefault {
 
   val atbp = Command(Name, logging)
     .subcommands(
+      Hubad.command,
       Markdown2Confluence.command,
       MarkdownMerge.command,
       Plate.command,

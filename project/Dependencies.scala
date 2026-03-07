@@ -22,6 +22,8 @@ object Dependencies {
     val adfBuilderJavaMarkdown =
       "com.atlassian.adf" % s"adf-builder-java-markdown" % AdfBuilderJava
 
+    val automaton = "dk.brics" % "automaton" % "1.12-4"
+
     val basedir = "ph.samson.xdg" %% "basedir" % "1.0"
 
     val betterFiles = "com.github.pathikrit" %% "better-files" % "3.9.2"
@@ -113,6 +115,19 @@ object Dependencies {
 
   val http = libraryDependencies ++= Seq(
     zioHttp
+  )
+
+  val hubad = libraryDependencies ++= Seq(
+    automaton,
+    betterFiles,
+    pdfbox,
+    zio,
+    TestLibs.slf4jSimple,
+    TestLibs.zioLogging,
+    TestLibs.zioLoggingSlf4j2,
+    TestLibs.zioTest,
+    TestLibs.zioTestMagnolia,
+    TestLibs.zioTestSbt
   )
 
   val jira = libraryDependencies ++= Seq(
