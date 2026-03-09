@@ -119,7 +119,7 @@ object Dependencies {
 
   val hubad = libraryDependencies ++= Seq(
     automaton,
-    betterFiles,
+    basedir,
     pdfbox,
     zio,
     TestLibs.slf4jSimple,

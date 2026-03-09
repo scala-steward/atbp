@@ -100,7 +100,6 @@ lazy val traceviz = atbpModule("traceviz")
   .settings(Dependencies.traceviz)
 
 lazy val hubad = atbpModule("hubad")
-  .dependsOn(stmt2csvIt % "test->test")
   .settings(Dependencies.hubad)
 
 // Pseudo-project to limit usage of Atlassian repo
