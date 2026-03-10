@@ -19,6 +19,8 @@ import scala.jdk.StreamConverters.*
 
 object PlantUml {
 
+  val DefaultFormat = FileFormat.PNG
+
   def render(adf: Doc): ZIO[Any, Throwable, Map[String, File]] = {
     def renders(outDir: File) = adf
       .allNodesOfType(classOf[CodeBlock])
@@ -40,9 +42,9 @@ object PlantUml {
           .map(l =>
             if (l.contains(".svg")) FileFormat.SVG
             else if (l.contains(".png")) FileFormat.PNG
-            else FileFormat.SVG
+            else DefaultFormat
           )
-          .orElse(FileFormat.SVG)
+          .orElse(DefaultFormat)
         for {
           out <- ZIO.attemptBlocking {
             val outFile =
