@@ -43,7 +43,7 @@ object Dependencies {
 
     val jsoup = "org.jsoup" % "jsoup" % "1.22.1"
 
-    val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.6"
+    val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.7"
 
     val plantuml = "net.sourceforge.plantuml" % "plantuml" % "1.2026.2"
 
