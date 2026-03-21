@@ -7,6 +7,7 @@ import ph.samson.atbp.stmt2csv.parsers.BpiAccountParser
 import ph.samson.atbp.stmt2csv.parsers.BpiCreditCardParser
 import ph.samson.atbp.stmt2csv.parsers.MayaCreditCardParser
 import ph.samson.atbp.stmt2csv.parsers.MayaSavingsParser
+import ph.samson.atbp.stmt2csv.parsers.MayaWalletParser
 import ph.samson.atbp.stmt2csv.parsers.StatementParser
 import ph.samson.atbp.stmt2csv.parsers.UnionBankCreditCardParser
 import zio.Task
@@ -21,6 +22,7 @@ object Extractor {
       BpiCreditCardParser,
       MayaCreditCardParser,
       MayaSavingsParser,
+      MayaWalletParser,
       UnionBankCreditCardParser
     )
 
