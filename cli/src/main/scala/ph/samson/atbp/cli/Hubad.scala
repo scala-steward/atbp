@@ -17,7 +17,7 @@ case class Hubad(source: File, target: Option[File]) extends ToolCommand {
         source.sibling(s"${source.nameWithoutExtension(false)}.hubad.pdf")
     }
     for {
-      pdf <- RemovePassword.tryPattern(
+      pdf <- RemovePassword.tryPatterns(
         source,
         "" :: conf.hubad.map(_.passwords).getOrElse(Nil)*
       )

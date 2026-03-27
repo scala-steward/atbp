@@ -11,26 +11,28 @@ import scala.jdk.CollectionConverters.*
 
 object RemovePassword {
 
-  def tryPattern(file: File, patterns: String*): Task[PDDocument] =
+  def tryPatterns(file: File, patterns: String*): Task[PDDocument] =
     ZIO.logSpan("tryPattern") {
       for {
         bytes <- ZIO.attemptBlockingIO(file.byteArray)
-        patterns <- ZIO.logSpan("generate") {
+        generated <- ZIO.logSpan("generate") {
           ZIO
-            .succeed(patterns.flatMap(generate).toList)
-            .tap(result => ZIO.logInfo(s"generated ${result.length} passwords"))
+            .succeed(patterns.map(generate).toList)
+            .tap(result =>
+              ZIO.logInfo(s"generated ${result.map(_.length).sum} passwords")
+            )
         }
         doc <-
-          patterns match {
+          generated.sortBy(_.length) match {
             case head :: next =>
               ZIO.raceAll(
-                tryPassword(bytes, head),
-                next.map(password => tryPassword(bytes, password))
+                tryPasswords(bytes, head),
+                next.map(passwords => tryPasswords(bytes, passwords))
               )
             case Nil =>
               ZIO.fail(
                 new IllegalArgumentException(
-                  s"No passwords generated for ${patterns.mkString(", ")}"
+                  s"No passwords generated for ${generated.mkString(", ")}"
                 )
               )
           }
@@ -38,7 +40,21 @@ object RemovePassword {
       } yield doc
     }
 
-  def tryPassword(
+  private def tryPasswords(
+      bytes: Array[Byte],
+      passwords: List[String]
+  ): Task[PDDocument] = ZIO.logSpan("tryPasswords") {
+    passwords match {
+      case head :: next =>
+        ZIO.raceAll(
+          tryPassword(bytes, head),
+          next.map(password => tryPassword(bytes, password))
+        )
+      case Nil => ZIO.fail(new IllegalArgumentException("No passwords"))
+    }
+  }
+
+  private def tryPassword(
       bytes: Array[Byte],
       password: String
   ): Task[PDDocument] = ZIO.logSpan("tryPassword") {

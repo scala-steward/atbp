@@ -17,7 +17,7 @@ object RemovePasswordSpec extends ZIOSpecDefault {
       "Maya.PersonalGoal.withPassword.2026-03-01.pdf"
     ) { (file, pattern) =>
       for {
-        result <- RemovePassword.tryPattern(file, pattern)
+        result <- RemovePassword.tryPatterns(file, pattern)
       } yield assertTrue(result.getNumberOfPages > 0)
     }
   )
