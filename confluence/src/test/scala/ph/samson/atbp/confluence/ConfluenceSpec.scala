@@ -56,7 +56,7 @@ abstract class ConfluenceSpec extends ZIOSpec[Client] {
       user <- System.propertyOrElse(SysProps.User, "bogus")
       token <- System.propertyOrElse(SysProps.Token, "bogus")
     } yield {
-      Conf(site, user, token)
+      Conf(site, user, token, 10)
     }
   }
 

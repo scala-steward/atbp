@@ -1,5 +1,6 @@
 package ph.samson.atbp.jira
 
+import ph.samson.atbp.http.ConcurrencyLimiter
 import ph.samson.atbp.http.StatusCheck
 import ph.samson.atbp.jira.model.Changelog
 import ph.samson.atbp.jira.model.Comment
@@ -316,10 +317,13 @@ object Client {
         Accept(MediaType.application.json)
       )
       url <- ZIO.fromEither(URL.decode(s"https://${conf.site}"))
+      limiter <- ConcurrencyLimiter(conf.concurrentRequests)
       client <- ZIO.serviceWith[HttpClient](
         _.addHeaders(headers).url(
           url
-        ) @@ loggingAspect @@ StatusCheck.successOnly()
+        ) @@ loggingAspect
+          @@ StatusCheck.successOnly()
+          @@ limiter
       )
     } yield {
       LiveImpl(client): Client

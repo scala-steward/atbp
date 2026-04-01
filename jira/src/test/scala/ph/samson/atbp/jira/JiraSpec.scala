@@ -23,7 +23,7 @@ abstract class JiraSpec extends ZIOSpec[Client] {
       user <- System.envOrElse(EnvVars.User, "bogus")
       token <- System.envOrElse(EnvVars.Token, "bogus")
     } yield {
-      Conf(site, user, token)
+      Conf(site, user, token, 10)
     }
   }
 

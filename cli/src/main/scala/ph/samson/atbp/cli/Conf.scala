@@ -19,11 +19,13 @@ case class Conf(
     md2c: Option[Md2cConf]
 ) {
   def jiraConf: Option[JiraConf] = jira.orElse(confluence.map {
-    case ConfluenceConf(site, user, token) => JiraConf(site, user, token)
+    case ConfluenceConf(site, user, token, concurrentRequests) =>
+      JiraConf(site, user, token, concurrentRequests)
   })
 
   def confluenceConf: Option[ConfluenceConf] = confluence.orElse(jira.map {
-    case JiraConf(site, user, token) => ConfluenceConf(site, user, token)
+    case JiraConf(site, user, token, concurrentRequests) =>
+      ConfluenceConf(site, user, token, concurrentRequests)
   })
 }
 
