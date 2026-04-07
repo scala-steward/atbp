@@ -14,6 +14,8 @@ import zio.http.Header.RetryAfter
 import zio.http.Status.ServerError
 import zio.http.Status.TooManyRequests
 
+import java.io.IOException
+
 object StatusCheck {
 
   def successOnly(): ZClientAspect[
@@ -131,8 +133,11 @@ object StatusCheck {
                     }
                   case _: PrematureChannelClosureException => ZIO.succeed(true)
                   case nie: NativeIoException              =>
-                    ZIO.logWarning(s"retrying NativeIoException: $nie") *> ZIO
-                      .succeed(true)
+                    ZIO.logWarning(s"retrying NativeIoException: $nie") *>
+                      ZIO.succeed(true)
+                  case ioe: IOException =>
+                    ZIO.logWarning(s"retrying IOException`: $ioe") *>
+                      ZIO.succeed(true)
                   case other =>
                     ZIO.logWarning(
                       s"not retrying other exception: $other"
