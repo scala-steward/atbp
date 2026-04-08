@@ -55,7 +55,7 @@ lazy val cli = atbpModule("cli")
       Cmd(
         "RUN",
         "apt-get update",
-        "&& apt-get install -y graphviz",
+        "&& apt-get install -y git graphviz",
         "&& apt-get autoremove",
         "&& apt-get clean",
         "&& rm -rf /var/lib/apt/lists/*"
