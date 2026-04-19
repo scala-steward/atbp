@@ -15,6 +15,11 @@ object BdoCreditCardParserIntegrationTest
         entries.last.date == LocalDate.parse("2026-01-28"),
         entries.last.amount == 97
       )
+    },
+    parserTest("BDO.Credit_Card.2026-04-01.pdf") { entries =>
+      assertTrue(
+        entries(15).description == "SOUTH SPRMRKET LS BNOS LOS BANOS PH"
+      )
     }
   )
 }

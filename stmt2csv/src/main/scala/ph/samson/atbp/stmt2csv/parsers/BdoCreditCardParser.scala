@@ -57,8 +57,10 @@ object BdoCreditCardParser extends StatementParser {
     Transaction(saleDate, postDate, description.mkString(" | "), amount)
   }
 
+  val Footer = "American Express is a registered trademark of American Express."
+
   def extraDetail[T: P] = P(
-    !("SUBTOTAL" | date) ~ anyLine
+    !("SUBTOTAL" | Footer | date) ~ anyLine
   )
 
   val DateFmt = DateTimeFormatter.ofPattern("MM/dd/yy")
