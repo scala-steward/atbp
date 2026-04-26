@@ -99,7 +99,7 @@ object MayaSavingsParser extends StatementParser {
   }
 
   def extraDetail[T: P] = P(
-    !("Page" | monthDay) ~ anyLine
+    !("Page" | "Fees and charges" | monthDay) ~ anyLine
   ).map(ExtraDetail.apply)
 
   val MonthDayFmt = DateTimeFormatter.ofPattern("d MMM")
