@@ -23,6 +23,14 @@ object MayaCreditCardParserIntegrationTest
         entries.last.date == LocalDate.parse("2026-02-01"),
         entries.last.amount == 963.43
       )
+    },
+    parserTest("Maya.Credit_Card.2026-04-08.pdf") { entries =>
+      assertTrue(
+        entries.head.date == LocalDate.parse("2026-03-10"),
+        entries.head.amount == 1630,
+        entries.last.date == LocalDate.parse("2026-03-26"),
+        entries.last.amount == 517.10
+      )
     }
   )
 
