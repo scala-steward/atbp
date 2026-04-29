@@ -41,7 +41,7 @@ object Dependencies {
 
     val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
 
-    val jsoup = "org.jsoup" % "jsoup" % "1.22.1"
+    val jsoup = "org.jsoup" % "jsoup" % "1.22.2"
 
     val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.7"
 
