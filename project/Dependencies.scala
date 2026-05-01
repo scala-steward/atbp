@@ -37,7 +37,7 @@ object Dependencies {
       "org.commonmark" % "commonmark-ext-image-attributes" % CommonMark
     val commonmarkExtIns = "org.commonmark" % "commonmark-ext-ins" % CommonMark
 
-    val commonsIo = "commons-io" % "commons-io" % "2.21.0"
+    val commonsIo = "commons-io" % "commons-io" % "2.22.0"
 
     val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
 
