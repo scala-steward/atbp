@@ -52,6 +52,29 @@ object Plate {
   }
 
   private object Label {
+
+    /** Extensions matched when expanding a directory into sources for `label`.
+      */
+    private val TextExtensions = Set("md", "markdown")
+
+    private def isTextFile(file: File): Boolean =
+      file.isRegularFile && file.nonEmpty &&
+        file
+          .extension(includeDot = false)
+          .exists(ext => TextExtensions.contains(ext.toLowerCase))
+
+    /** Files are kept as-is; directories are replaced by all text files under
+      * them (recursive).
+      */
+    private def expandSources(sources: List[File]): List[File] =
+      sources
+        .flatMap {
+          case dir if dir.isDirectory =>
+            dir.walk().filter(isTextFile).toList.sortBy(_.pathAsString)
+          case file => List(file)
+        }
+        .distinctBy(_.path)
+
     val value = Options.text("value")
     val exclude = Options
       .text("exclude")
@@ -61,7 +84,7 @@ object Plate {
 
     val command = Command("label", value ++ exclude, sources).map {
       case ((v, e), s) =>
-        Label(s.map(File.apply), v, e)
+        Label(expandSources(s.map(File.apply)), v, e)
     }
   }
 
