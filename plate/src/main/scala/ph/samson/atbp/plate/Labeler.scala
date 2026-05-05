@@ -10,7 +10,7 @@ import zio.ZLayer
 
 trait Labeler {
   def label(
-      source: File,
+      sources: List[File],
       value: String,
       excludeProjects: List[String]
   ): Task[Int]
@@ -22,7 +22,7 @@ object Labeler {
 
   private class LiveImpl(client: Client) extends Labeler {
     override def label(
-        source: File,
+        sources: List[File],
         value: String,
         excludeProjects: List[String]
     ): Task[Int] = {
@@ -34,7 +34,9 @@ object Labeler {
         for {
           searchLabeled <- client.search(s"labels = $value").fork
 
-          content <- ZIO.attemptBlockingIO(source.contentAsString)
+          content <- ZIO.attemptBlockingIO(
+            sources.map(_.contentAsString).mkString("\n")
+          )
           sourceKeys = JiraKey.findAllMatchIn(content).map(_.group(1)).toList
           (ancestors, descendants) <-
             client.getAncestors(sourceKeys) <&>
