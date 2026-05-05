@@ -80,7 +80,7 @@ object Plate {
       .text("exclude")
       .map(_.split(',').toList.map(_.trim))
       .withDefault(Nil) ?? "Projects to exclude"
-    val sources = Args.file("sources", Yes).atLeast(1)
+    val sources = Args.path("sources").atLeast(1)
 
     val command = Command("label", value ++ exclude, sources).map {
       case ((v, e), s) =>
