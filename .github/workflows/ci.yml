@@ -53,7 +53,7 @@ jobs:
         run: tar cf targets.tar plate/target stmt2csv/target target traceviz/target jira/target hubad/target confluence/target md2c/target retext/target cli/target stmt2csv-it/target http/target adf-builder/target project/target
 
       - name: Upload target directories
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: target-${{ matrix.os }}-${{ matrix.scala }}-${{ matrix.java }}
           path: targets.tar
@@ -90,7 +90,7 @@ jobs:
         uses: sbt/setup-sbt@v1
 
       - name: Download target directories (3.8.3)
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: target-${{ matrix.os }}-3.8.3-${{ matrix.java }}
 
