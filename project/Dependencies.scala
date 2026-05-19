@@ -53,7 +53,7 @@ object Dependencies {
 
     val zio = "dev.zio" %% "zio" % Zio
 
-    val zioCli = "dev.zio" %% "zio-cli" % "0.8.0"
+    val zioCli = "dev.zio" %% "zio-cli" % "0.8.1"
 
     val zioConfig = "dev.zio" %% "zio-config" % ZioConfig
     val zioConfigMagnolia = "dev.zio" %% "zio-config-magnolia" % ZioConfig
