@@ -30,7 +30,7 @@ case class MarkdownMerge(
             }
           }
       }
-      outFile <- ZIO.attemptBlockingIO {
+      _ <- ZIO.attemptBlockingIO {
         target.overwrite(result.mkString("\n"))
       }
     } yield ()

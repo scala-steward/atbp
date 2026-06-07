@@ -21,7 +21,7 @@ case class Hubad(source: File, target: Option[File]) extends ToolCommand {
         source,
         "" :: conf.hubad.map(_.passwords).getOrElse(Nil)*
       )
-      out <- ZIO.attemptBlockingIO {
+      _ <- ZIO.attemptBlockingIO {
         pdf.setAllSecurityToBeRemoved(true)
         pdf.save(outPath.toJava)
       }
