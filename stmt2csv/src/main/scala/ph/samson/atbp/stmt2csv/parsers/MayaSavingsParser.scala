@@ -71,7 +71,7 @@ object MayaSavingsParser extends StatementParser {
     (!statementDate ~ anyLine).rep ~
       statementDate ~
       (transaction | anyLine.map(Boring.apply)).rep
-  ).map { case (prelude, date, lines) =>
+  ).map { case (_, date, lines) =>
     Statement(date.date, lines.toList.collect { case t: Transaction => t })
   }
 

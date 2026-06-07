@@ -34,7 +34,7 @@ object Extractor {
       case Nil => ZIO.fail(new IllegalStateException("No parsers"))
     }
     _ <- ZIO.logDebug(s"result:\n${parsed.mkString("\n")}")
-    - <- ZIO.acquireReleaseWith(
+    _ <- ZIO.acquireReleaseWith(
       ZIO.attemptBlockingIO(CSVWriter.open(target.toJava))
     )(w => ZIO.succeedBlocking(w.close())) { writer =>
       ZIO.attemptBlockingIO(writer.writeAll(parsed.map {
@@ -54,7 +54,7 @@ object Extractor {
       case Nil => ZIO.fail(new IllegalStateException("No parsers"))
     }
     _ <- ZIO.logDebug(s"result:\n$extract")
-    - <- ZIO.attemptBlockingIO(target.write(extract))
+    _ <- ZIO.attemptBlockingIO(target.write(extract))
   } yield {
     target
   }

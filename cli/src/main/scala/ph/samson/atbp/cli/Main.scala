@@ -106,7 +106,7 @@ object Main extends ZIOCliDefault {
       exitCode: ExitCode
   ): ZIO[Any, Nothing, Unit] =
     for {
-      - <- ZIO.logDebugCause(cause)
+      _ <- ZIO.logDebugCause(cause)
       _ <- ZIO.logError(cause.value.getMessage)
       _ <- exit(exitCode)
     } yield ()
