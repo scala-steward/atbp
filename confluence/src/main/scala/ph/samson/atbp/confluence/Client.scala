@@ -227,14 +227,13 @@ object Client {
         codec: BinaryCodec[MultiEntityResult[T]]
     ): Task[List[T]] =
       links.next match {
-        case None       => ZIO.succeed(Nil)
-        case Some(next) =>
+        case None    => ZIO.succeed(Nil)
+        case Some(_) =>
           ZIO.scoped(ZIO.logSpan("getNextPage") {
             for {
-              linksBase <- ZIO.fromEither(URL.decode(links.base))
-              nextUrl <- ZIO.fromEither(URL.decode(next))
+              nextUrl <- ZIO.fromEither(links.url)
               _ <- ZIO.logDebug(s"getNextPage: $nextUrl")
-              res <- client.url(linksBase).addUrl(nextUrl).get("")
+              res <- client.url(nextUrl).get("")
               result <- res.body.to[MultiEntityResult[T]]
               _ <- ZIO.logDebug(s"result: $result")
               next <- getNextPage(result._links)
