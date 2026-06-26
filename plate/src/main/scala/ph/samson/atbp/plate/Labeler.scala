@@ -37,7 +37,11 @@ object Labeler {
           content <- ZIO.attemptBlockingIO(
             sources.map(_.contentAsString).mkString("\n")
           )
-          sourceKeys = JiraKey.findAllMatchIn(content).map(_.group(1)).toList
+          sourceKeys = JiraKey
+            .findAllMatchIn(content)
+            .map(_.group(1))
+            .toList
+            .filterNot(excludeKey)
           (ancestors, descendants) <-
             client.getAncestors(sourceKeys) <&>
               client.getDescendants(sourceKeys)
@@ -62,12 +66,16 @@ object Labeler {
             )
             .fork
 
-          toRemove = currentKeys.filterNot(localKeys.contains)
+          toRemove: List[String] = currentKeys.filterNot(
+            localKeys.contains
+          ) ++ currentKeys.filter(excludeKey)
           _ <- ZIO
             .logInfo(s"toRemove ${toRemove.length}: $toRemove")
             .when(toRemove.nonEmpty)
           _ <- ZIO.foreachParDiscard(toRemove)(key =>
-            client.removeLabel(key, value)
+            client.removeLabel(key, value).catchAll { error =>
+              ZIO.logDebugCause(s"Failed unlabeling $key", Cause.fail(error))
+            }
           )
 
           _ <- add.join

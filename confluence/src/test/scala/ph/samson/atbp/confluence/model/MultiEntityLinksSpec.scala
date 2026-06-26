@@ -26,8 +26,7 @@ object MultiEntityLinksSpec extends ZIOSpecDefault {
     },
     test("deduplicates overlapping path suffix in base") {
       val links = MultiEntityLinks(
-        base =
-          "https://example.atlassian.net/wiki/api/v2/pages/123/children",
+        base = "https://example.atlassian.net/wiki/api/v2/pages/123/children",
         next = Some("children?cursor=abc")
       )
       assertTrue(
