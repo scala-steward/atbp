@@ -5,7 +5,8 @@ enum GameWinner {
   case PlayerA, PlayerB
 }
 
-/** Expand final match scores into atomic per-game outcomes for Glicko2 updates. */
+/** Expand final match scores into atomic per-game outcomes for Glicko2 updates.
+  */
 object ScoreExpansion {
 
   /** Game order within the match is irrelevant; only win counts matter. */

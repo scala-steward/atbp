@@ -121,13 +121,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Wrap `com.github.mrdimosthenis` `glicko2` with repo tuning (1500 / 350 / 0.06 / τ 0.5). Implement `leaderboard(snapshot)` and per-game update folding over expanded match games.
 
 **Acceptance criteria:**
-- [ ] Default parameters match spec
-- [ ] Golden-vector tests against published Glicko2 examples
-- [ ] Property: RD decreases (or stays) after games played
-- [ ] Property: ratings remain bounded for extreme inputs
+- [x] Default parameters match spec
+- [x] Golden-vector tests against published Glicko2 examples
+- [x] Property: RD decreases (or stays) after games played
+- [x] Property: ratings remain bounded for extreme inputs
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *glicko*"`
+- [x] `sbt --client "liga/testOnly *glicko*"`
 
 **Dependencies:** Task 2
 
@@ -142,8 +142,8 @@ Task 1: SBT modules (liga + liga-js scaffold)
 ---
 
 ### Checkpoint: Foundation
-- [ ] `sbt --client liga/test` passes
-- [ ] Domain + Glicko2 math verified before any I/O
+- [x] `sbt --client liga/test` passes
+- [x] Domain + Glicko2 math verified before any I/O
 
 ---
 

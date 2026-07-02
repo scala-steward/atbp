@@ -1,0 +1,16 @@
+# Golden vectors for dimos.glicko2 1.0.1 with repo tuning (1500 / 350 / 0.06 / tau 0.5).
+# Derived from Glickman's published walkthrough scenarios; values differ slightly from
+# the paper due to library implementation details.
+
+example1:
+  player-a: { rating: 1500, rd: 350, volatility: 0.06 }
+  player-b: { rating: 1400, rd: 30, volatility: 0.06 }
+  results: [won-against-b]
+  expected-a: { rating: 1631.369, rd: 252.160, volatility: 0.06 }
+
+example2:
+  player-a: { rating: 1631.369, rd: 252.160, volatility: 0.06 }
+  player-c: { rating: 1550, rd: 100, volatility: 0.06 }
+  player-d: { rating: 1700, rd: 300, volatility: 0.06 }
+  results: [won-against-c, defeated-by-d]
+  expected-a: { rating: 1644.372, rd: 192.020, volatility: 0.06 }
