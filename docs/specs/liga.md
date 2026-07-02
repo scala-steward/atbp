@@ -91,14 +91,14 @@ atbp liga serve [--data <dir>] [--port 5442] [--lan] [--new]
 
 ```
 ./club/                          # --data ./club/
-  2025/spring-open.conf          # completed period files (any depth, any name)
-  2026/fall-league.conf
+  2025/spring-open.liga          # completed period files (any depth, any name)
+  2026/fall-league.liga
   tournament-spring-2026/        # in-progress tournament (prefix tournament-)
     000001-created.json
     000002-seeded.json
 ```
 
-- Period files: HOCON files with `liga.period { ... }`, discovered **recursively** under `--data`, **excluding** `tournament-*` directories.
+- Period files: HOCON content in **`*.liga`** files with `liga.period { ... }`, discovered **recursively** under `--data`, **excluding** `tournament-*` directories.
 - Tournaments: subdirectories named `tournament-<id>/` containing append-only JSON event files.
 - **Resume rule:** on `serve` startup, if exactly one incomplete `tournament-*` dir exists, resume it automatically. If zero, allow `--new`. If more than one, fail with a list (director must complete or remove extras).
 
@@ -111,7 +111,7 @@ liga/                              → JVM core: Glicko2, period I/O, handicap, 
   src/main/scala/ph/samson/atbp/liga/
     glicko/                        → dimos.glicko2 wrapper + tuning
     model/                         → Player, Match, Period, Bracket, TournamentEvent
-    io/                            → Period file parser/writer (HOCON)
+    io/                            → Period file parser/writer (`*.liga` / HOCON)
     handicap/                      → Suggestion algorithm
     bracket/                       → Double-elim generation, seeding, advancement
     tournament/                    → Append-only event log + replay
@@ -141,7 +141,7 @@ docs/
   specs/liga.md                    → This spec (source of truth for implementation)
 
 liga/src/test/resources/
-  periods/                         → Fixture period files for tests
+  periods/                         # Fixture `*.liga` period files for tests
   tournaments/                     → Fixture event logs for replay tests
 ```
 
@@ -149,14 +149,14 @@ liga/src/test/resources/
 
 ## Domain Model
 
-### Period file (HOCON)
+### Period file (`*.liga`, HOCON content)
 
-One file = one Glicko2 rating period (typically one completed tournament).
+One file = one Glicko2 rating period (typically one completed tournament). File extension **`.liga`**; body is HOCON.
 
 ```hocon
 liga.period {
   name = "Spring 2026 Open"
-  completed = "2026-03-15"
+  completed = "2026-03-15"         # ISO-8601 date (YYYY-MM-DD); ordering key
 
   # Optional presentation metadata — does NOT affect rating math
   format = "8-ball"
@@ -178,9 +178,9 @@ liga.period {
 
 **Score → Glicko2 games:** a match with `score-a = 7, score-b = 4` expands to 11 atomic game outcomes (7 wins for A, 4 for B). Game order within the match is irrelevant.
 
-**Processing order:** period files are sorted by the **`completed` date** field (ascending). Filename and directory depth are ignored for ordering. Ties on `completed` date are a hard error — each period must have a unique completion date.
+**Processing order:** period files are sorted by the **`completed` date** field (ascending, ISO-8601 `YYYY-MM-DD`). Filename and directory depth are ignored for ordering. Ties on `completed` date are a hard error — each period must have a unique completion date.
 
-**Discovery:** scan `--data` recursively for `*.conf` files containing `liga.period`; skip any path under a `tournament-*` directory.
+**Discovery:** scan `--data` recursively for **`*.liga`** files; skip any path under a `tournament-*` directory.
 
 ### Rating lifecycle
 
@@ -245,7 +245,7 @@ Event types (v1):
 | `HandicapApplied` | Final agreed handicap before play |
 | `MatchStarted` | Locks handicap |
 | `MatchResult` | Final scores; advances bracket |
-| `TournamentCompleted` | Triggers period file emission into `--data` |
+| `TournamentCompleted` | Writes finalized period file to **`--data` root** (not inside `tournament-*` dir) |
 
 Replay: sort files by `seq`, fold into current `TournamentState`. Never mutate or delete event files. A tournament is **incomplete** until a `TournamentCompleted` event exists in its replay.
 
@@ -372,14 +372,15 @@ Per [docs/ideas/liga.md](../ideas/liga.md): single-elim, round-robin, auth, mult
 
 | # | Question | Decision |
 |---|----------|----------|
-| 1 | Period file format | **HOCON** (`.conf`); `liga.period { ... }` |
+| 1 | Period file format | **HOCON in `*.liga` files**; `liga.period { ... }` |
 | 2 | Glicko2 implementation | **`com.github.mrdimosthenis` `glicko2` 1.0.1** — JVM (`%%`) + Scala.js (`%%%`); handicap algorithm shared where practical |
 | 3 | Data layout | Single **`--data` flag** (default CWD). Period files anywhere recursively under `--data`. In-progress tournaments in **`tournament-<id>/`** subdirs. Auto-resume if exactly one incomplete tournament |
 | 4 | Serve bind | **`localhost:5442`** default. **`--lan`** exposes audience + read API on `0.0.0.0`; director stays localhost-only |
 | 5 | Audience poll interval | **5 seconds** |
 | 6 | Bracket size (v1) | **8–64** players (power of two; byes as needed) |
-| 7 | Period ordering | By **`completed` date** field ascending; duplicate dates = error |
+| 7 | Period ordering | By **`completed` date** (`YYYY-MM-DD`) ascending; duplicate dates = error |
 | 8 | SBT modules | **Separate `liga` + `liga-js`** modules |
+| 9 | Emitted period file location | **`--data` root** on tournament complete |
 
 ### Assumptions to validate (from idea doc)
 
@@ -413,7 +414,9 @@ Carried forward from [docs/ideas/liga.md](../ideas/liga.md):
 | Tournament persistence | Append-only JSON in `tournament-<id>/` under `--data` |
 | Data root | Single `--data` directory (default CWD) |
 | Period discovery | Recursive under `--data`; exclude `tournament-*` dirs |
-| Period ordering | `completed` date ascending |
+| Period ordering | `completed` date (`YYYY-MM-DD`) ascending |
+| Period file extension | `.liga` |
+| Emitted period file | Written to `--data` root on tournament complete |
 | Glicko2 library | `mrdimosthenis/glicko2` (JVM + Scala.js) |
 | Serve port | 5442 on localhost; `--lan` for audience on LAN |
 | Bracket size | 8–64 players |
