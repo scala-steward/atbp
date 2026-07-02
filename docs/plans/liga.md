@@ -98,13 +98,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Define pure `case class` types for `Player`, `PlayerRating`, `MatchResult`, `Period`, `PeriodMatch`, `HandicapSuggestion`, `Bracket`, `BracketMatch`, `TournamentState`, and `TournamentEvent` payloads — no I/O, no ZIO.
 
 **Acceptance criteria:**
-- [ ] `PlayerRating` holds rating, RD, career W–L
-- [ ] `PeriodMatch` captures scores, race-to, suggested/applied handicap
-- [ ] `BracketMatch` has lifecycle states: pending → ready → started → completed
-- [ ] Score expansion helper: `expandGames(scoreA, scoreB)` returns atomic game outcomes
+- [x] `PlayerRating` holds rating, RD, career W–L
+- [x] `PeriodMatch` captures scores, race-to, suggested/applied handicap
+- [x] `BracketMatch` has lifecycle states: pending → ready → started → completed
+- [x] Score expansion helper: `expandGames(scoreA, scoreB)` returns atomic game outcomes
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *model*"` — score expansion tests pass (`7-4` → 11 games)
+- [x] `sbt --client "liga/testOnly *model*"` — score expansion tests pass (`7-4` → 11 games)
 
 **Dependencies:** Task 1
 
