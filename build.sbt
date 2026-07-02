@@ -1,4 +1,7 @@
 import com.typesafe.sbt.packager.docker.Cmd
+import org.scalajs.linker.interface.ESVersion
+import org.scalajs.sbtplugin.ScalaJSPlugin
+import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import sbtdynver.DynVer
 
 ThisBuild / organization := "samson.ph"
@@ -16,6 +19,8 @@ lazy val root = Project("atbp", file("."))
     http,
     hubad,
     jira,
+    liga,
+    ligaJs,
     md2c,
     plate,
     retext,
@@ -25,7 +30,7 @@ lazy val root = Project("atbp", file("."))
   )
 
 lazy val cli = atbpModule("cli")
-  .dependsOn(hubad, md2c, plate, retext, stmt2csv, traceviz)
+  .dependsOn(hubad, liga, md2c, plate, retext, stmt2csv, traceviz)
   .enablePlugins(
     DockerPlugin,
     JavaAppPackaging
@@ -101,6 +106,26 @@ lazy val traceviz = atbpModule("traceviz")
 
 lazy val hubad = atbpModule("hubad")
   .settings(Dependencies.hubad)
+
+lazy val liga = atbpModule("liga")
+  .dependsOn(http)
+  .settings(Dependencies.liga)
+
+lazy val ligaJs = Project("ligaJs", file("liga-js"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    name := "atbp-liga-js",
+    Compile / packageDoc / mappings := Nil,
+    scalaJSUseMainModuleInitializer := false,
+    scalaJSLinkerConfig :=
+      scalaJSLinkerConfig.value
+        .withESFeatures(_.withESVersion(ESVersion.ES2017)),
+    libraryDependencies ++= Seq(
+      "com.github.mrdimosthenis" %%% "glicko2" % "1.0.1",
+      "com.raquo" %%% "laminar" % "17.2.1"
+    )
+  )
+  .settings(scalacOptions ++= Seq("-no-indent", "-old-syntax"))
 
 // Pseudo-project to limit usage of Atlassian repo
 lazy val adfBuilder = atbpModule("adf-builder")

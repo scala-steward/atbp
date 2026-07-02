@@ -70,15 +70,15 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Add `liga` (JVM) and `liga-js` (Scala.js) projects to `build.sbt`, register dependencies (`glicko2`, `zio-json`, `better-files`, `zio-config-typesafe`, Laminar), wire `cli.dependsOn(liga)`, and confirm `sbt --client compile` succeeds for both modules.
 
 **Acceptance criteria:**
-- [ ] `liga` module exists with package `ph.samson.atbp.liga`
-- [ ] `liga-js` module exists with `%%%` glicko2 dependency
-- [ ] `liga` aggregated in root; `cli` depends on `liga`
-- [ ] `sbt --client liga/test` runs (empty suite OK)
-- [ ] `sbt --client ligaJs/fastLinkJS` compiles (empty main OK)
+- [x] `liga` module exists with package `ph.samson.atbp.liga`
+- [x] `liga-js` module exists with `%%%` glicko2 dependency
+- [x] `liga` aggregated in root; `cli` depends on `liga`
+- [x] `sbt --client liga/test` runs (empty suite OK)
+- [x] `sbt --client ligaJs/fastLinkJS` compiles (empty main OK)
 
 **Verification:**
-- [ ] `sbt --client compile` succeeds
-- [ ] `sbt --client liga/test` succeeds
+- [x] `sbt --client compile` succeeds
+- [x] `sbt --client liga/test` succeeds
 
 **Dependencies:** None
 

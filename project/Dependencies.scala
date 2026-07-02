@@ -41,6 +41,8 @@ object Dependencies {
 
     val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
 
+    val glicko2 = "com.github.mrdimosthenis" %% "glicko2" % "1.0.1"
+
     val jsoup = "org.jsoup" % "jsoup" % "1.22.2"
 
     val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.7"
@@ -213,5 +215,21 @@ object Dependencies {
     adfBuilderJava,
     adfBuilderJavaJackson2,
     adfBuilderJavaMarkdown
+  )
+
+  val liga = libraryDependencies ++= Seq(
+    betterFiles,
+    glicko2,
+    zio,
+    zioConfig,
+    zioConfigTypesafe,
+    zioHttp,
+    zioJson,
+    TestLibs.slf4jSimple,
+    TestLibs.zioLogging,
+    TestLibs.zioLoggingSlf4j2,
+    TestLibs.zioTest,
+    TestLibs.zioTestMagnolia,
+    TestLibs.zioTestSbt
   )
 }
