@@ -113,16 +113,13 @@ lazy val liga = atbpModule("liga")
 
 lazy val ligaJs = atbpModule("liga-js")
   .enablePlugins(ScalaJSPlugin)
+  .settings(Dependencies.ligaJs)
   .settings(
     Compile / packageDoc / mappings := Nil,
     scalaJSUseMainModuleInitializer := false,
     scalaJSLinkerConfig :=
       scalaJSLinkerConfig.value
-        .withESFeatures(_.withESVersion(ESVersion.ES2017)),
-    libraryDependencies ++= Seq(
-      "com.github.mrdimosthenis" %%% "glicko2" % "1.0.1",
-      "com.raquo" %%% "laminar" % "17.2.1"
-    )
+        .withESFeatures(_.withESVersion(ESVersion.ES2017))
   )
 
 // Pseudo-project to limit usage of Atlassian repo

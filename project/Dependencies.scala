@@ -1,5 +1,6 @@
 import sbt.*
 import sbt.Keys.*
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
 
 object Dependencies {
 
@@ -41,9 +42,12 @@ object Dependencies {
 
     val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
 
-    val glicko2 = "com.github.mrdimosthenis" %% "glicko2" % "1.0.1"
+    val glicko2 =
+      Def.setting("com.github.mrdimosthenis" %%% "glicko2" % "1.0.1")
 
     val jsoup = "org.jsoup" % "jsoup" % "1.22.2"
+
+    val laminar = Def.setting("com.raquo" %%% "laminar" % "17.2.1")
 
     val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.7"
 
@@ -219,7 +223,7 @@ object Dependencies {
 
   val liga = libraryDependencies ++= Seq(
     betterFiles,
-    glicko2,
+    glicko2.value,
     zio,
     zioConfig,
     zioConfigTypesafe,
@@ -231,5 +235,10 @@ object Dependencies {
     TestLibs.zioTest,
     TestLibs.zioTestMagnolia,
     TestLibs.zioTestSbt
+  )
+
+  val ligaJs = libraryDependencies ++= Seq(
+    glicko2.value,
+    laminar.value
   )
 }

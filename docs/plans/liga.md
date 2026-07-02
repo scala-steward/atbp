@@ -74,7 +74,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 - [x] `liga-js` module exists with `%%%` glicko2 dependency
 - [x] `liga` aggregated in root; `cli` depends on `liga`
 - [x] `sbt --client liga/test` runs (empty suite OK)
-- [x] `sbt --client ligaJs/fastLinkJS` compiles (empty main OK)
+- [x] `sbt --client liga-js/fastLinkJS` compiles (empty main OK)
 
 **Verification:**
 - [x] `sbt --client compile` succeeds
