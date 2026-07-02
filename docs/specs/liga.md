@@ -1,7 +1,7 @@
 # Spec: Liga
 
 > **Source:** [docs/ideas/liga.md](../ideas/liga.md) · [docs/intent/liga.md](../intent/liga.md)  
-> **Status:** Specify — open questions resolved; awaiting final spec approval
+> **Status:** Specify — plan approved; ready for implementation
 
 ## Objective
 
@@ -93,13 +93,14 @@ atbp liga serve [--data <dir>] [--port 5442] [--lan] [--new]
 ./club/                          # --data ./club/
   2025/spring-open.liga          # completed period files (any depth, any name)
   2026/fall-league.liga
-  tournament-spring-2026/        # in-progress tournament (prefix tournament-)
+  tournament-20260315-spring-open/   # in-progress tournament (prefix tournament-)
     000001-created.json
     000002-seeded.json
 ```
 
 - Period files: HOCON content in **`*.liga`** files with `liga.period { ... }`, discovered **recursively** under `--data`, **excluding** `tournament-*` directories.
-- Tournaments: subdirectories named `tournament-<id>/` containing append-only JSON event files.
+- Tournaments: subdirectories named `tournament-<YYYYMMDD>-<slug>/` (e.g. `tournament-20260315-spring-open/`) containing append-only JSON event files. `<slug>` is the director-provided tournament name lowercased with non-alphanumeric runs replaced by `-`.
+- **Emitted period files:** on tournament complete, write `<completed-date>-<slug>.liga` to the `--data` root (e.g. `2026-03-15-spring-open.liga`).
 - **Resume rule:** on `serve` startup, if exactly one incomplete `tournament-*` dir exists, resume it automatically. If zero, allow `--new`. If more than one, fail with a list (director must complete or remove extras).
 
 ---
@@ -221,7 +222,7 @@ Display-name strings; **case-sensitive** match. Typos and renames via find-and-r
 
 ### Tournament event log (append-only JSON)
 
-Directory: `<data>/tournament-<id>/` (e.g. `./club/tournament-spring-2026/`)
+Directory: `<data>/tournament-<YYYYMMDD>-<slug>/` (e.g. `./club/tournament-20260315-spring-open/`)
 
 Each state change appends one file: `000001-created.json`, `000002-seeded.json`, …
 
@@ -381,6 +382,11 @@ Per [docs/ideas/liga.md](../ideas/liga.md): single-elim, round-robin, auth, mult
 | 7 | Period ordering | By **`completed` date** (`YYYY-MM-DD`) ascending; duplicate dates = error |
 | 8 | SBT modules | **Separate `liga` + `liga-js`** modules |
 | 9 | Emitted period file location | **`--data` root** on tournament complete |
+| 10 | Leaderboard CLI output | Fixed-width table; sort by **rating desc**; rating **integer**, RD **1 decimal**, W–L `12-8` |
+| 11 | Tournament directory ID | **`tournament-<YYYYMMDD>-<slug>/`** from director name + creation date (e.g. `tournament-20260315-spring-open/`) |
+| 12 | Emitted period filename | **`<completed-date>-<slug>.liga`** at data root (e.g. `2026-03-15-spring-open.liga`) |
+| 13 | CI for Scala.js | Defer `ligaJs` to CI until after manual E2E (Task 23) |
+| 14 | Docker entrypoint | Generic `atbp` image; explicit `atbp liga serve` |
 
 ### Assumptions to validate (from idea doc)
 
@@ -411,7 +417,7 @@ Carried forward from [docs/ideas/liga.md](../ideas/liga.md):
 | Player identity | Display-name strings |
 | Serve runtime | Single JVM on director laptop |
 | Race-to-N | Per bracket round + per-match override |
-| Tournament persistence | Append-only JSON in `tournament-<id>/` under `--data` |
+| Tournament persistence | Append-only JSON in `tournament-<YYYYMMDD>-<slug>/` under `--data` |
 | Data root | Single `--data` directory (default CWD) |
 | Period discovery | Recursive under `--data`; exclude `tournament-*` dirs |
 | Period ordering | `completed` date (`YYYY-MM-DD`) ascending |
@@ -421,22 +427,14 @@ Carried forward from [docs/ideas/liga.md](../ideas/liga.md):
 | Serve port | 5442 on localhost; `--lan` for audience on LAN |
 | Bracket size | 8–64 players |
 | Resume | Auto-resume sole incomplete `tournament-*` dir |
+| Leaderboard output | Fixed-width table; rating desc; integer rating, 1-decimal RD, `12-8` W–L |
+| Tournament dir ID | `tournament-<YYYYMMDD>-<slug>/` |
+| Emitted period filename | `<completed-date>-<slug>.liga` at data root |
+| Scala.js CI | Deferred until post-E2E |
+| Docker | Generic `atbp` entrypoint; `atbp liga serve` explicit |
 
 ---
 
-## Next Steps (after spec approval)
+## Next Steps
 
-1. **Phase 2: Plan** — implementation order, module wiring, SBT Scala.js setup, risk mitigations
-2. **Phase 3: Tasks** — discrete tasks with acceptance criteria (~5 files each)
-3. **Phase 4: Implement** — incremental delivery per task list
-
-Suggested implementation order (for Plan phase):
-
-1. `liga` core: Glicko2 + period I/O + leaderboard CLI
-2. Handicap algorithm + `liga handicap` CLI
-3. Bracket engine (double-elim, seeding)
-4. Tournament event log + replay
-5. ZIO HTTP serve + JSON API
-6. Scala.js/Laminar director UI
-7. Audience UI + polling
-8. Period file emission on tournament complete
+1. **Implement** — follow [docs/plans/liga.md](../plans/liga.md) task list starting at Task 1

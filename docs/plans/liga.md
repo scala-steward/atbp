@@ -1,7 +1,7 @@
 # Implementation Plan: Liga
 
 > **Source:** [docs/specs/liga.md](../specs/liga.md)  
-> **Status:** Plan — awaiting review and open-question resolution
+> **Status:** Plan — open questions resolved; ready for implementation
 
 ## Overview
 
@@ -209,7 +209,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 **Acceptance criteria:**
 - [ ] `--data` defaults to CWD
-- [ ] Output format is stable and human-readable (table or aligned columns)
+- [ ] Fixed-width table; sort by rating descending; rating as integer, RD to 1 decimal, W–L as `12-8`
 - [ ] Command registered under `atbp liga` with `leaderboard` as default
 
 **Verification:**
@@ -497,7 +497,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Acceptance criteria:**
 - [ ] Auto-resume sole incomplete tournament
 - [ ] Multiple incomplete → error listing dirs
-- [ ] `--new` creates `tournament-<id>/` with `TournamentCreated`
+- [ ] `--new` creates `tournament-<YYYYMMDD>-<slug>/` (e.g. `tournament-20260315-spring-open/`) from director-provided name + creation timestamp
 - [ ] `--data` defaults to CWD
 
 **Verification:**
@@ -635,7 +635,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 - [ ] Emitted file validates against period I/O parser
 - [ ] `completed` date set appropriately
 - [ ] Re-running `liga leaderboard` includes new period
-- [ ] File written to data root, not inside `tournament-*`
+- [ ] File written to data root as `<completed-date>-<slug>.liga` (e.g. `2026-03-15-spring-open.liga`), not inside `tournament-*`
 
 **Verification:**
 - [ ] Integration test: complete tournament → parse emitted file → correct ratings
@@ -707,13 +707,17 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 ---
 
-## Open Questions
+## Resolved Open Questions (from plan review)
 
-1. **Leaderboard output format** — table columns, sort order (rating desc?), decimal places for RD. Recommend: rating desc, 1 decimal RD, fixed-width table. Confirm before Task 6.
-2. **Tournament ID naming** — `tournament-<slug>` generation: timestamp-based vs director-provided name? Spec implies director provides name at creation.
-3. **Emitted period filename** — convention for `*.liga` filename on complete (e.g. `2026-03-15-spring-open.liga`)? Needs decision before Task 22.
-4. **CI for Scala.js** — spec says "ask first" for CI changes. Defer `ligaJs` to CI until after manual verification?
-5. **Docker image** — should `serve` mode be the default `cli` entrypoint in container, or remain explicit `atbp liga serve`?
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Leaderboard CLI output format | Fixed-width table; **sort by rating desc**; rating as **integer**, RD **1 decimal**, W–L as `12-8` |
+| 2 | Tournament directory ID | **`tournament-<YYYYMMDD>-<slug>/`** — slug from director-provided name (e.g. `tournament-20260315-spring-open/`) |
+| 3 | Emitted period filename | **`<completed-date>-<slug>.liga`** at `--data` root (e.g. `2026-03-15-spring-open.liga`); slug matches tournament |
+| 4 | CI for Scala.js | **Defer** `ligaJs` CI until after manual E2E verification (Task 23) |
+| 5 | Docker entrypoint | Keep **generic `atbp` entrypoint**; run `atbp liga serve` explicitly |
+
+**Slug rule:** director-provided tournament name → lowercase, trim, replace non-alphanumeric runs with `-`, collapse repeated `-`, strip leading/trailing `-`. Same slug used in tournament dir and emitted period filename.
 
 ---
 
