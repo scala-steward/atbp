@@ -98,7 +98,7 @@ atbp liga serve [--data <dir>] [--port 5442] [--lan] [--new]
     000002-seeded.json
 ```
 
-- Period files: HOCON content in **`*.liga`** files with `liga.period { ... }`, discovered **recursively** under `--data`, **excluding** `tournament-*` directories.
+- Period files: HOCON content in **`*.liga`** files (bare top-level fields, no wrapper key), discovered **recursively** under `--data`, **excluding** `tournament-*` directories.
 - Tournaments: subdirectories named `tournament-<YYYYMMDD>-<slug>/` (e.g. `tournament-20260315-spring-open/`) containing append-only JSON event files. `<slug>` is the director-provided tournament name lowercased with non-alphanumeric runs replaced by `-`.
 - **Emitted period files:** on tournament complete, write `<completed-date>-<slug>.liga` to the `--data` root (e.g. `2026-03-15-spring-open.liga`).
 - **Resume rule:** on `serve` startup, if exactly one incomplete `tournament-*` dir exists, resume it automatically. If zero, allow `--new`. If more than one, fail with a list (director must complete or remove extras).
@@ -152,29 +152,27 @@ liga/src/test/resources/
 
 ### Period file (`*.liga`, HOCON content)
 
-One file = one Glicko2 rating period (typically one completed tournament). File extension **`.liga`**; body is HOCON.
+One file = one Glicko2 rating period (typically one completed tournament). File extension **`.liga`**; body is bare HOCON (top-level fields, no wrapper key).
 
 ```hocon
-liga.period {
-  name = "Spring 2026 Open"
-  completed = "2026-03-15"         # ISO-8601 date (YYYY-MM-DD); ordering key
+name = "Spring 2026 Open"
+completed = "2026-03-15"         # ISO-8601 date (YYYY-MM-DD); ordering key
 
-  # Optional presentation metadata — does NOT affect rating math
-  format = "8-ball"
-  race-to = 7
+# Optional presentation metadata — does NOT affect rating math
+format = "8-ball"
+race-to = 7
 
-  matches = [
-    {
-      player-a = "Alice"
-      player-b = "Bob"
-      score-a = 7
-      score-b = 4
-      race-to = 7                    # effective N for this match
-      handicap-suggested = 2         # games spotted to weaker player
-      handicap-applied = 2           # agreed spot (may differ from suggested)
-    }
-  ]
-}
+matches = [
+  {
+    player-a = "Alice"
+    player-b = "Bob"
+    score-a = 7
+    score-b = 4
+    race-to = 7                    # effective N for this match
+    handicap-suggested = 2         # games spotted to weaker player
+    handicap-applied = 2           # agreed spot (may differ from suggested)
+  }
+]
 ```
 
 **Score → Glicko2 games:** a match with `score-a = 7, score-b = 4` expands to 11 atomic game outcomes (7 wins for A, 4 for B). Game order within the match is irrelevant.
@@ -373,7 +371,7 @@ Per [docs/ideas/liga.md](../ideas/liga.md): single-elim, round-robin, auth, mult
 
 | # | Question | Decision |
 |---|----------|----------|
-| 1 | Period file format | **HOCON in `*.liga` files**; `liga.period { ... }` |
+| 1 | Period file format | **HOCON in `*.liga` files**; bare top-level fields (no `liga.period` wrapper) |
 | 2 | Glicko2 implementation | **`com.github.mrdimosthenis` `glicko2` 1.0.1** — JVM (`%%`) + Scala.js (`%%%`); handicap algorithm shared where practical |
 | 3 | Data layout | Single **`--data` flag** (default CWD). Period files anywhere recursively under `--data`. In-progress tournaments in **`tournament-<id>/`** subdirs. Auto-resume if exactly one incomplete tournament |
 | 4 | Serve bind | **`localhost:5442`** default. **`--lan`** exposes audience + read API on `0.0.0.0`; director stays localhost-only |

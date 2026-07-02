@@ -153,7 +153,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 ## Task 4: Period file I/O (HOCON)
 
-**Description:** Parse and write `*.liga` files with `liga.period { ... }` structure using zio-config. Round-trip tests with fixture files.
+**Description:** Parse and write `*.liga` files as bare top-level HOCON (no wrapper key) using zio-config. Round-trip tests with fixture files.
 
 **Acceptance criteria:**
 - [ ] Parse all fields from spec (`name`, `completed`, `format`, `race-to`, `matches[]`)
