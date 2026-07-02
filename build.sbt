@@ -111,10 +111,9 @@ lazy val liga = atbpModule("liga")
   .dependsOn(http)
   .settings(Dependencies.liga)
 
-lazy val ligaJs = Project("ligaJs", file("liga-js"))
+lazy val ligaJs = atbpModule("liga-js")
   .enablePlugins(ScalaJSPlugin)
   .settings(
-    name := "atbp-liga-js",
     Compile / packageDoc / mappings := Nil,
     scalaJSUseMainModuleInitializer := false,
     scalaJSLinkerConfig :=
@@ -125,7 +124,6 @@ lazy val ligaJs = Project("ligaJs", file("liga-js"))
       "com.raquo" %%% "laminar" % "17.2.1"
     )
   )
-  .settings(scalacOptions ++= Seq("-no-indent", "-old-syntax"))
 
 // Pseudo-project to limit usage of Atlassian repo
 lazy val adfBuilder = atbpModule("adf-builder")
