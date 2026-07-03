@@ -1,42 +1,68 @@
 package ph.samson.atbp.liga.io
 
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.ConfigRenderOptions
+import com.typesafe.config.ConfigValueFactory
 import ph.samson.atbp.liga.model.*
+
+import scala.jdk.CollectionConverters.*
 
 object PeriodWriter {
 
-  def write(period: Period): String = {
-    val lines = scala.collection.mutable.ArrayBuffer.empty[String]
+  private val RenderOptions =
+    ConfigRenderOptions
+      .defaults()
+      .setOriginComments(false)
+      .setComments(false)
+      .setFormatted(true)
+      .setJson(false)
 
-    lines += s"""name = ${quote(period.name)}"""
-    lines += s"""completed = ${quote(period.completed.toString)}"""
-    period.format.foreach(format => lines += s"""format = ${quote(format)}""")
-    period.raceTo.foreach(raceTo => lines += s"""race-to = $raceTo""")
+  def write(period: Period): String =
+    toConfig(period).root().render(RenderOptions) + "\n"
 
-    lines += ""
-    lines += renderMatches(period.matches)
+  private def toConfig(period: Period) = {
+    val withCore =
+      ConfigFactory
+        .empty()
+        .withValue("name", ConfigValueFactory.fromAnyRef(period.name))
+        .withValue(
+          "completed",
+          ConfigValueFactory.fromAnyRef(period.completed.toString)
+        )
 
-    lines.mkString("\n") + "\n"
-  }
-
-  private def renderMatches(matches: List[PeriodMatch]): String =
-    if (matches.isEmpty) {
-      "matches = []"
-    } else {
-      val entries = matches.map(renderMatch).mkString("\n")
-      s"matches = [\n$entries\n]"
+    val withFormat = period.format match {
+      case Some(format) =>
+        withCore.withValue("format", ConfigValueFactory.fromAnyRef(format))
+      case None => withCore
     }
 
-  private def renderMatch(periodMatch: PeriodMatch): String =
-    s"""  {
-       |    player-a = ${quote(periodMatch.playerA.name)}
-       |    player-b = ${quote(periodMatch.playerB.name)}
-       |    score-a = ${periodMatch.scoreA}
-       |    score-b = ${periodMatch.scoreB}
-       |    race-to = ${periodMatch.raceTo}
-       |    handicap-suggested = ${periodMatch.handicapSuggested}
-       |    handicap-applied = ${periodMatch.handicapApplied}
-       |  }""".stripMargin
+    val withRaceTo = period.raceTo match {
+      case Some(raceTo) =>
+        withFormat.withValue(
+          "race-to",
+          ConfigValueFactory.fromAnyRef(raceTo: Integer)
+        )
+      case None => withFormat
+    }
 
-  private def quote(value: String): String =
-    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    withRaceTo.withValue(
+      "matches",
+      ConfigValueFactory.fromIterable(
+        period.matches.map(matchValues).asJava
+      )
+    )
+  }
+
+  private def matchValues(
+      periodMatch: PeriodMatch
+  ): java.util.Map[String, AnyRef] =
+    Map[String, AnyRef](
+      "player-a" -> periodMatch.playerA.name,
+      "player-b" -> periodMatch.playerB.name,
+      "score-a" -> Int.box(periodMatch.scoreA),
+      "score-b" -> Int.box(periodMatch.scoreB),
+      "race-to" -> Int.box(periodMatch.raceTo),
+      "handicap-suggested" -> Int.box(periodMatch.handicapSuggested),
+      "handicap-applied" -> Int.box(periodMatch.handicapApplied)
+    ).asJava
 }
