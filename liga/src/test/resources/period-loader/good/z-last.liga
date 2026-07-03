@@ -1,0 +1,14 @@
+name = "Spring League"
+completed = "2026-03-15"
+
+matches = [
+  {
+    player-a = "Alice"
+    player-b = "Carol"
+    score-a = 4
+    score-b = 7
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+]

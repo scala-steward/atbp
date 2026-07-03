@@ -182,14 +182,14 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Recursively discover `*.liga` under `--data`, exclude `tournament-*` dirs, sort by `completed` date ascending, error on duplicate dates, fold periods through Glicko2 to produce a reproducible leaderboard snapshot.
 
 **Acceptance criteria:**
-- [ ] Discovery ignores paths under `tournament-*`
-- [ ] Ordering by `completed` only (filename/depth ignored)
-- [ ] Duplicate `completed` dates → hard error with both file paths
-- [ ] Same inputs → bit-for-bit identical output (deterministic sort of players)
+- [x] Discovery ignores paths under `tournament-*`
+- [x] Ordering by `completed` only (filename/depth ignored)
+- [x] Duplicate `completed` dates → hard error with both file paths
+- [x] Same inputs → bit-for-bit identical output (deterministic sort of players)
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *PeriodLoader*"` or equivalent
-- [ ] Golden fixture: two period files → expected rating table
+- [x] `sbt --client "liga/testOnly *PeriodLoader*"` or equivalent
+- [x] Golden fixture: two period files → expected rating table
 
 **Dependencies:** Tasks 3, 4
 

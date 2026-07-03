@@ -1,0 +1,14 @@
+name = "Winter League"
+completed = "2026-01-10"
+
+matches = [
+  {
+    player-a = "Alice"
+    player-b = "Bob"
+    score-a = 7
+    score-b = 4
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+]
