@@ -226,6 +226,7 @@ object Dependencies {
     glicko2.value,
     zio,
     zioConfig,
+    zioConfigMagnolia,
     zioConfigTypesafe,
     zioHttp,
     zioJson,

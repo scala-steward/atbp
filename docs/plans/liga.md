@@ -156,14 +156,14 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Parse and write `*.liga` files as bare top-level HOCON (no wrapper key) using zio-config. Round-trip tests with fixture files.
 
 **Acceptance criteria:**
-- [ ] Parse all fields from spec (`name`, `completed`, `format`, `race-to`, `matches[]`)
-- [ ] Write produces valid HOCON that re-parses identically
-- [ ] Invalid HOCON surfaces clear errors
-- [ ] `completed` date parsed as `LocalDate` (ordering key)
+- [x] Parse all fields from spec (`name`, `completed`, `format`, `race-to`, `matches[]`)
+- [x] Write produces valid HOCON that re-parses identically
+- [x] Invalid HOCON surfaces clear errors
+- [x] `completed` date parsed as `LocalDate` (ordering key)
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *io*"`
-- [ ] Fixture round-trip in `liga/src/test/resources/periods/`
+- [x] `sbt --client "liga/testOnly *io*"`
+- [x] Fixture round-trip in `liga/src/test/resources/periods/`
 
 **Dependencies:** Task 2
 

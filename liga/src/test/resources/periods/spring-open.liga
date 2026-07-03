@@ -1,0 +1,26 @@
+name = "Spring 2026 Open"
+completed = "2026-03-15"
+
+format = "8-ball"
+race-to = 7
+
+matches = [
+  {
+    player-a = "Alice"
+    player-b = "Bob"
+    score-a = 7
+    score-b = 4
+    race-to = 7
+    handicap-suggested = 2
+    handicap-applied = 2
+  }
+  {
+    player-a = "Carol"
+    player-b = "Dave"
+    score-a = 5
+    score-b = 7
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+]
