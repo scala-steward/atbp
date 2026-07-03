@@ -36,8 +36,22 @@ object Glicko2 {
   def snapshot(player: Player, rating: Double, rd: Double): Snapshot =
     snapshot(player, rating, rd, tuning.initVolatility)
 
-  def snapshot(player: Player, rating: Double, rd: Double, volatility: Double): Snapshot =
-    Map(player -> InternalRating(player, rating, rd, volatility, wins = 0, losses = 0))
+  def snapshot(
+      player: Player,
+      rating: Double,
+      rd: Double,
+      volatility: Double
+  ): Snapshot =
+    Map(
+      player -> InternalRating(
+        player,
+        rating,
+        rd,
+        volatility,
+        wins = 0,
+        losses = 0
+      )
+    )
 
   def updateAfterGame(
       state: Snapshot,
@@ -74,22 +88,39 @@ object Glicko2 {
     state
       .updated(
         playerA,
-        InternalRating(playerA, aUpdated.rating, aUpdated.deviation, aUpdated.volatility, aWins, aLosses)
+        InternalRating(
+          playerA,
+          aUpdated.rating,
+          aUpdated.deviation,
+          aUpdated.volatility,
+          aWins,
+          aLosses
+        )
       )
       .updated(
         playerB,
-        InternalRating(playerB, bUpdated.rating, bUpdated.deviation, bUpdated.volatility, bWins, bLosses)
+        InternalRating(
+          playerB,
+          bUpdated.rating,
+          bUpdated.deviation,
+          bUpdated.volatility,
+          bWins,
+          bLosses
+        )
       )
   }
 
-  /** Apply all expanded games in one rating period (order-independent within the match). */
+  /** Apply all expanded games in one rating period (order-independent within
+    * the match).
+    */
   def updateAfterMatch(state: Snapshot, periodMatch: PeriodMatch): Snapshot = {
     val a = getOrNew(state, periodMatch.playerA)
     val b = getOrNew(state, periodMatch.playerB)
     val aGlicko = a.toGlickoPlayer
     val bGlicko = b.toGlickoPlayer
 
-    val games = ScoreExpansion.expandGames(periodMatch.scoreA, periodMatch.scoreB)
+    val games =
+      ScoreExpansion.expandGames(periodMatch.scoreA, periodMatch.scoreB)
     val aResults = games.map {
       case GameWinner.PlayerA => Result.WonAgainst(bGlicko)
       case GameWinner.PlayerB => Result.DefeatedBy(bGlicko)

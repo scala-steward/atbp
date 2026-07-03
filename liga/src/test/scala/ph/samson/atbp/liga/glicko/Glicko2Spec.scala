@@ -52,7 +52,8 @@ object Glicko2Spec extends ZIOSpecDefault {
         val state =
           Glicko2.snapshot(alice, rating = 1500, rd = 350) ++
             Glicko2.snapshot(bob, rating = 1400, rd = 30)
-        val after = Glicko2.updateAfterGame(state, alice, bob, GameWinner.PlayerA)
+        val after =
+          Glicko2.updateAfterGame(state, alice, bob, GameWinner.PlayerA)
         val a = Glicko2.ratingOf(after, alice)
         assertTrue(
           approx(1631.369, a.rating),
@@ -126,14 +127,18 @@ object Glicko2Spec extends ZIOSpecDefault {
           handicapApplied = 0
         )
         val before = Glicko2.newPlayerRating(alice)
-        val after = Glicko2.ratingOf(Glicko2.updateAfterMatch(Glicko2.empty, periodMatch), alice)
+        val after = Glicko2.ratingOf(
+          Glicko2.updateAfterMatch(Glicko2.empty, periodMatch),
+          alice
+        )
         assertTrue(after.rd <= before.rd)
       },
       test("ratings remain bounded for extreme rating gaps") {
         val state =
           Glicko2.snapshot(alice, rating = 1500, rd = 350) ++
             Glicko2.snapshot(bob, rating = 5000, rd = 50)
-        val after = Glicko2.updateAfterGame(state, alice, bob, GameWinner.PlayerA)
+        val after =
+          Glicko2.updateAfterGame(state, alice, bob, GameWinner.PlayerA)
         val a = Glicko2.ratingOf(after, alice)
         val b = Glicko2.ratingOf(after, bob)
         assertTrue(
