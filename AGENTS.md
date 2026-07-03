@@ -6,6 +6,19 @@
   a running sbt server for faster execution
 - to verify that the app starts use `sbt run`, WITHOUT `--client`, as it
   prevents interrupting the process
-- before committing, ALWAYS format all changed Scala files using `fixup` task : `sbt --client fixup`
-- ALWAYS include `fixup` results in the current commit so they don't show up as 
-  part of the commit of next changes
+
+### Commit workflow (required — never skip)
+
+Before **every** commit that touches Scala (or `build.sbt` / `project/`):
+
+1. Run `sbt --client fixup` on the changed files
+2. Run `git status` / `git diff` and confirm there are no unstaged formatting changes
+3. `git add` **all** source changes **and** any files modified by `fixup`
+4. Commit once — the commit must contain both the logic change and the `fixup` output
+
+**Never** commit until step 3 is done. Running `fixup` and then committing without
+staging its results is a workflow violation — amend or add a follow-up commit if that
+happens.
+
+`fixup` results must land in the **same** commit as the change they format, not in a
+later commit.
