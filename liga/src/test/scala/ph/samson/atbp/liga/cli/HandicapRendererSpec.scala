@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.cli
 
+import ph.samson.atbp.liga.handicap.WinProbability
 import ph.samson.atbp.liga.model.*
 import zio.test.*
 
@@ -12,14 +13,28 @@ object HandicapRendererSpec extends ZIOSpecDefault {
     PlayerRating(player, rating, rd, wins = 0, losses = 0)
 
   def spec = suite("HandicapRenderer")(
-    test("renders weaker player, suggested handicap, and race-to") {
+    test("renders weaker player, race-to, and win probabilities by handicap") {
+      val weaker = rating(bob, 1450, 90)
+      val stronger = rating(alice, 1700, 80)
       val suggestion = HandicapSuggestion(bob, handicap = 3, raceTo = 7)
-      val rendered = HandicapRenderer.render(suggestion)
+      val result = HandicapResult(weaker, stronger, suggestion)
+      val handicaps = List(0, 2, 3, 4)
+      val probabilities = handicaps.map { handicap =>
+        WinProbability.matchWinProbability(
+          weaker,
+          stronger,
+          raceTo = 7,
+          handicap = handicap
+        )
+      }
+      val probabilityCells =
+        probabilities.map(p => f"${p * 100}%.1f%%").mkString(" | ")
+      val rendered = HandicapRenderer.render(result)
       assertTrue(
         rendered ==
-          """| Weaker player | Handicap | Race-to |
-             #| --- | ---: | ---: |
-             #| Bob | 3 | 7 |
+          s"""| Weaker player | Race-to | + 0 | + 2 | + 3 | + 4 |
+             #| --- | ---: | ---: | ---: | ---: | ---: |
+             #| Bob | 7 | $probabilityCells |
              #""".stripMargin('#')
       )
     },
@@ -39,8 +54,8 @@ object HandicapRendererSpec extends ZIOSpecDefault {
       val result = HandicapRenderer.suggest(ratings, "Alice", "Bob", raceTo = 7)
       assertTrue(
         result.isRight,
-        result.exists(_.weakerPlayer == bob),
-        result.exists(_.raceTo == 7)
+        result.exists(_.suggestion.weakerPlayer == bob),
+        result.exists(_.suggestion.raceTo == 7)
       )
     }
   )
