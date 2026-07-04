@@ -49,7 +49,7 @@ object Liga {
   }
 
   private def dataDir(dataDir: Option[java.nio.file.Path]): File =
-    dataDir.map(path => File(path)).getOrElse(File("."))
+    dataDir.map(path => File(path)).getOrElse(File.currentWorkingDirectory)
 
   private val data =
     Options

@@ -21,6 +21,7 @@ object PeriodLoader {
 
   def discover(root: File): Task[List[LoadedPeriod]] =
     for {
+      _ <- ZIO.logDebug(s"loading from $root")
       files <- ZIO.attemptBlocking(DataLayout.discoverPeriodFiles(root))
       loaded <- ZIO.foreach(files)(loadFile)
       _ <- validateUniqueCompletedDates(loaded)
