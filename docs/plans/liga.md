@@ -291,13 +291,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Generate bracket for 8–64 players (round up to power of 2), seed by rating (1 vs N, 2 vs N−1), assign byes to lowest seeds, track winners/losers bracket advancement.
 
 **Acceptance criteria:**
-- [ ] Supports 8, 16, 32, 64 (and non-power-of-2 with byes)
-- [ ] Seeding order deterministic from sorted ratings
-- [ ] Bye matches auto-advance winner
-- [ ] `advance(match, winner)` returns updated bracket + next matches ready
+- [x] Supports 8, 16, 32, 64 (and non-power-of-2 with byes)
+- [x] Seeding order deterministic from sorted ratings
+- [x] Bye matches auto-advance winner
+- [x] `advance(match, winner)` returns updated bracket + next matches ready
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *bracket*"` — seeding, bye, advancement for each size
+- [x] `sbt --client "liga/testOnly *bracket*"` — seeding, bye, advancement for each size
 
 **Dependencies:** Task 2
 

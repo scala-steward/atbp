@@ -19,10 +19,10 @@ object MarkdownTableSpec extends ZIOSpecDefault {
       assertTrue(
         rendered ==
           """| Player | Rating |
-             #| ------ | -----: |
-             #| Alice  |   1700 |
-             #| Bob    |   1600 |
-             #""".stripMargin('#')
+            #| ------ | -----: |
+            #| Alice  |   1700 |
+            #| Bob    |   1600 |
+            #""".stripMargin('#')
       )
     }
   )

@@ -34,9 +34,13 @@ object MarkdownTable {
       widths: List[Int],
       aligns: List[Alignment]
   ): String =
-    "| " + cells.zip(widths).zip(aligns).map { case ((cell, width), align) =>
-      pad(cell, width, align)
-    }.mkString(" | ") + " |"
+    "| " + cells
+      .zip(widths)
+      .zip(aligns)
+      .map { case ((cell, width), align) =>
+        pad(cell, width, align)
+      }
+      .mkString(" | ") + " |"
 
   private def pad(text: String, width: Int, align: Alignment): String =
     align match {
