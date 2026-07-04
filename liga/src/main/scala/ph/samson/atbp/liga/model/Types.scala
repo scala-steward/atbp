@@ -1,6 +1,5 @@
 package ph.samson.atbp.liga.model
 
-import java.time.Instant
 import java.time.LocalDate
 
 /** Display-name player identity (case-sensitive). */
@@ -119,12 +118,4 @@ final case class MatchResultPayload(
 
 final case class TournamentCompletedPayload(
     completed: LocalDate
-)
-
-/** Append-only tournament event (JSON codecs added in a later task). */
-final case class TournamentEvent(
-    seq: Int,
-    eventType: String,
-    at: Instant,
-    payload: String
 )

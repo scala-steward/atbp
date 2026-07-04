@@ -316,12 +316,12 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Define all v1 event types (`TournamentCreated`, `RoundRaceToSet`, `BracketSeeded`, `MatchReady`, `HandicapApplied`, `MatchStarted`, `MatchResult`, `TournamentCompleted`) with zio-json codecs and `seq` field.
 
 **Acceptance criteria:**
-- [ ] Each event type matches spec payload shapes
-- [ ] JSON round-trip for every event type
-- [ ] `seq` is monotonically increasing
+- [x] Each event type matches spec payload shapes
+- [x] JSON round-trip for every event type
+- [x] `seq` is monotonically increasing
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *EventCodec*"`
+- [x] `sbt --client "liga/testOnly *EventCodec*"`
 
 **Dependencies:** Tasks 2, 9
 
