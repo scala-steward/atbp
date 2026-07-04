@@ -210,7 +210,7 @@ CLI `liga handicap` and director UI use the **same function**. Server response i
 
 ### Bracket constraints (v1)
 
-- **8–64 players**, bracket size rounded up to next power of two; byes go to lowest seeds.
+- **8–64 players**, bracket size rounded up to next power of two; byes go to **top seeds** (highest-rated players).
 - Seeding by period-start rating (1 vs N, 2 vs N−1, …).
 - Double-elimination only.
 

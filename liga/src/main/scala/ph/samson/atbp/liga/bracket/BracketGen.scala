@@ -52,11 +52,11 @@ object BracketGen {
       winners: Map[String, Player]
   ): Option[Player] =
     feeder match {
-      case BracketTopology.Feeder.Empty          => None
+      case BracketTopology.Feeder.Empty        => None
       case BracketTopology.Feeder.Seed(number) =>
         seedSlots.getOrElse(number, None)
-      case BracketTopology.Feeder.WinnerOf(id)     => winners.get(id)
-      case BracketTopology.Feeder.LoserOf(_)       => None
+      case BracketTopology.Feeder.WinnerOf(id) => winners.get(id)
+      case BracketTopology.Feeder.LoserOf(_)   => None
     }
 
   private def emptyMatch(
@@ -80,11 +80,12 @@ object BracketGen {
     def loop(current: Bracket): Bracket = {
       val byeMatch = current.matches.find(isByeMatch).map(_.id)
       byeMatch match {
-        case None => current
+        case None          => current
         case Some(matchId) =>
           val matchDef = current.matches.find(_.id == matchId).get
           val winner = matchDef.playerA.orElse(matchDef.playerB).get
-          val after = Advancement.advance(current, matchId, winner, topology).toOption.get
+          val after =
+            Advancement.advance(current, matchId, winner, topology).toOption.get
           loop(after.bracket)
       }
     }

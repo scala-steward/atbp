@@ -11,7 +11,10 @@ object Seeding {
 
   /** Standard tournament bracket slot order (1-based seed numbers). */
   def bracketSlotSeeds(bracketSize: Int): List[Int] = {
-    require(isPowerOfTwo(bracketSize), s"bracket size must be a power of two: $bracketSize")
+    require(
+      isPowerOfTwo(bracketSize),
+      s"bracket size must be a power of two: $bracketSize"
+    )
     val rounds = log2(bracketSize)
     (1 until rounds).foldLeft(List(1, 2)) { (seeds, _) =>
       val nextSize = seeds.length * 2
@@ -21,7 +24,10 @@ object Seeding {
 
   /** Round player count up to the next power of two in [8, 64]. */
   def bracketSize(playerCount: Int): Int = {
-    require(playerCount >= 8 && playerCount <= 64, s"player count must be 8–64: $playerCount")
+    require(
+      playerCount >= 8 && playerCount <= 64,
+      s"player count must be 8–64: $playerCount"
+    )
     nextPowerOfTwo(playerCount)
   }
 

@@ -288,7 +288,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 ## Task 9: Double-elimination bracket engine
 
-**Description:** Generate bracket for 8–64 players (round up to power of 2), seed by rating (1 vs N, 2 vs N−1), assign byes to lowest seeds, track winners/losers bracket advancement.
+**Description:** Generate bracket for 8–64 players (round up to power of 2), seed by rating (1 vs N, 2 vs N−1), assign byes to top seeds, track winners/losers bracket advancement.
 
 **Acceptance criteria:**
 - [x] Supports 8, 16, 32, 64 (and non-power-of-2 with byes)

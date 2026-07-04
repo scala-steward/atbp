@@ -86,8 +86,8 @@ private[bracket] object BracketTopology {
         BracketMaps(
           matches = maps.matches.updated(id, MatchDef(id, feederA, feederB)),
           winnerTo = winnerTo,
-          loserTo =
-            maps.loserTo.updated(id, losersDropTarget(winnersRounds, round, index))
+          loserTo = maps.loserTo
+            .updated(id, losersDropTarget(winnersRounds, round, index))
         )
     }
   }

@@ -25,10 +25,10 @@ object Advancement {
   ): Either[String, AdvanceResult] = {
     for {
       matchDef <- findMatch(bracket, matchId)
-      _        <- validateWinner(matchDef, winner)
-      loser    <- loserOf(matchDef, winner)
-      updated  <- completeMatch(bracket, matchId, winner)
-      placed   <- placePlayers(updated, topology, matchId, winner, loser)
+      _ <- validateWinner(matchDef, winner)
+      loser <- loserOf(matchDef, winner)
+      updated <- completeMatch(bracket, matchId, winner)
+      placed <- placePlayers(updated, topology, matchId, winner, loser)
     } yield readyNewMatches(placed, topology, matchId)
   }
 
@@ -45,7 +45,9 @@ object Advancement {
       matchDef: BracketMatch,
       winner: Player
   ): Either[String, Unit] =
-    if (matchDef.playerA.contains(winner) || matchDef.playerB.contains(winner)) {
+    if (
+      matchDef.playerA.contains(winner) || matchDef.playerB.contains(winner)
+    ) {
       Right(())
     } else {
       Left(s"$winner is not a participant in ${matchDef.id}")
@@ -105,7 +107,7 @@ object Advancement {
       player: Player
   ): Bracket =
     target match {
-      case None => bracket
+      case None                   => bracket
       case Some((targetId, slot)) =>
         val updatedMatches = bracket.matches.map { matchDef =>
           if (matchDef.id == targetId) {
@@ -143,7 +145,9 @@ object Advancement {
 
     val newlyReady =
       affectedTargets.filter { targetId =>
-        bracket.matches.find(_.id == targetId).exists(_.state == BracketMatchState.Ready)
+        bracket.matches
+          .find(_.id == targetId)
+          .exists(_.state == BracketMatchState.Ready)
       }
 
     AdvanceResult(bracket, newlyReady)

@@ -60,9 +60,12 @@ object BracketSpec extends ZIOSpecDefault {
         val byeMatches = bracket.matches.filter(m =>
           m.id.startsWith("wb-1-") && m.state == BracketMatchState.Completed
         )
+        val byeWinners =
+          byeMatches.flatMap(m => m.playerA.orElse(m.playerB)).map(_.name)
         assertTrue(
           bracket.size == 16,
-          byeMatches.size == 4
+          byeMatches.size == 4,
+          byeWinners.sorted == List("P1", "P2", "P3", "P4")
         )
       },
       test("supports bracket sizes 8, 16, 32, and 64") {
@@ -82,7 +85,10 @@ object BracketSpec extends ZIOSpecDefault {
         val after1 =
           Advancement.advance(bracket, "wb-1-4", Player("P3")).toOption.get
         val after2 =
-          Advancement.advance(after1.bracket, "wb-1-3", Player("P2")).toOption.get
+          Advancement
+            .advance(after1.bracket, "wb-1-3", Player("P2"))
+            .toOption
+            .get
         val next = findMatch(after2.bracket, "wb-2-2")
         assertTrue(
           next.playerA.contains(Player("P2")),
@@ -111,7 +117,9 @@ object BracketSpec extends ZIOSpecDefault {
     )
   )
 
-  /** Play every ready match, always picking playerA as winner, until grand final is ready. */
+  /** Play every ready match, always picking playerA as winner, until grand
+    * final is ready.
+    */
   private def playOutTournament(
       players: List[PlayerRating],
       maxSteps: Int
@@ -122,7 +130,7 @@ object BracketSpec extends ZIOSpecDefault {
         bracket
       } else {
         bracket.matches.find(_.state == BracketMatchState.Ready) match {
-          case None => bracket
+          case None       => bracket
           case Some(next) =>
             val winner = next.playerA.orElse(next.playerB).get
             Advancement.advance(bracket, next.id, winner) match {
