@@ -257,13 +257,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Wire `atbp liga handicap <player-a> <player-b> --race <n> [--data <dir>]`. Load period snapshot, look up players, print suggested spot for weaker player.
 
 **Acceptance criteria:**
-- [ ] Unknown player name → clear error
-- [ ] Output shows weaker player, suggested handicap, race-to
-- [ ] Uses frozen period-end ratings from discovered files
+- [x] Unknown player name → clear error
+- [x] Output shows weaker player, suggested handicap, race-to
+- [x] Uses frozen period-end ratings from discovered files
 
 **Verification:**
-- [ ] Manual: `atbp liga handicap Alice Bob --race 7 --data <fixtures>`
-- [ ] CLI formatting test
+- [x] Manual: `atbp liga handicap --race 7 --data <fixtures> Alice Bob`
+- [x] CLI formatting test
 
 **Dependencies:** Tasks 6, 7
 
@@ -276,8 +276,8 @@ Task 1: SBT modules (liga + liga-js scaffold)
 ---
 
 ### Checkpoint: CLI Core
-- [ ] `atbp liga leaderboard` and `atbp liga handicap` work against fixture data
-- [ ] All `liga/test` green
+- [x] `atbp liga leaderboard` and `atbp liga handicap` work against fixture data
+- [x] All `liga/test` green
 - [ ] **Human review** before tournament work
 
 ---
