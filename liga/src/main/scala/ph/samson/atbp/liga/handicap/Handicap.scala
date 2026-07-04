@@ -14,44 +14,23 @@ object Handicap {
       a: PlayerRating,
       b: PlayerRating,
       raceTo: Int
-  ): HandicapSuggestion = {
-    val (weaker, stronger) = weakerAndStronger(a, b)
-    // Spec cap: never spot more than 75% of the race length.
-    val cap = (0.75 * raceTo).floor.toInt
-    val handicap = searchHandicap(weaker, stronger, raceTo, cap)
-    HandicapSuggestion(weaker.player, handicap, raceTo)
-  }
+  ): HandicapSuggestion =
+    if (a.rating == b.rating) {
+      val weaker = List(a, b).minBy(_.player.name)
+      HandicapSuggestion(weaker.player, handicap = 0, raceTo)
+    } else {
+      val (weaker, stronger) = weakerAndStronger(a, b)
+      // Spec cap: never spot more than 75% of the race length.
+      val cap = (0.75 * raceTo).floor.toInt
+      val handicap = searchHandicap(weaker, stronger, raceTo, cap)
+      HandicapSuggestion(weaker.player, handicap, raceTo)
+    }
 
-  /** Decide which player receives the spot.
-    *
-    * Tie-break order (spec):
-    *   1. Lower Glicko2 rating → weaker (receives handicap).
-    *   2. Equal rating → lower RD → weaker (more established rating at same
-    *      number is treated as the favourite).
-    *   3. Still tied → alphabetical by display name (deterministic).
-    */
   private def weakerAndStronger(
       a: PlayerRating,
       b: PlayerRating
-  ): (PlayerRating, PlayerRating) = {
-    val byRating = a.rating.compare(b.rating)
-    if (byRating < 0) {
-      (a, b)
-    } else if (byRating > 0) {
-      (b, a)
-    } else {
-      val byRd = a.rd.compare(b.rd)
-      if (byRd < 0) {
-        (a, b)
-      } else if (byRd > 0) {
-        (b, a)
-      } else if (a.player.name <= b.player.name) {
-        (a, b)
-      } else {
-        (b, a)
-      }
-    }
-  }
+  ): (PlayerRating, PlayerRating) =
+    if (a.rating < b.rating) (a, b) else (b, a)
 
   /** Find the handicap closest to a 50% match-win probability for the weaker
     * player.

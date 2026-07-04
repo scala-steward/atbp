@@ -57,11 +57,14 @@ object HandicapSpec extends ZIOSpecDefault {
         Math.abs(probability - 0.5) <= 0.05
       )
     },
-    test("weaker player tie-break uses lower RD then alphabetical name") {
+    test("equal ratings with different RD still suggest handicap 0") {
       val a = rating(alice, 1500, rd = 80)
       val b = rating(bob, 1500, rd = 120)
       val suggestion = Handicap.suggest(a, b, raceTo = 5)
-      assertTrue(suggestion.weakerPlayer == alice)
+      assertTrue(
+        suggestion.handicap == 0,
+        suggestion.weakerPlayer == alice
+      )
     },
     test("suggest is symmetric regardless of argument order") {
       val a = rating(alice, 1650, rd = 90)
