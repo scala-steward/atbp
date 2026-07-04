@@ -36,7 +36,9 @@ object HandicapSpec extends ZIOSpecDefault {
         suggestion.handicap == 5
       )
     },
-    test("suggestion targets roughly 50% win probability for the weaker player") {
+    test(
+      "suggestion targets roughly 50% win probability for the weaker player"
+    ) {
       val a = rating(alice, 1700, rd = 80)
       val b = rating(bob, 1450, rd = 90)
       val suggestion = Handicap.suggest(a, b, raceTo = 7)
