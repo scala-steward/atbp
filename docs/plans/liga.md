@@ -233,13 +233,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Pure `Handicap.suggest(a, b, raceTo)` — weaker player by rating (tie → RD → alphabetical), binary search `h` in `[0, floor(0.75 × N)]` for ~50% win probability using per-game Glicko2 expected score with handicap offset.
 
 **Acceptance criteria:**
-- [ ] Cap never exceeds `floor(0.75 × N)`
-- [ ] Equal ratings → handicap 0 (or minimal)
-- [ ] Large rating gap → hits cap, doesn't overflow
-- [ ] Same function usable from CLI and serve (pure, no ZIO)
+- [x] Cap never exceeds `floor(0.75 × N)`
+- [x] Equal ratings → handicap 0 (or minimal)
+- [x] Large rating gap → hits cap, doesn't overflow
+- [x] Same function usable from CLI and serve (pure, no ZIO)
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *handicap*"` — edge cases, cap, symmetry
+- [x] `sbt --client "liga/testOnly *handicap*"` — edge cases, cap, symmetry
 
 **Dependencies:** Task 3
 
