@@ -9,8 +9,7 @@ object DataLayout {
   def discoverPeriodFiles(root: File): List[File] =
     if (!root.exists) Nil
     else
-      root
-        .listRecursively
+      root.listRecursively
         .filter(_.isRegularFile)
         .filter(_.extension(includeDot = false).contains("liga"))
         .filterNot(isUnderTournamentDir(_, root))

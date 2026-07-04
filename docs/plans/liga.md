@@ -208,13 +208,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Wire `atbp liga leaderboard [--data <dir>]` as default subcommand. Render rating, RD, career W–L to stdout. Register in `Main.scala`.
 
 **Acceptance criteria:**
-- [ ] `--data` defaults to CWD
-- [ ] Fixed-width table; sort by rating descending; rating as integer, RD to 1 decimal, W–L as `12-8`
-- [ ] Command registered under `atbp liga` with `leaderboard` as default
+- [x] `--data` defaults to CWD
+- [x] Fixed-width table; sort by rating descending; rating as integer, RD to 1 decimal, W–L as `12-8`
+- [x] Command registered under `atbp liga` with `leaderboard` as default
 
 **Verification:**
-- [ ] `sbt --client "cli/runMain ph.samson.atbp.cli.Main liga leaderboard --data liga/src/test/resources/periods/"`
-- [ ] CLI output formatting test
+- [x] `sbt --client "cli/runMain ph.samson.atbp.cli.Main liga leaderboard --data liga/src/test/resources/periods/"`
+- [x] CLI output formatting test
 
 **Dependencies:** Task 5
 

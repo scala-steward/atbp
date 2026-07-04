@@ -39,7 +39,9 @@ object PeriodLoader {
       .foreach(
         loaded
           .groupBy(_.period.completed)
-          .collect { case (date, entries) if entries.size > 1 => date -> entries }
+          .collect {
+            case (date, entries) if entries.size > 1 => date -> entries
+          }
       ) { case (date, entries) =>
         ZIO.fail(DuplicateCompletedDate(date, entries.map(_.file)))
       }
