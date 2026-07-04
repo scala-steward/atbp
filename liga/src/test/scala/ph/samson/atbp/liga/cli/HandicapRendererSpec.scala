@@ -1,6 +1,5 @@
 package ph.samson.atbp.liga.cli
 
-import ph.samson.atbp.liga.handicap.WinProbability
 import ph.samson.atbp.liga.model.*
 import zio.test.*
 
@@ -18,24 +17,13 @@ object HandicapRendererSpec extends ZIOSpecDefault {
       val stronger = rating(alice, 1700, 80)
       val suggestion = HandicapSuggestion(bob, handicap = 3, raceTo = 7)
       val result = HandicapResult(weaker, stronger, suggestion)
-      val handicaps = List(0, 2, 3, 4)
-      val probabilities = handicaps.map { handicap =>
-        WinProbability.matchWinProbability(
-          weaker,
-          stronger,
-          raceTo = 7,
-          handicap = handicap
-        )
-      }
-      val probabilityCells =
-        probabilities.map(p => f"${p * 100}%.1f%%").mkString(" | ")
       val rendered = HandicapRenderer.render(result)
       assertTrue(
         rendered ==
-          s"""| Weaker player | Race-to | + 0 | + 2 | + 3 | + 4 |
-             #| --- | ---: | ---: | ---: | ---: | ---: |
-             #| Bob | 7 | $probabilityCells |
-             #""".stripMargin('#')
+          """| Weaker player | Race-to |  + 0 |  + 2 |   + 3 |   + 4 |
+            #| ------------- | ------: | ---: | ---: | ----: | ----: |
+            #| Bob           |       7 | 0.7% | 4.9% | 11.8% | 25.8% |
+            #""".stripMargin('#')
       )
     },
     test("unknown player name returns clear error") {

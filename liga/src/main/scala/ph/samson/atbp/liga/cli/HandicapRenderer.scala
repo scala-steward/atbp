@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.cli
 
+import ph.samson.atbp.liga.cli.MarkdownTable.Alignment
 import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.handicap.WinProbability
 import ph.samson.atbp.liga.model.*
@@ -35,14 +36,18 @@ object HandicapRenderer {
     val handicaps =
       List(0, math.max(0, suggested - 1), suggested, suggested + 1)
     val probabilities = handicaps.map(winProbability(result, _))
-    val handicapHeaders = handicaps.map(formatSpotHeader).mkString(" | ")
-    val probabilityCells = probabilities.map(formatProbability).mkString(" | ")
-    val header = s"| Weaker player | Race-to | $handicapHeaders |"
-    val separator =
-      s"| --- | ---: | ${handicaps.map(_ => "---:").mkString(" | ")} |"
+    val spotColumns = handicaps.map { handicap =>
+      MarkdownTable.Column(formatSpotHeader(handicap), Alignment.Right)
+    }
+    val columns =
+      MarkdownTable.Column("Weaker player", Alignment.Left) ::
+        MarkdownTable.Column("Race-to", Alignment.Right) ::
+        spotColumns
     val row =
-      s"| ${suggestion.weakerPlayer.name} | ${suggestion.raceTo} | $probabilityCells |"
-    (header :: separator :: row :: Nil).mkString("\n") + "\n"
+      suggestion.weakerPlayer.name ::
+        suggestion.raceTo.toString ::
+        probabilities.map(formatProbability)
+    MarkdownTable.render(columns, List(row))
   }
 
   private def winProbability(result: HandicapResult, handicap: Int): Double =

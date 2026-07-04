@@ -17,11 +17,11 @@ object LeaderboardRendererSpec extends ZIOSpecDefault {
       val rendered = LeaderboardRenderer.render(ratings)
       assertTrue(
         rendered ==
-          """#| Player | Rating | RD | W-L |
-             #| --- | ---: | ---: | ---: |
-             #| Alice | 1700 | 99.9 | 12-8 |
-             #| Bob | 1600 | 120.5 | 5-3 |
-             #""".stripMargin('#')
+          """| Player | Rating |    RD |  W-L |
+            #| ------ | -----: | ----: | ---: |
+            #| Alice  |   1700 |  99.9 | 12-8 |
+            #| Bob    |   1600 | 120.5 |  5-3 |
+            #""".stripMargin('#')
       )
     },
     test("formats rating as integer and RD to one decimal") {
@@ -30,7 +30,7 @@ object LeaderboardRendererSpec extends ZIOSpecDefault {
       )
       val rendered = LeaderboardRenderer.render(ratings)
       assertTrue(
-        rendered.contains("| 1701 |"),
+        rendered.contains("|   1701 |"),
         rendered.contains("| 99.9 |")
       )
     }
