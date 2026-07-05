@@ -67,6 +67,7 @@ object Dependencies {
     val zioConfigYaml = "dev.zio" %% "zio-config-yaml" % ZioConfig
 
     val zioHttp = "dev.zio" %% "zio-http" % ZioHttp
+    val zioHttpTestkit = "dev.zio" %% "zio-http-testkit" % ZioHttp
 
     val zioJson = "dev.zio" %% "zio-json" % "0.9.2"
 
@@ -235,7 +236,8 @@ object Dependencies {
     TestLibs.zioLoggingSlf4j2,
     TestLibs.zioTest,
     TestLibs.zioTestMagnolia,
-    TestLibs.zioTestSbt
+    TestLibs.zioTestSbt,
+    zioHttpTestkit % Test
   )
 
   val ligaJs = libraryDependencies ++= Seq(

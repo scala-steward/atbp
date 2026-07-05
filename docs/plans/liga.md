@@ -401,12 +401,12 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** ZIO HTTP app in `liga/serve/` serving static placeholder, configurable port (default 5442), bind `127.0.0.1`. Load HOCON config for poll interval etc.
 
 **Acceptance criteria:**
-- [ ] Server starts on `127.0.0.1:5442`
-- [ ] Health or root route responds
-- [ ] Graceful shutdown on interrupt
+- [x] Server starts on `127.0.0.1:5442`
+- [x] Health or root route responds
+- [x] Graceful shutdown on interrupt
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *Serve*"` — boot test with zio-http test client
+- [x] `sbt --client "liga/testOnly *Serve*"` — boot test with zio-http test client
 - [ ] Manual: server starts without error
 
 **Dependencies:** Task 1
