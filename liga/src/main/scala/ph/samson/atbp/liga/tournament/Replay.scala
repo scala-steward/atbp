@@ -20,10 +20,12 @@ object Replay {
   def replay(events: List[TournamentEvent]): Either[String, TournamentState] =
     for {
       _ <- EventCodec.validateMonotonicSeq(events)
-      state <- events.sortBy(_.seq).foldLeft(Right(empty): Either[String, TournamentState]) {
-        case (Right(current), event) => applyEvent(current, event)
-        case (left, _)               => left
-      }
+      state <- events
+        .sortBy(_.seq)
+        .foldLeft(Right(empty): Either[String, TournamentState]) {
+          case (Right(current), event) => applyEvent(current, event)
+          case (left, _)               => left
+        }
     } yield state
 
   def isComplete(state: TournamentState): Boolean =
@@ -48,7 +50,8 @@ object Replay {
       case TournamentEvent.RoundRaceToSet(_, _, payload) =>
         Right(
           state.copy(
-            roundRaceTo = state.roundRaceTo.updated(payload.round, payload.raceTo)
+            roundRaceTo =
+              state.roundRaceTo.updated(payload.round, payload.raceTo)
           )
         )
 
@@ -92,10 +95,10 @@ object Replay {
       update: BracketMatch => BracketMatch
   ): Either[String, TournamentState] =
     state.bracket match {
-      case None => Left(s"no bracket loaded for match $matchId")
+      case None          => Left(s"no bracket loaded for match $matchId")
       case Some(bracket) =>
         bracket.matches.find(_.id == matchId) match {
-          case None => Left(s"unknown match: $matchId")
+          case None    => Left(s"unknown match: $matchId")
           case Some(_) =>
             val updatedMatches = bracket.matches.map { matchDef =>
               if (matchDef.id == matchId) {
@@ -104,7 +107,9 @@ object Replay {
                 matchDef
               }
             }
-            Right(state.copy(bracket = Some(bracket.copy(matches = updatedMatches))))
+            Right(
+              state.copy(bracket = Some(bracket.copy(matches = updatedMatches)))
+            )
         }
     }
 
@@ -138,7 +143,7 @@ object Replay {
       scoreA: Int,
       scoreB: Int
   ): Either[String, Player] =
-  if (scoreA == scoreB) {
+    if (scoreA == scoreB) {
       Left(s"tie score in ${matchDef.id}")
     } else if (scoreA > scoreB) {
       matchDef.playerA.toRight(s"no player A in ${matchDef.id}")

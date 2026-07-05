@@ -11,7 +11,7 @@
 
 Before **every** commit that touches Scala (or `build.sbt` / `project/`):
 
-1. Run `sbt --client fixup` on the changed files
+1. Run `sbt --client fixup` on the whole project. No arguments. Not just changed files.
 2. Run `git status` / `git diff` and confirm there are no unstaged formatting changes
 3. `git add` **all** source changes **and** any files modified by `fixup`
 4. Commit once — the commit must contain both the logic change and the `fixup` output

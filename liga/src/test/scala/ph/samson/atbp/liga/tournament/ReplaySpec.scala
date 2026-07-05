@@ -19,7 +19,9 @@ object ReplaySpec extends ZIOSpecDefault {
   private def eightPlayerRatings: List[PlayerRating] =
     (1 to 8).map(i => rating(s"P$i", 1700 - i * 10)).toList
 
-  private def withTempDir[R, A](f: File => ZIO[R, Throwable, A]): ZIO[R, Throwable, A] =
+  private def withTempDir[R, A](
+      f: File => ZIO[R, Throwable, A]
+  ): ZIO[R, Throwable, A] =
     ZIO.acquireReleaseWith(
       ZIO.attemptBlocking(File.newTemporaryDirectory("liga-replay"))
     )(dir => ZIO.attemptBlocking(dir.delete()).ignore)(f)
@@ -53,7 +55,8 @@ object ReplaySpec extends ZIOSpecDefault {
           loaded <- EventLog.read(dir)
           duplicate <- EventLog.append(dir, created).either
         } yield assertTrue(
-          files.map(_.name) == List("000001-created.json", "000002-seeded.json"),
+          files
+            .map(_.name) == List("000001-created.json", "000002-seeded.json"),
           loaded.size == 2,
           duplicate.isLeft
         )
@@ -95,12 +98,14 @@ object ReplaySpec extends ZIOSpecDefault {
           TournamentEvent.MatchReady(
             seq = 3,
             at = at,
-            payload = MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
+            payload =
+              MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
           ),
           TournamentEvent.HandicapApplied(
             seq = 4,
             at = at,
-            payload = HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
+            payload =
+              HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
           ),
           TournamentEvent.MatchStarted(
             seq = 5,
@@ -110,7 +115,8 @@ object ReplaySpec extends ZIOSpecDefault {
           TournamentEvent.MatchResult(
             seq = 6,
             at = at,
-            payload = MatchResultPayload(matchId = "wb-1-1", scoreA = 7, scoreB = 4)
+            payload =
+              MatchResultPayload(matchId = "wb-1-1", scoreA = 7, scoreB = 4)
           )
         )
         for {
@@ -181,8 +187,12 @@ object ReplaySpec extends ZIOSpecDefault {
         )
         for {
           _ <- ZIO.attemptBlocking {
-            dir.createChild("000002-seeded.json").write(EventCodec.encode(second))
-            dir.createChild("000001-created.json").write(EventCodec.encode(first))
+            dir
+              .createChild("000002-seeded.json")
+              .write(EventCodec.encode(second))
+            dir
+              .createChild("000001-created.json")
+              .write(EventCodec.encode(first))
           }
           loaded <- EventLog.read(dir)
         } yield assertTrue(loaded.map(_.seq) == List(1, 2))

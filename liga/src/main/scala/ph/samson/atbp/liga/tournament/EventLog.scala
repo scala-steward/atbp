@@ -27,7 +27,9 @@ object EventLog {
 
   def append(dir: File, event: TournamentEvent): Task[Unit] =
     for {
-      _ <- ZIO.attemptBlocking(dir.createDirectoryIfNotExists(createParents = true))
+      _ <- ZIO.attemptBlocking(
+        dir.createDirectoryIfNotExists(createParents = true)
+      )
       existing <- read(dir)
       expectedSeq = existing.map(_.seq).maxOption.getOrElse(0) + 1
       _ <- ZIO.when(event.seq != expectedSeq) {
@@ -48,14 +50,14 @@ object EventLog {
 
   private def suffixFor(event: TournamentEvent): String =
     event match {
-      case _: TournamentEvent.Created            => "created"
-      case _: TournamentEvent.RoundRaceToSet     => "round-race-to"
-      case _: TournamentEvent.BracketSeeded      => "seeded"
-      case _: TournamentEvent.MatchReady         => "match-ready"
-      case _: TournamentEvent.HandicapApplied    => "handicap"
-      case _: TournamentEvent.MatchStarted       => "started"
-      case _: TournamentEvent.MatchResult        => "result"
-      case _: TournamentEvent.TournamentCompleted  => "completed"
+      case _: TournamentEvent.Created             => "created"
+      case _: TournamentEvent.RoundRaceToSet      => "round-race-to"
+      case _: TournamentEvent.BracketSeeded       => "seeded"
+      case _: TournamentEvent.MatchReady          => "match-ready"
+      case _: TournamentEvent.HandicapApplied     => "handicap"
+      case _: TournamentEvent.MatchStarted        => "started"
+      case _: TournamentEvent.MatchResult         => "result"
+      case _: TournamentEvent.TournamentCompleted => "completed"
     }
 
   private def parseFile(file: File): Option[TournamentEvent] =

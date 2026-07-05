@@ -47,7 +47,8 @@ object ReplayFixtureWriter {
       TournamentEvent.HandicapApplied(
         seq = 4,
         at = at,
-        payload = HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
+        payload =
+          HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
       ),
       TournamentEvent.MatchStarted(
         seq = 5,
@@ -58,7 +59,8 @@ object ReplayFixtureWriter {
     val completed = TournamentEvent.TournamentCompleted(
       seq = 6,
       at = at,
-      payload = TournamentCompletedPayload(completed = LocalDate.parse("2026-03-15"))
+      payload =
+        TournamentCompletedPayload(completed = LocalDate.parse("2026-03-15"))
     )
 
     writeDir(root / "eight-player-seeded", List(created, seeded))
