@@ -27,17 +27,19 @@ object DirectorRoutes {
         (matchId: String, req: Request) =>
           directorOnly(req)(handleReady(ctx, matchId))
       },
-      Method.POST / "api" / "matches" / string("matchId") / "handicap" -> handler {
-        (matchId: String, req: Request) =>
-          directorOnly(req)(handleHandicap(ctx, matchId, req))
+      Method.POST / "api" / "matches" / string(
+        "matchId"
+      ) / "handicap" -> handler { (matchId: String, req: Request) =>
+        directorOnly(req)(handleHandicap(ctx, matchId, req))
       },
       Method.POST / "api" / "matches" / string("matchId") / "start" -> handler {
         (matchId: String, req: Request) =>
           directorOnly(req)(handleStart(ctx, matchId))
       },
-      Method.POST / "api" / "matches" / string("matchId") / "result" -> handler {
-        (matchId: String, req: Request) =>
-          directorOnly(req)(handleResult(ctx, matchId, req))
+      Method.POST / "api" / "matches" / string(
+        "matchId"
+      ) / "result" -> handler { (matchId: String, req: Request) =>
+        directorOnly(req)(handleResult(ctx, matchId, req))
       }
     )
 
@@ -50,16 +52,17 @@ object DirectorRoutes {
       effect: Task[Response]
   ): UIO[Response] =
     if (isLocalDirector(req)) {
-      effect.catchSome {
-        case ServeContext.CommandError(message) =>
+      effect
+        .catchSome { case ServeContext.CommandError(message) =>
           ZIO.succeed(badRequest(message))
-      }.catchAll { err =>
-        ZIO.succeed(
-          Response
-            .text(err.getMessage)
-            .status(Status.InternalServerError)
-        )
-      }
+        }
+        .catchAll { err =>
+          ZIO.succeed(
+            Response
+              .text(err.getMessage)
+              .status(Status.InternalServerError)
+          )
+        }
     } else {
       ZIO.succeed(Response.text("forbidden").status(Status.Forbidden))
     }

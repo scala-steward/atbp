@@ -58,7 +58,11 @@ object WriteApiSpec extends ZIOSpecDefault {
       (tournamentDir / "000001-created.json")
         .write(EventCodec.encode(created))
       if (seeded) {
-        File(getClass.getResource("/tournaments/eight-player-seeded/000002-seeded.json"))
+        File(
+          getClass.getResource(
+            "/tournaments/eight-player-seeded/000002-seeded.json"
+          )
+        )
           .copyTo(tournamentDir / "000002-seeded.json")
         (1 to 3).foreach { round =>
           val event = TournamentEvent.RoundRaceToSet(
@@ -66,7 +70,8 @@ object WriteApiSpec extends ZIOSpecDefault {
             at = at,
             payload = RoundRaceToSetPayload(round = round, raceTo = 7)
           )
-          (tournamentDir / EventLog.filenameFor(event)).write(EventCodec.encode(event))
+          (tournamentDir / EventLog.filenameFor(event))
+            .write(EventCodec.encode(event))
         }
       }
       val ctx = ServeContext(dataDir = dataDir, tournamentDir = tournamentDir)
@@ -77,7 +82,9 @@ object WriteApiSpec extends ZIOSpecDefault {
     ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
 
   def spec = suite("WriteApi")(
-    test("POST /api/tournament/seed creates bracket with frozen period ratings") {
+    test(
+      "POST /api/tournament/seed creates bracket with frozen period ratings"
+    ) {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
         seedBody = """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
