@@ -365,14 +365,14 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Orchestrate match lifecycle: ready → handicap applied → started (locked) → result → bracket advance. Enforce: no handicap edit after start, ratings frozen during tournament, per-round race-to defaults.
 
 **Acceptance criteria:**
-- [ ] `MatchReady` triggers handicap suggestion
-- [ ] `HandicapApplied` can differ from suggested
-- [ ] `MatchStarted` rejects further handicap changes
-- [ ] `MatchResult` advances bracket and marks next matches ready
-- [ ] Invalid transitions return typed errors
+- [x] `MatchReady` triggers handicap suggestion
+- [x] `HandicapApplied` can differ from suggested
+- [x] `MatchStarted` rejects further handicap changes
+- [x] `MatchResult` advances bracket and marks next matches ready
+- [x] Invalid transitions return typed errors
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *TournamentState*"` — full lifecycle + illegal transitions
+- [x] `sbt --client "liga/testOnly *Tournament*"` — full lifecycle + illegal transitions
 
 **Dependencies:** Tasks 7, 9, 11
 
@@ -386,8 +386,8 @@ Task 1: SBT modules (liga + liga-js scaffold)
 ---
 
 ### Checkpoint: Tournament Core
-- [ ] Replay fixtures produce correct bracket states
-- [ ] Match lifecycle rules enforced in tests
+- [x] Replay fixtures produce correct bracket states
+- [x] Match lifecycle rules enforced in tests
 - [ ] No HTTP yet — pure JVM verification
 
 ---

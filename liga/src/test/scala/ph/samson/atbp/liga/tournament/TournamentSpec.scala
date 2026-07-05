@@ -88,7 +88,9 @@ object TournamentSpec extends ZIOSpecDefault {
       test("ready rejects pending matches without both players") {
         val state = seededState()
         val pending =
-          state.bracket.get.matches.find(_.state == BracketMatchState.Pending).get
+          state.bracket.get.matches
+            .find(_.state == BracketMatchState.Pending)
+            .get
         assertTrue(Tournament.ready(state, pending.id, seq = 3, at).isLeft)
       },
       test("ready rejects started matches") {
@@ -118,7 +120,13 @@ object TournamentSpec extends ZIOSpecDefault {
           .toOption
           .get
         val result =
-          Tournament.applyHandicap(readyState, "wb-1-1", handicap = 3, seq = 4, at)
+          Tournament.applyHandicap(
+            readyState,
+            "wb-1-1",
+            handicap = 3,
+            seq = 4,
+            at
+          )
         assertTrue(
           result.isRight,
           result.toOption.get.payload.handicapApplied == 3
@@ -141,7 +149,9 @@ object TournamentSpec extends ZIOSpecDefault {
     ),
     suite("start")(
       test("MatchStarted requires handicap to be applied first") {
-        assertTrue(Tournament.start(seededState(), "wb-1-1", seq = 5, at).isLeft)
+        assertTrue(
+          Tournament.start(seededState(), "wb-1-1", seq = 5, at).isLeft
+        )
       },
       test("start succeeds after handicap applied") {
         val state = withMatch(seededState(), "wb-1-1") {
@@ -184,8 +194,10 @@ object TournamentSpec extends ZIOSpecDefault {
               TournamentEvent.HandicapApplied(
                 seq = 4,
                 at = at,
-                payload =
-                  HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 2)
+                payload = HandicapAppliedPayload(
+                  matchId = "wb-1-1",
+                  handicapApplied = 2
+                )
               ) :+
               TournamentEvent.MatchStarted(
                 seq = 5,
@@ -267,8 +279,10 @@ object TournamentSpec extends ZIOSpecDefault {
                 TournamentEvent.HandicapApplied(
                   seq = 3,
                   at = at,
-                  payload =
-                    HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 2)
+                  payload = HandicapAppliedPayload(
+                    matchId = "wb-1-1",
+                    handicapApplied = 2
+                  )
                 )
             )
             .isLeft,

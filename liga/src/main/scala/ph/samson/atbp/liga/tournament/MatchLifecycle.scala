@@ -29,8 +29,10 @@ object MatchLifecycle {
     val message: String = s"$action rejected for $matchId: $reason"
   }
 
-  final case class MissingRaceToError(matchId: String, round: Int) extends Error {
-    val message: String = s"no race-to configured for round $round (match $matchId)"
+  final case class MissingRaceToError(matchId: String, round: Int)
+      extends Error {
+    val message: String =
+      s"no race-to configured for round $round (match $matchId)"
   }
 
   final case class MissingRatingError(player: Player) extends Error {
@@ -190,7 +192,11 @@ object MatchLifecycle {
       bracket <- state.bracket.toRight(NoBracketError(): Error)
       round <- bracketRound(matchId, bracket.size)
         .toRight(
-          InvalidTransitionError(matchId, "ready", "cannot determine bracket round")
+          InvalidTransitionError(
+            matchId,
+            "ready",
+            "cannot determine bracket round"
+          )
         )
       raceTo <- state.roundRaceTo
         .get(round)

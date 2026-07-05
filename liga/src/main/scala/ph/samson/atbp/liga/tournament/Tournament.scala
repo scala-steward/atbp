@@ -6,7 +6,9 @@ import ph.samson.atbp.liga.tournament.events.TournamentEvent
 
 import java.time.Instant
 
-/** Pure tournament command handlers that validate lifecycle rules and produce events. */
+/** Pure tournament command handlers that validate lifecycle rules and produce
+  * events.
+  */
 object Tournament {
 
   type Error = MatchLifecycle.Error
