@@ -1,0 +1,188 @@
+package ph.samson.atbp.liga.serve
+
+import better.files.File
+import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.serve.ApiJson.*
+import ph.samson.atbp.liga.serve.Routes as LigaRoutes
+import ph.samson.atbp.liga.tournament.EventCodec
+import ph.samson.atbp.liga.tournament.EventLog
+import ph.samson.atbp.liga.tournament.events.TournamentEvent
+import zio.*
+import zio.http.*
+import zio.json.*
+import zio.test.*
+
+import java.net.InetAddress
+import java.time.Instant
+
+object WriteApiSpec extends ZIOSpecDefault {
+
+  private val at = Instant.parse("2026-03-15T18:00:00Z")
+
+  private val loopback: Option[InetAddress] =
+    Some(InetAddress.getLoopbackAddress)
+
+  private val remote: Option[InetAddress] =
+    Some(InetAddress.getByName("192.168.1.50"))
+
+  private def localhostPost(path: String, body: String): Request =
+    Request
+      .post(path, Body.fromString(body))
+      .copy(remoteAddress = loopback)
+
+  private def remotePost(path: String, body: String): Request =
+    Request
+      .post(path, Body.fromString(body))
+      .copy(remoteAddress = remote)
+
+  private def withTempTournament(
+      seeded: Boolean
+  ): ZIO[Any, Throwable, (ServeContext, File)] =
+    ZIO.attempt {
+      val root = File.newTemporaryDirectory("liga-write-api")
+      val dataDir = root / "data"
+      val tournamentDir = root / "tournament-test"
+      dataDir.createDirectoryIfNotExists()
+      tournamentDir.createDirectoryIfNotExists()
+      File(getClass.getResource("/periods/eight-player-seed.liga"))
+        .copyTo(dataDir / "eight-player-seed.liga")
+      val players = (1 to 8).map(i => Player(s"P$i")).toList
+      val created = TournamentEvent.Created(
+        seq = 1,
+        at = at,
+        payload = TournamentCreatedPayload(
+          name = "Spring Open",
+          players = players
+        )
+      )
+      (tournamentDir / "000001-created.json")
+        .write(EventCodec.encode(created))
+      if (seeded) {
+        File(getClass.getResource("/tournaments/eight-player-seeded/000002-seeded.json"))
+          .copyTo(tournamentDir / "000002-seeded.json")
+        (1 to 3).foreach { round =>
+          val event = TournamentEvent.RoundRaceToSet(
+            seq = round + 2,
+            at = at,
+            payload = RoundRaceToSetPayload(round = round, raceTo = 7)
+          )
+          (tournamentDir / EventLog.filenameFor(event)).write(EventCodec.encode(event))
+        }
+      }
+      val ctx = ServeContext(dataDir = dataDir, tournamentDir = tournamentDir)
+      (ctx, root)
+    }
+
+  private def cleanup(root: File): UIO[Unit] =
+    ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
+
+  def spec = suite("WriteApi")(
+    test("POST /api/tournament/seed creates bracket with frozen period ratings") {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        seedBody = """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
+        response <- LigaRoutes
+          .routes(ctx)
+          .runZIO(localhostPost("/api/tournament/seed", seedBody))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
+        seededFileExists = (ctx.tournamentDir / "000005-seeded.json").exists
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.bracket.exists(_.size == 8),
+        parsed.frozenRatings.size == 8,
+        parsed.frozenRatings.map(_.player.name).sorted == (1 to 8)
+          .map(i => s"P$i")
+          .toList,
+        parsed.roundRaceTo == Map(1 -> 7, 2 -> 7, 3 -> 7),
+        seededFileExists
+      )
+    },
+    test("seed → ready → handicap → start → result flow") {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        seed <- LigaRoutes
+          .routes(ctx)
+          .runZIO(
+            localhostPost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
+            )
+          )
+        ready <- LigaRoutes
+          .routes(ctx)
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        readyBody <- ready.body.asString
+        afterReady <- ZIO.fromEither(readyBody.fromJson[TournamentResponse])
+        handicap <- LigaRoutes
+          .routes(ctx)
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/handicap",
+              """{"handicap":3}"""
+            )
+          )
+        start <- LigaRoutes
+          .routes(ctx)
+          .runZIO(localhostPost("/api/matches/wb-1-1/start", ""))
+        result <- LigaRoutes
+          .routes(ctx)
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/result",
+              """{"scoreA":7,"scoreB":4}"""
+            )
+          )
+        resultBody <- result.body.asString
+        finalState <- ZIO.fromEither(resultBody.fromJson[TournamentResponse])
+        matchDef = finalState.bracket
+          .flatMap(_.matches.find(_.id == "wb-1-1"))
+          .get
+        _ <- cleanup(root)
+      } yield assertTrue(
+        seed.status == Status.Ok,
+        ready.status == Status.Ok,
+        afterReady.bracket
+          .flatMap(_.matches.find(_.id == "wb-1-1"))
+          .flatMap(_.handicapSuggested)
+          .nonEmpty,
+        handicap.status == Status.Ok,
+        start.status == Status.Ok,
+        result.status == Status.Ok,
+        matchDef.state == BracketMatchState.Completed,
+        matchDef.handicapApplied.contains(3),
+        matchDef.result.contains(MatchResult(7, 4))
+      )
+    },
+    test("write routes reject non-localhost requests with 403") {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        response <- LigaRoutes
+          .routes(ctx)
+          .runZIO(
+            remotePost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
+            )
+          )
+        _ <- cleanup(root)
+      } yield assertTrue(response.status == Status.Forbidden)
+    },
+    test("ready rejects illegal transition with 400") {
+      for {
+        (ctx, root) <- withTempTournament(seeded = true)
+        response <- LigaRoutes
+          .routes(ctx)
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        again <- LigaRoutes
+          .routes(ctx)
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.Ok,
+        again.status == Status.BadRequest
+      )
+    }
+  )
+}

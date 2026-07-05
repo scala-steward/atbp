@@ -1,0 +1,41 @@
+name = "Eight player seed fixture"
+completed = "2026-03-01"
+
+matches = [
+  {
+    player-a = "P1"
+    player-b = "P2"
+    score-a = 7
+    score-b = 4
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+  {
+    player-a = "P3"
+    player-b = "P4"
+    score-a = 7
+    score-b = 5
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+  {
+    player-a = "P5"
+    player-b = "P6"
+    score-a = 6
+    score-b = 7
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+  {
+    player-a = "P7"
+    player-b = "P8"
+    score-a = 7
+    score-b = 3
+    race-to = 7
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+]

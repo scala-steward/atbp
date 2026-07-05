@@ -7,7 +7,7 @@ import zio.json.EncoderOps
 object Routes {
 
   def routes(ctx: ServeContext): Routes[Any, Response] =
-    staticRoutes ++ readApi(ctx)
+    staticRoutes ++ readApi(ctx) ++ DirectorRoutes.routes(ctx)
 
   private val directorPlaceholder =
     """<!DOCTYPE html>

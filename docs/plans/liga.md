@@ -449,13 +449,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Director-only POST routes: seed, ready, handicap, start, result. Each appends an event to the log and returns updated state.
 
 **Acceptance criteria:**
-- [ ] `POST /api/tournament/seed` — creates + seeds bracket with frozen ratings
-- [ ] `POST /api/matches/:id/ready|handicap|start|result` — append events, enforce lifecycle
-- [ ] Write routes return 403 or refuse connection off localhost
+- [x] `POST /api/tournament/seed` — creates + seeds bracket with frozen ratings
+- [x] `POST /api/matches/:id/ready|handicap|start|result` — append events, enforce lifecycle
+- [x] Write routes return 403 or refuse connection off localhost
 
 **Verification:**
-- [ ] Integration test: seed → ready → handicap → start → result flow
-- [ ] Test that write routes reject non-localhost (or aren't bound on LAN)
+- [x] Integration test: seed → ready → handicap → start → result flow
+- [x] Test that write routes reject non-localhost (or aren't bound on LAN)
 
 **Dependencies:** Task 14
 

@@ -1,0 +1,101 @@
+package ph.samson.atbp.liga.tournament
+
+import ph.samson.atbp.liga.bracket.BracketGen
+import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.tournament.events.TournamentEvent
+
+import java.time.Instant
+
+/** Builds bracket seeding events from period-end ratings. */
+object Seed {
+
+  sealed trait Error {
+    def message: String
+  }
+
+  final case class TournamentCompletedError() extends Error {
+    val message: String = "tournament is already completed"
+  }
+
+  final case class AlreadySeededError() extends Error {
+    val message: String = "bracket is already seeded"
+  }
+
+  final case class NoPlayersError() extends Error {
+    val message: String = "tournament has no players"
+  }
+
+  final case class InvalidPlayerCountError(count: Int) extends Error {
+    val message: String = s"player count $count must be between 8 and 64"
+  }
+
+  final case class MissingPlayerError(name: String) extends Error {
+    val message: String = s"unknown player: $name"
+  }
+
+  def buildEvents(
+      state: TournamentState,
+      periodRatings: List[PlayerRating],
+      roundRaceTo: Map[Int, Int],
+      startSeq: Int,
+      at: Instant
+  ): Either[Error, List[TournamentEvent]] =
+    for {
+      _ <- validateState(state)
+      ratings <- resolveRatings(state.players, periodRatings)
+      _ <- validatePlayerCount(ratings.size)
+      bracket = BracketGen.generate(ratings)
+      raceToEvents = roundRaceTo.toList.sortBy(_._1).zipWithIndex.map {
+        case ((round, raceTo), index) =>
+          TournamentEvent.RoundRaceToSet(
+            seq = startSeq + index,
+            at = at,
+            payload = RoundRaceToSetPayload(round = round, raceTo = raceTo)
+          )
+      }
+      seededSeq = startSeq + raceToEvents.size
+      seeded = TournamentEvent.BracketSeeded(
+        seq = seededSeq,
+        at = at,
+        payload = BracketSeededPayload(
+          frozenRatings = ratings,
+          bracket = bracket
+        )
+      )
+    } yield raceToEvents :+ seeded
+
+  private def validateState(
+      state: TournamentState
+  ): Either[Error, Unit] =
+    if (state.completed) {
+      Left(TournamentCompletedError())
+    } else if (state.bracket.nonEmpty) {
+      Left(AlreadySeededError())
+    } else if (state.players.isEmpty) {
+      Left(NoPlayersError())
+    } else {
+      Right(())
+    }
+
+  private def validatePlayerCount(count: Int): Either[Error, Unit] =
+    if (count >= 8 && count <= 64) {
+      Right(())
+    } else {
+      Left(InvalidPlayerCountError(count))
+    }
+
+  private def resolveRatings(
+      players: List[Player],
+      periodRatings: List[PlayerRating]
+  ): Either[Error, List[PlayerRating]] = {
+    val byName = periodRatings.map(r => r.player.name -> r).toMap
+    players.foldLeft(Right(Nil): Either[Error, List[PlayerRating]]) {
+      case (Right(acc), player) =>
+        byName.get(player.name) match {
+          case Some(rating) => Right(acc :+ rating)
+          case None         => Left(MissingPlayerError(player.name))
+        }
+      case (left, _) => left
+    }
+  }
+}
