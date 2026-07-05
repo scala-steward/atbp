@@ -29,10 +29,14 @@ object Server {
   def httpConfig(config: ServeConfig): HttpServer.Config =
     HttpServer.Config.default.binding(config.host, config.port)
 
-  /** Start the HTTP server until interrupted; shuts down gracefully on interrupt. */
+  /** Start the HTTP server until interrupted; shuts down gracefully on
+    * interrupt.
+    */
   def run(config: ServeConfig): ZIO[Any, Throwable, Nothing] =
-    HttpServer.serve(routes).provide(
-      ZLayer.succeed(httpConfig(config)),
-      HttpServer.live
-    )
+    HttpServer
+      .serve(routes)
+      .provide(
+        ZLayer.succeed(httpConfig(config)),
+        HttpServer.live
+      )
 }

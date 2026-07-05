@@ -13,12 +13,17 @@ Before **every** commit that touches Scala (or `build.sbt` / `project/`):
 
 1. Run `sbt --client fixup` on the whole project. No arguments. Not just changed files.
 2. Run `git status` / `git diff` and confirm there are no unstaged formatting changes
-3. `git add` **all** source changes **and** any files modified by `fixup`
-4. Commit once — the commit must contain both the logic change and the `fixup` output
+3. If step 2 shows changes, stage them and run `fixup` again; repeat until `git status` is clean
+4. `git add` **all** source changes **and** any files modified by `fixup`
+5. Commit once — the commit must contain both the logic change and the `fixup` output
 
-**Never** commit until step 3 is done. Running `fixup` and then committing without
+**Never** commit until step 4 is done. Running `fixup` and then committing without
 staging its results is a workflow violation — amend or add a follow-up commit if that
 happens.
 
 `fixup` results must land in the **same** commit as the change they format, not in a
 later commit.
+
+**Do not report "fixup is clean"** unless `fixup` exits successfully **and** `git status`
+shows no unstaged changes afterward. A successful `fixup` exit alone is not enough —
+scalafmt may still reformat files that must be staged before the commit is complete.

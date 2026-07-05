@@ -39,7 +39,11 @@ object ServeConfig {
     }
   }
 
-  def withOverrides(base: ServeConfig, host: Option[String], port: Option[Int]): ServeConfig =
+  def withOverrides(
+      base: ServeConfig,
+      host: Option[String],
+      port: Option[Int]
+  ): ServeConfig =
     base.copy(
       host = host.getOrElse(base.host),
       port = port.getOrElse(base.port)
