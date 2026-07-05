@@ -339,14 +339,14 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Write events as `000001-created.json`, etc. Replay by sorting on `seq`, fold into `TournamentState`. Detect incomplete tournaments (no `TournamentCompleted`).
 
 **Acceptance criteria:**
-- [ ] Events never mutated or deleted
-- [ ] Replay from fixture dir reproduces expected state
-- [ ] Crash mid-sequence: partial replay matches last consistent state
-- [ ] `isComplete` = presence of `TournamentCompleted`
+- [x] Events never mutated or deleted
+- [x] Replay from fixture dir reproduces expected state
+- [x] Crash mid-sequence: partial replay matches last consistent state
+- [x] `isComplete` = presence of `TournamentCompleted`
 
 **Verification:**
-- [ ] `sbt --client "liga/testOnly *replay*"`
-- [ ] Fixtures in `liga/src/test/resources/tournaments/`
+- [x] `sbt --client "liga/testOnly *replay*"`
+- [x] Fixtures in `liga/src/test/resources/tournaments/`
 
 **Dependencies:** Task 10
 

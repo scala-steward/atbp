@@ -65,7 +65,8 @@ object EventCodecSpec extends ZIOSpecDefault {
       val event = TournamentEvent.HandicapApplied(
         seq = 5,
         at = at,
-        payload = HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
+        payload =
+          HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
       )
       assertTrue(roundTrip(event))
     },
@@ -89,7 +90,8 @@ object EventCodecSpec extends ZIOSpecDefault {
       val event = TournamentEvent.TournamentCompleted(
         seq = 8,
         at = at,
-        payload = TournamentCompletedPayload(completed = LocalDate.parse("2026-03-15"))
+        payload =
+          TournamentCompletedPayload(completed = LocalDate.parse("2026-03-15"))
       )
       assertTrue(roundTrip(event))
     },

@@ -28,8 +28,12 @@ object EventCodec {
   def decode(json: String): Either[String, TournamentEvent] =
     json.fromJson[TournamentEvent]
 
-  /** Ensures each event `seq` is strictly greater than the previous when sorted. */
-  def validateMonotonicSeq(events: List[TournamentEvent]): Either[String, Unit] = {
+  /** Ensures each event `seq` is strictly greater than the previous when
+    * sorted.
+    */
+  def validateMonotonicSeq(
+      events: List[TournamentEvent]
+  ): Either[String, Unit] = {
     val sorted = events.sortBy(_.seq)
     val violation = sorted.sliding(2).collectFirst {
       case List(previous, next) if previous.seq >= next.seq =>

@@ -76,6 +76,7 @@ final case class TournamentState(
     players: List[Player],
     bracket: Option[Bracket] = None,
     frozenRatings: Map[Player, PlayerRating] = Map.empty,
+    roundRaceTo: Map[Int, Int] = Map.empty,
     completed: Boolean = false
 )
 
