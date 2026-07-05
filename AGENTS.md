@@ -27,3 +27,15 @@ later commit.
 **Do not report "fixup is clean"** unless `fixup` exits successfully **and** `git status`
 shows no unstaged changes afterward. A successful `fixup` exit alone is not enough —
 scalafmt may still reformat files that must be staged before the commit is complete.
+
+Verify with this loop (do not skip `git status`):
+
+```bash
+sbt --client fixup && git status
+```
+
+If `git status` lists modified files, stage them, run the command again, and repeat until
+`git status` is clean. Only then stage everything and commit.
+
+In user-facing verification or commit summaries, do **not** list `fixup` as passing unless
+you ran this loop and `git status` was clean on the last iteration.

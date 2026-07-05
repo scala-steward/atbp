@@ -29,30 +29,31 @@ object Routes {
     Method.GET / "audience" -> handler(Response.html(audiencePlaceholder))
   )
 
-  private def readApi(ctx: ServeContext): Routes[Any, Response] = zio.http.Routes(
-    Method.GET / "api" / "tournament" -> handler {
-      ctx.loadTournament
-        .map(state => Response.json(ApiJson.tournamentFrom(state).toJson))
-        .catchAll(err =>
-          ZIO.succeed(
-            Response
-              .text(err.getMessage)
-              .status(Status.InternalServerError)
+  private def readApi(ctx: ServeContext): Routes[Any, Response] =
+    zio.http.Routes(
+      Method.GET / "api" / "tournament" -> handler {
+        ctx.loadTournament
+          .map(state => Response.json(ApiJson.tournamentFrom(state).toJson))
+          .catchAll(err =>
+            ZIO.succeed(
+              Response
+                .text(err.getMessage)
+                .status(Status.InternalServerError)
+            )
           )
-        )
-    },
-    Method.GET / "api" / "leaderboard" -> handler {
-      (for {
-        state <- ctx.loadTournament
-        ratings <- ctx.loadLeaderboard(state)
-      } yield Response.json(ApiJson.leaderboardFrom(ratings).toJson))
-        .catchAll(err =>
-          ZIO.succeed(
-            Response
-              .text(err.getMessage)
-              .status(Status.InternalServerError)
+      },
+      Method.GET / "api" / "leaderboard" -> handler {
+        (for {
+          state <- ctx.loadTournament
+          ratings <- ctx.loadLeaderboard(state)
+        } yield Response.json(ApiJson.leaderboardFrom(ratings).toJson))
+          .catchAll(err =>
+            ZIO.succeed(
+              Response
+                .text(err.getMessage)
+                .status(Status.InternalServerError)
+            )
           )
-        )
-    }
-  )
+      }
+    )
 }

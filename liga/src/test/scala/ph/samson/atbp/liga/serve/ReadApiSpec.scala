@@ -30,7 +30,9 @@ object ReadApiSpec extends ZIOSpecDefault {
     test("GET /api/tournament returns bracket and match handicaps") {
       val ctx = context(fixturePeriods, "eight-player-partial")
       for {
-        response <- LigaRoutes.routes(ctx).runZIO(Request.get("/api/tournament"))
+        response <- LigaRoutes
+          .routes(ctx)
+          .runZIO(Request.get("/api/tournament"))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
         matchDef = parsed.bracket
@@ -53,13 +55,17 @@ object ReadApiSpec extends ZIOSpecDefault {
     test("GET /api/leaderboard returns period-start frozen ratings") {
       val ctx = context(fixturePeriods, "eight-player-seeded")
       for {
-        response <- LigaRoutes.routes(ctx).runZIO(Request.get("/api/leaderboard"))
+        response <- LigaRoutes
+          .routes(ctx)
+          .runZIO(Request.get("/api/leaderboard"))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
       } yield assertTrue(
         response.status == Status.Ok,
         parsed.ratings.size == 8,
-        parsed.ratings.map(_.player.name).sorted == (1 to 8).map(i => s"P$i").toList,
+        parsed.ratings
+          .map(_.player.name)
+          .sorted == (1 to 8).map(i => s"P$i").toList,
         parsed.ratings.find(_.player.name == "P1").exists(_.rating == 1690.0)
       )
     },
@@ -70,14 +76,20 @@ object ReadApiSpec extends ZIOSpecDefault {
           val target = dir / "tournament-test"
           target.createDirectoryIfNotExists()
           File(
-            getClass.getResource("/tournaments/eight-player-seeded/000001-created.json")
+            getClass.getResource(
+              "/tournaments/eight-player-seeded/000001-created.json"
+            )
           ).copyTo(target / "000001-created.json")
           ServeContext(dataDir = fixturePeriods, tournamentDir = target)
         }
-        response <- LigaRoutes.routes(unseeded).runZIO(Request.get("/api/leaderboard"))
+        response <- LigaRoutes
+          .routes(unseeded)
+          .runZIO(Request.get("/api/leaderboard"))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
-        _ <- ZIO.attemptBlocking(unseeded.tournamentDir.delete(swallowIOExceptions = true))
+        _ <- ZIO.attemptBlocking(
+          unseeded.tournamentDir.delete(swallowIOExceptions = true)
+        )
       } yield assertTrue(
         parsed.ratings.nonEmpty,
         parsed.ratings.exists(_.player.name == "Alice")
