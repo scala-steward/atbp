@@ -1,21 +1,28 @@
 package ph.samson.atbp.liga.serve
 
+import better.files.File
 import ph.samson.atbp.liga.serve.Server as LigaServer
 import zio.http.*
 import zio.test.*
 
 object ServerSpec extends ZIOSpecDefault {
 
+  private val ctx = ServeContext(
+    dataDir = File(getClass.getResource("/periods")),
+    tournamentDir =
+      File(getClass.getResource("/tournaments/eight-player-seeded"))
+  )
+
   def spec = suite("Server")(
     test("GET /health returns ok") {
       for {
-        response <- LigaServer.routes.runZIO(Request.get("/health"))
+        response <- LigaServer.routes(ctx).runZIO(Request.get("/health"))
         body <- response.body.asString
       } yield assertTrue(response.status == Status.Ok, body == "ok")
     },
     test("GET / returns director placeholder HTML") {
       for {
-        response <- LigaServer.routes.runZIO(Request.get("/"))
+        response <- LigaServer.routes(ctx).runZIO(Request.get("/"))
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,
@@ -27,7 +34,7 @@ object ServerSpec extends ZIOSpecDefault {
     },
     test("GET /audience returns audience placeholder HTML") {
       for {
-        response <- LigaServer.routes.runZIO(Request.get("/audience"))
+        response <- LigaServer.routes(ctx).runZIO(Request.get("/audience"))
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,

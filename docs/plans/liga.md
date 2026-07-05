@@ -425,12 +425,12 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Implement `GET /api/tournament` and `GET /api/leaderboard` returning JSON from replayed state + period snapshot.
 
 **Acceptance criteria:**
-- [ ] `/api/tournament` returns bracket, match states, handicaps
-- [ ] `/api/leaderboard` returns period-start frozen ratings
-- [ ] JSON schema stable for frontend consumption
+- [x] `/api/tournament` returns bracket, match states, handicaps
+- [x] `/api/leaderboard` returns period-start frozen ratings
+- [x] JSON schema stable for frontend consumption
 
 **Verification:**
-- [ ] Integration test with fixture tournament dir
+- [x] Integration test with fixture tournament dir
 - [ ] `curl localhost:5442/api/tournament` after seeding
 
 **Dependencies:** Tasks 11, 12, 13
