@@ -1,0 +1,289 @@
+package ph.samson.atbp.liga.tournament
+
+import ph.samson.atbp.liga.bracket.BracketGen
+import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.tournament.events.TournamentEvent
+import zio.test.*
+
+import java.time.Instant
+
+object TournamentSpec extends ZIOSpecDefault {
+
+  private val at = Instant.parse("2026-03-15T18:00:00Z")
+
+  private def rating(name: String, r: Double): PlayerRating =
+    PlayerRating(Player(name), r, rd = 100, wins = 0, losses = 0)
+
+  private val eightPlayerRatings: List[PlayerRating] =
+    (1 to 8).map(i => rating(s"P$i", 1700 - i * 10)).toList
+
+  private def seededState(roundRaceTo: Map[Int, Int]): TournamentState = {
+    val bracket = BracketGen.generate(eightPlayerRatings)
+    TournamentState(
+      name = "Spring Open",
+      players = eightPlayerRatings.map(_.player),
+      bracket = Some(bracket),
+      frozenRatings = eightPlayerRatings.map(r => r.player -> r).toMap,
+      roundRaceTo = roundRaceTo
+    )
+  }
+
+  private def seededState(): TournamentState =
+    seededState(Map(1 -> 7, 2 -> 7, 3 -> 7))
+
+  private def seededEvents(state: TournamentState): List[TournamentEvent] =
+    List(
+      TournamentEvent.Created(
+        seq = 1,
+        at = at,
+        payload = TournamentCreatedPayload(
+          name = state.name,
+          players = state.players
+        )
+      ),
+      TournamentEvent.BracketSeeded(
+        seq = 2,
+        at = at,
+        payload = BracketSeededPayload(
+          frozenRatings = eightPlayerRatings,
+          bracket = state.bracket.get
+        )
+      )
+    )
+
+  private def matchOf(state: TournamentState, id: String): BracketMatch =
+    state.bracket.flatMap(_.matches.find(_.id == id)).get
+
+  private def withMatch(
+      state: TournamentState,
+      id: String
+  )(
+      update: BracketMatch => BracketMatch
+  ): TournamentState =
+    state.copy(
+      bracket = state.bracket.map { bracket =>
+        bracket.copy(
+          matches = bracket.matches.map { matchDef =>
+            if (matchDef.id == id) {
+              update(matchDef)
+            } else {
+              matchDef
+            }
+          }
+        )
+      }
+    )
+
+  def spec = suite("Tournament")(
+    suite("ready")(
+      test("MatchReady computes handicap suggestion from frozen ratings") {
+        val state = seededState()
+        val result = Tournament.ready(state, "wb-1-1", seq = 3, at)
+        assertTrue(
+          result.isRight,
+          result.toOption.get.payload.matchId == "wb-1-1",
+          result.toOption.get.payload.handicapSuggested >= 0
+        )
+      },
+      test("ready rejects pending matches without both players") {
+        val state = seededState()
+        val pending =
+          state.bracket.get.matches.find(_.state == BracketMatchState.Pending).get
+        assertTrue(Tournament.ready(state, pending.id, seq = 3, at).isLeft)
+      },
+      test("ready rejects started matches") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(Tournament.ready(state, "wb-1-1", seq = 3, at).isLeft)
+      }
+    ),
+    suite("handicap")(
+      test("HandicapApplied can differ from suggested") {
+        val base = seededState()
+        val readyState = Replay
+          .replay(
+            seededEvents(base) :+
+              TournamentEvent.MatchReady(
+                seq = 3,
+                at = at,
+                payload =
+                  MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
+              )
+          )
+          .toOption
+          .get
+        val result =
+          Tournament.applyHandicap(readyState, "wb-1-1", handicap = 3, seq = 4, at)
+        assertTrue(
+          result.isRight,
+          result.toOption.get.payload.handicapApplied == 3
+        )
+      },
+      test("handicap rejects started matches") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(
+          Tournament
+            .applyHandicap(state, "wb-1-1", handicap = 3, seq = 4, at)
+            .isLeft
+        )
+      }
+    ),
+    suite("start")(
+      test("MatchStarted requires handicap to be applied first") {
+        assertTrue(Tournament.start(seededState(), "wb-1-1", seq = 5, at).isLeft)
+      },
+      test("start succeeds after handicap applied") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Ready,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(Tournament.start(state, "wb-1-1", seq = 5, at).isRight)
+      }
+    ),
+    suite("result")(
+      test("MatchResult advances bracket and marks next matches ready") {
+        val base = seededState()
+        val state = withMatch(base, "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        val folded = for {
+          event <- Tournament.recordResult(
+            state,
+            "wb-1-1",
+            scoreA = 7,
+            scoreB = 4,
+            seq = 6,
+            at
+          )
+          next <- Replay.replay(
+            seededEvents(base) :+
+              TournamentEvent.MatchReady(
+                seq = 3,
+                at = at,
+                payload =
+                  MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
+              ) :+
+              TournamentEvent.HandicapApplied(
+                seq = 4,
+                at = at,
+                payload =
+                  HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 2)
+              ) :+
+              TournamentEvent.MatchStarted(
+                seq = 5,
+                at = at,
+                payload = MatchStartedPayload(matchId = "wb-1-1")
+              ) :+
+              event
+          )
+        } yield next
+        val after = folded.toOption.get
+        assertTrue(
+          folded.isRight,
+          matchOf(after, "wb-1-1").state == BracketMatchState.Completed,
+          matchOf(after, "wb-2-1").playerA.contains(Player("P1"))
+        )
+      },
+      test("result rejects matches that have not started") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Ready,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(
+          Tournament
+            .recordResult(state, "wb-1-1", scoreA = 7, scoreB = 4, seq = 6, at)
+            .isLeft
+        )
+      }
+    ),
+    suite("full lifecycle")(
+      test("ready → handicap → start → result replays cleanly") {
+        val state = seededState()
+        val seeded = seededEvents(state)
+        val ready = Tournament.ready(state, "wb-1-1", seq = 3, at).toOption.get
+        val afterReady = Replay.replay(seeded :+ ready).toOption.get
+        val handicap =
+          Tournament
+            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 4, at)
+            .toOption
+            .get
+        val afterHandicap =
+          Replay.replay(seeded :+ ready :+ handicap).toOption.get
+        val started =
+          Tournament.start(afterHandicap, "wb-1-1", seq = 5, at).toOption.get
+        val afterStart =
+          Replay.replay(seeded :+ ready :+ handicap :+ started).toOption.get
+        val result = Tournament
+          .recordResult(
+            afterStart,
+            "wb-1-1",
+            scoreA = 7,
+            scoreB = 4,
+            seq = 6,
+            at
+          )
+          .toOption
+          .get
+        val finalState =
+          Replay
+            .replay(seeded :+ ready :+ handicap :+ started :+ result)
+            .toOption
+            .get
+        val matchDef = matchOf(finalState, "wb-1-1")
+        assertTrue(
+          matchDef.state == BracketMatchState.Completed,
+          matchDef.handicapSuggested.contains(ready.payload.handicapSuggested),
+          matchDef.handicapApplied.contains(3),
+          matchDef.result.contains(MatchResult(7, 4))
+        )
+      },
+      test("illegal transitions fail during replay") {
+        val state = seededState()
+        assertTrue(
+          Replay
+            .replay(
+              seededEvents(state) :+
+                TournamentEvent.HandicapApplied(
+                  seq = 3,
+                  at = at,
+                  payload =
+                    HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 2)
+                )
+            )
+            .isLeft,
+          Replay
+            .replay(
+              seededEvents(state) :+
+                TournamentEvent.MatchStarted(
+                  seq = 3,
+                  at = at,
+                  payload = MatchStartedPayload(matchId = "wb-1-1")
+                )
+            )
+            .isLeft
+        )
+      }
+    )
+  )
+}

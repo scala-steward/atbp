@@ -64,29 +64,51 @@ object Replay {
         )
 
       case TournamentEvent.MatchReady(_, _, payload) =>
-        updateMatch(state, payload.matchId) { matchDef =>
-          matchDef.copy(
-            state = BracketMatchState.Ready,
-            handicapSuggested = Some(payload.handicapSuggested)
-          )
-        }
+        for {
+          matchDef <- findMatch(state, payload.matchId)
+          _ <- MatchLifecycle.validateReady(state, matchDef).left.map(_.message)
+          updated <- updateMatch(state, payload.matchId) { current =>
+            current.copy(handicapSuggested = Some(payload.handicapSuggested))
+          }
+        } yield updated
 
       case TournamentEvent.HandicapApplied(_, _, payload) =>
-        updateMatch(state, payload.matchId) { matchDef =>
-          matchDef.copy(handicapApplied = Some(payload.handicapApplied))
-        }
+        for {
+          _ <- MatchLifecycle.requireActive(state).left.map(_.message)
+          matchDef <- findMatch(state, payload.matchId)
+          _ <- MatchLifecycle.validateHandicap(matchDef).left.map(_.message)
+          updated <- updateMatch(state, payload.matchId) { current =>
+            current.copy(handicapApplied = Some(payload.handicapApplied))
+          }
+        } yield updated
 
       case TournamentEvent.MatchStarted(_, _, payload) =>
-        updateMatch(state, payload.matchId) { matchDef =>
-          matchDef.copy(state = BracketMatchState.Started)
-        }
+        for {
+          _ <- MatchLifecycle.requireActive(state).left.map(_.message)
+          matchDef <- findMatch(state, payload.matchId)
+          _ <- MatchLifecycle.validateStart(matchDef).left.map(_.message)
+          updated <- updateMatch(state, payload.matchId) { current =>
+            current.copy(state = BracketMatchState.Started)
+          }
+        } yield updated
 
       case TournamentEvent.MatchResult(_, _, payload) =>
-        applyMatchResult(state, payload)
+        for {
+          _ <- MatchLifecycle.requireActive(state).left.map(_.message)
+          matchDef <- findMatch(state, payload.matchId)
+          _ <- MatchLifecycle.validateResult(matchDef).left.map(_.message)
+          result <- applyMatchResult(state, payload)
+        } yield result
 
       case TournamentEvent.TournamentCompleted(_, _, _) =>
         Right(state.copy(completed = true))
     }
+
+  private def findMatch(
+      state: TournamentState,
+      matchId: String
+  ): Either[String, BracketMatch] =
+    MatchLifecycle.findMatch(state, matchId).left.map(_.message)
 
   private def updateMatch(
       state: TournamentState,
@@ -94,24 +116,17 @@ object Replay {
   )(
       update: BracketMatch => BracketMatch
   ): Either[String, TournamentState] =
-    state.bracket match {
-      case None          => Left(s"no bracket loaded for match $matchId")
-      case Some(bracket) =>
-        bracket.matches.find(_.id == matchId) match {
-          case None    => Left(s"unknown match: $matchId")
-          case Some(_) =>
-            val updatedMatches = bracket.matches.map { matchDef =>
-              if (matchDef.id == matchId) {
-                update(matchDef)
-              } else {
-                matchDef
-              }
-            }
-            Right(
-              state.copy(bracket = Some(bracket.copy(matches = updatedMatches)))
-            )
+    for {
+      _ <- findMatch(state, matchId).map(_ => ())
+      bracket <- state.bracket.toRight(s"no bracket loaded for match $matchId")
+      updatedMatches = bracket.matches.map { matchDef =>
+        if (matchDef.id == matchId) {
+          update(matchDef)
+        } else {
+          matchDef
         }
-    }
+      }
+    } yield state.copy(bracket = Some(bracket.copy(matches = updatedMatches)))
 
   private def applyMatchResult(
       state: TournamentState,
