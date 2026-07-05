@@ -167,15 +167,21 @@ matches = [
     player-a = "Alice"
     player-b = "Bob"
     score-a = 7
-    score-b = 4
-    race-to = 7                    # effective N for this match
-    handicap-suggested = 2         # games spotted to weaker player
-    handicap-applied = 2           # agreed spot (may differ from suggested)
+    score-b = 3                      # racks won in play (not board total)
+    race-to = 7                        # effective N for this match
+    handicap-suggested = 2             # games spotted to weaker player
+    handicap-applied = 2               # agreed spot (may differ from suggested)
   }
 ]
 ```
 
-**Score → Glicko2 games:** a match with `score-a = 7, score-b = 4` expands to 11 atomic game outcomes (7 wins for A, 4 for B). Game order within the match is irrelevant.
+**Scores vs handicaps:** `score-a` and `score-b` are **racks actually won in play** — spotted games are **not** included. Handicap fields are match metadata only; they do **not** enter Glicko2 math. The weaker player (by period-start rating; tie → RD → alphabetical) receives the spot.
+
+**Score → Glicko2 games:** racks expand directly to atomic game outcomes — e.g. `score-a = 7, score-b = 3` → 10 games (7 for A, 3 for B). Game order within the match is irrelevant.
+
+**Example:** race-to-7, Bob (weaker) spotted 2, final board **7–5** (Alice wins). Period file stores `score-a = 7`, `score-b = 3`, `handicap-applied = 2` — Bob's 5 on the board is 2 spotted + 3 racks won.
+
+**Tournament vs period scores:** during a tournament, `MatchResult` events record **scoreboard totals** (what the director sees) for bracket advancement and display. On `TournamentCompleted`, period emission converts each completed match to rack-only `score-a` / `score-b` by subtracting `handicap-applied` from the spotted player's board score (never below 0).
 
 **Processing order:** period files are sorted by the **`completed` date** field (ascending, ISO-8601 `YYYY-MM-DD`). Filename and directory depth are ignored for ordering. Ties on `completed` date are a hard error — each period must have a unique completion date.
 
@@ -243,7 +249,7 @@ Event types (v1):
 | `MatchReady` | Handicap suggested; director may still edit |
 | `HandicapApplied` | Final agreed handicap before play |
 | `MatchStarted` | Locks handicap |
-| `MatchResult` | Final scores; advances bracket |
+| `MatchResult` | Final **scoreboard** totals; advances bracket (see period file score semantics below) |
 | `TournamentCompleted` | Writes finalized period file to **`--data` root** (not inside `tournament-*` dir) |
 
 Replay: sort files by `seq`, fold into current `TournamentState`. Never mutate or delete event files. A tournament is **incomplete** until a `TournamentCompleted` event exists in its replay.
@@ -318,11 +324,12 @@ case class LigaLeaderboard(periods: File) extends ToolCommand {
 | Concern | Level | Location | Approach |
 |---------|-------|----------|----------|
 | Glicko2 math | Unit | `liga/.../glicko/*Spec.scala` | Golden vectors from published examples + property tests (ratings bounded, RD decreases with play) |
-| Score expansion | Unit | `liga/.../model/*Spec.scala` | `7-4` → 11 games |
+| Score expansion | Unit | `liga/.../model/*Spec.scala` | Rack-only scores: `7-3` → 10 games (handicap excluded) |
 | Handicap cap | Unit | `liga/.../handicap/*Spec.scala` | Extreme rating gaps never exceed `0.75 × N` |
 | Period I/O | Unit | `liga/.../io/*Spec.scala` | Parse fixture HOCON → domain → write → re-parse |
 | Bracket logic | Unit | `liga/.../bracket/*Spec.scala` | 8/16/32/64 seeding, bye, winners/losers advancement |
 | Event replay | Unit | `liga/.../tournament/*Spec.scala` | Fixture event dirs → expected state; crash mid-sequence |
+| Period emission | Unit | `liga/.../tournament/PeriodEmissionSpec.scala` | Scoreboard → rack-only conversion; handicapped match Glicko2 game count |
 | CLI | Unit | `liga/.../cli/*Spec.scala` | Leaderboard + handicap output formatting |
 | HTTP API | Integration | `liga/.../serve/*Spec.scala` | zio-http test client against routes |
 | Frontend | Manual (v1) | — | Director flow + audience on second window; automated JS tests deferred |
