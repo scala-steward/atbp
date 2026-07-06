@@ -43,15 +43,12 @@ object DirectorRoutes {
       }
     )
 
-  private def isLocalDirector(req: Request): Boolean =
-    req.remoteAddress.forall(_.isLoopbackAddress)
-
   private def directorOnly(
       req: Request
   )(
       effect: Task[Response]
   ): UIO[Response] =
-    if (isLocalDirector(req)) {
+    if (BindConfig.isLocalDirector(req)) {
       effect
         .catchSome { case ServeContext.CommandError(message) =>
           ZIO.succeed(badRequest(message))

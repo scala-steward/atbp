@@ -472,12 +472,12 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Default: all routes on `127.0.0.1`. With `--lan`: audience routes (`/audience`, `/api/tournament`, `/api/leaderboard`) also on `0.0.0.0`; director routes stay localhost-only.
 
 **Acceptance criteria:**
-- [ ] `--lan` exposes read API + `/audience` on LAN
-- [ ] `POST` routes never reachable off localhost
-- [ ] `/` director SPA localhost-only even with `--lan`
+- [x] `--lan` exposes read API + `/audience` on LAN
+- [x] `POST` routes never reachable off localhost
+- [x] `/` director SPA localhost-only even with `--lan`
 
 **Verification:**
-- [ ] Test: read routes accessible on secondary interface; write routes not
+- [x] Test: read routes accessible on secondary interface; write routes not
 - [ ] Manual: phone/TV on LAN can hit `/api/tournament`
 
 **Dependencies:** Task 15

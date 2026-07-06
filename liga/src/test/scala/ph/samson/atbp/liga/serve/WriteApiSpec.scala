@@ -89,7 +89,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         (ctx, root) <- withTempTournament(seeded = false)
         seedBody = """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
         response <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/tournament/seed", seedBody))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
@@ -110,7 +110,7 @@ object WriteApiSpec extends ZIOSpecDefault {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
         seed <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(
             localhostPost(
               "/api/tournament/seed",
@@ -118,12 +118,12 @@ object WriteApiSpec extends ZIOSpecDefault {
             )
           )
         ready <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
         readyBody <- ready.body.asString
         afterReady <- ZIO.fromEither(readyBody.fromJson[TournamentResponse])
         handicap <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(
             localhostPost(
               "/api/matches/wb-1-1/handicap",
@@ -131,10 +131,10 @@ object WriteApiSpec extends ZIOSpecDefault {
             )
           )
         start <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/start", ""))
         result <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(
             localhostPost(
               "/api/matches/wb-1-1/result",
@@ -166,7 +166,7 @@ object WriteApiSpec extends ZIOSpecDefault {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
         response <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(
             remotePost(
               "/api/tournament/seed",
@@ -180,10 +180,10 @@ object WriteApiSpec extends ZIOSpecDefault {
       for {
         (ctx, root) <- withTempTournament(seeded = true)
         response <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
         again <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
         _ <- cleanup(root)
       } yield assertTrue(

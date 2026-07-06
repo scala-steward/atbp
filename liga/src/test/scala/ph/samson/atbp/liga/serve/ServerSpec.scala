@@ -16,13 +16,17 @@ object ServerSpec extends ZIOSpecDefault {
   def spec = suite("Server")(
     test("GET /health returns ok") {
       for {
-        response <- LigaServer.routes(ctx).runZIO(Request.get("/health"))
+        response <- LigaServer
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/health"))
         body <- response.body.asString
       } yield assertTrue(response.status == Status.Ok, body == "ok")
     },
     test("GET / returns director placeholder HTML") {
       for {
-        response <- LigaServer.routes(ctx).runZIO(Request.get("/"))
+        response <- LigaServer
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/"))
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,
@@ -34,15 +38,17 @@ object ServerSpec extends ZIOSpecDefault {
     },
     test("GET /audience returns audience placeholder HTML") {
       for {
-        response <- LigaServer.routes(ctx).runZIO(Request.get("/audience"))
+        response <- LigaServer
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/audience"))
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,
         body.contains("Liga audience")
       )
     },
-    test("default ServeConfig binds localhost:5442") {
-      val httpConfig = LigaServer.httpConfig(ServeConfig.default)
+    test("default BindConfig binds localhost:5442") {
+      val httpConfig = LigaServer.httpConfig(BindConfig())
       assertTrue(
         httpConfig.address.getHostString == "127.0.0.1",
         httpConfig.address.getPort == 5442

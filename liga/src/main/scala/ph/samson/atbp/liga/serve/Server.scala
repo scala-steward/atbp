@@ -6,23 +6,26 @@ import zio.http.Server as HttpServer
 
 object Server {
 
-  def routes(ctx: ServeContext): Routes[Any, Response] =
-    ph.samson.atbp.liga.serve.Routes.routes(ctx)
+  def routes(
+      ctx: ServeContext,
+      bind: BindConfig
+  ): Routes[Any, Response] =
+    ph.samson.atbp.liga.serve.Routes.routes(ctx, bind)
 
-  def httpConfig(config: ServeConfig): HttpServer.Config =
-    HttpServer.Config.default.binding(config.host, config.port)
+  def httpConfig(bind: BindConfig): HttpServer.Config =
+    HttpServer.Config.default.binding(bind.bindHost, bind.port)
 
   /** Start the HTTP server until interrupted; shuts down gracefully on
     * interrupt.
     */
   def run(
-      config: ServeConfig,
+      bind: BindConfig,
       ctx: ServeContext
   ): ZIO[Any, Throwable, Nothing] =
     HttpServer
-      .serve(routes(ctx))
+      .serve(routes(ctx, bind))
       .provide(
-        ZLayer.succeed(httpConfig(config)),
+        ZLayer.succeed(httpConfig(bind)),
         HttpServer.live
       )
 }

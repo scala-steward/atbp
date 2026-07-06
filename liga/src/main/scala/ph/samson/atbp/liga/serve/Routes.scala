@@ -6,8 +6,11 @@ import zio.json.EncoderOps
 
 object Routes {
 
-  def routes(ctx: ServeContext): Routes[Any, Response] =
-    staticRoutes ++ readApi(ctx) ++ DirectorRoutes.routes(ctx)
+  def routes(
+      ctx: ServeContext,
+      bind: BindConfig
+  ): Routes[Any, Response] =
+    staticRoutes(bind) ++ readApi(ctx) ++ DirectorRoutes.routes(ctx)
 
   private val directorPlaceholder =
     """<!DOCTYPE html>
@@ -23,11 +26,18 @@ object Routes {
       |<body><p>Liga audience display (coming soon)</p></body>
       |</html>""".stripMargin
 
-  private val staticRoutes: Routes[Any, Response] = zio.http.Routes(
-    Method.GET / "health" -> handler(Response.text("ok")),
-    Method.GET / Root -> handler(Response.html(directorPlaceholder)),
-    Method.GET / "audience" -> handler(Response.html(audiencePlaceholder))
-  )
+  private def staticRoutes(bind: BindConfig): Routes[Any, Response] =
+    zio.http.Routes(
+      Method.GET / "health" -> handler(Response.text("ok")),
+      Method.GET / Root -> handler { (req: Request) =>
+        if (bind.lan && !bind.isLocalDirector(req)) {
+          ZIO.succeed(Response.text("forbidden").status(Status.Forbidden))
+        } else {
+          ZIO.succeed(Response.html(directorPlaceholder))
+        }
+      },
+      Method.GET / "audience" -> handler(Response.html(audiencePlaceholder))
+    )
 
   private def readApi(ctx: ServeContext): Routes[Any, Response] =
     zio.http.Routes(

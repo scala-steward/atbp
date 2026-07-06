@@ -31,7 +31,7 @@ object ReadApiSpec extends ZIOSpecDefault {
       val ctx = context(fixturePeriods, "eight-player-partial")
       for {
         response <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(Request.get("/api/tournament"))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
@@ -56,7 +56,7 @@ object ReadApiSpec extends ZIOSpecDefault {
       val ctx = context(fixturePeriods, "eight-player-seeded")
       for {
         response <- LigaRoutes
-          .routes(ctx)
+          .routes(ctx, BindConfig())
           .runZIO(Request.get("/api/leaderboard"))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
@@ -83,7 +83,7 @@ object ReadApiSpec extends ZIOSpecDefault {
           ServeContext(dataDir = fixturePeriods, tournamentDir = target)
         }
         response <- LigaRoutes
-          .routes(unseeded)
+          .routes(unseeded, BindConfig())
           .runZIO(Request.get("/api/leaderboard"))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
