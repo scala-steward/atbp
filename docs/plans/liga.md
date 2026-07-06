@@ -535,13 +535,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Configure `liga-js` with Laminar, produce two entry points (`MainDirector`, `MainAudience`), embed compile output into `liga` resources for static serving.
 
 **Acceptance criteria:**
-- [ ] `sbt --client ligaJs/fastLinkJS` produces JS artifacts
-- [ ] `liga` serve module serves compiled assets from classpath
-- [ ] Two separate HTML/JS entry bundles
+- [x] `sbt --client ligaJs/fastLinkJS` produces JS artifacts
+- [x] `liga` serve module serves compiled assets from classpath
+- [x] Two separate HTML/JS entry bundles
 
 **Verification:**
-- [ ] `sbt --client compile` succeeds
-- [ ] Browser loads placeholder pages at `/` and `/audience`
+- [x] `sbt --client compile` succeeds
+- [x] Browser loads placeholder pages at `/` and `/audience` (served via `StaticAssetsSpec` + `ServerSpec`)
 
 **Dependencies:** Task 1 (can parallelize with Tasks 2–17)
 

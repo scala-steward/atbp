@@ -22,7 +22,7 @@ object ServerSpec extends ZIOSpecDefault {
         body <- response.body.asString
       } yield assertTrue(response.status == Status.Ok, body == "ok")
     },
-    test("GET / returns director placeholder HTML") {
+    test("GET / returns director SPA shell HTML") {
       for {
         response <- LigaServer
           .routes(ctx, BindConfig())
@@ -30,13 +30,15 @@ object ServerSpec extends ZIOSpecDefault {
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,
-        body.contains("Liga director"),
+        body.contains("Liga Director"),
+        body.contains("id=\"app\""),
+        body.contains("/assets/js/"),
         response
           .header(Header.ContentType)
           .exists(_.mediaType == MediaType.text.html)
       )
     },
-    test("GET /audience returns audience placeholder HTML") {
+    test("GET /audience returns audience SPA shell HTML") {
       for {
         response <- LigaServer
           .routes(ctx, BindConfig())
@@ -44,7 +46,9 @@ object ServerSpec extends ZIOSpecDefault {
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,
-        body.contains("Liga audience")
+        body.contains("Liga Audience"),
+        body.contains("id=\"app\""),
+        body.contains("/assets/js/")
       )
     },
     test("default BindConfig binds localhost:5442") {

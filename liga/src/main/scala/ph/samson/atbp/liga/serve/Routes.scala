@@ -10,21 +10,15 @@ object Routes {
       ctx: ServeContext,
       bind: BindConfig
   ): Routes[Any, Response] =
-    staticRoutes(bind) ++ readApi(ctx) ++ DirectorRoutes.routes(ctx)
+    StaticAssets.assetRoutes ++ staticRoutes(bind) ++ readApi(
+      ctx
+    ) ++ DirectorRoutes.routes(ctx)
 
-  private val directorPlaceholder =
-    """<!DOCTYPE html>
-      |<html lang="en">
-      |<head><meta charset="utf-8"><title>Liga</title></head>
-      |<body><p>Liga director UI (coming soon)</p></body>
-      |</html>""".stripMargin
-
-  private val audiencePlaceholder =
-    """<!DOCTYPE html>
-      |<html lang="en">
-      |<head><meta charset="utf-8"><title>Liga Audience</title></head>
-      |<body><p>Liga audience display (coming soon)</p></body>
-      |</html>""".stripMargin
+  private def htmlResponse(html: String): Response =
+    Response(
+      headers = Headers(Header.ContentType(MediaType.text.html)),
+      body = Body.fromString(html)
+    )
 
   private def staticRoutes(bind: BindConfig): Routes[Any, Response] =
     zio.http.Routes(
@@ -33,10 +27,12 @@ object Routes {
         if (bind.lan && !bind.isLocalDirector(req)) {
           ZIO.succeed(Response.text("forbidden").status(Status.Forbidden))
         } else {
-          ZIO.succeed(Response.html(directorPlaceholder))
+          ZIO.succeed(htmlResponse(StaticAssets.directorHtml))
         }
       },
-      Method.GET / "audience" -> handler(Response.html(audiencePlaceholder))
+      Method.GET / "audience" -> handler(
+        htmlResponse(StaticAssets.audienceHtml)
+      )
     )
 
   private def readApi(ctx: ServeContext): Routes[Any, Response] =

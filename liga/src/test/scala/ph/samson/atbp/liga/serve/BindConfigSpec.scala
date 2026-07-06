@@ -79,7 +79,7 @@ object BindConfigSpec extends ZIOSpecDefault {
         body <- response.body.asString
       } yield assertTrue(
         response.status == Status.Ok,
-        body.contains("Liga director")
+        body.contains("Liga Director")
       )
     },
     test("--lan blocks write routes from non-localhost") {

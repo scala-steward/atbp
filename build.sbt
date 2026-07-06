@@ -1,5 +1,6 @@
 import com.typesafe.sbt.packager.docker.Cmd
 import org.scalajs.linker.interface.ESVersion
+import org.scalajs.linker.interface.ModuleKind
 import org.scalajs.sbtplugin.ScalaJSPlugin
 import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import sbtdynver.DynVer
@@ -110,6 +111,18 @@ lazy val hubad = atbpModule("hubad")
 lazy val liga = atbpModule("liga")
   .dependsOn(http)
   .settings(Dependencies.liga)
+  .settings(
+    Compile / resourceGenerators += Def.task {
+      val linkerOut =
+        (ligaJs / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
+      val jsDest = (Compile / resourceManaged).value / "liga" / "web" / "js"
+      IO.createDirectory(jsDest)
+
+      val jsFiles = (linkerOut ** "*.js").get
+      jsFiles.foreach(src => IO.copyFile(src, jsDest / src.getName))
+      jsFiles.map(src => jsDest / src.getName)
+    }.taskValue
+  )
 
 lazy val ligaJs = atbpModule("liga-js")
   .enablePlugins(ScalaJSPlugin)
@@ -120,6 +133,7 @@ lazy val ligaJs = atbpModule("liga-js")
     scalaJSLinkerConfig :=
       scalaJSLinkerConfig.value
         .withESFeatures(_.withESVersion(ESVersion.ES2017))
+        .withModuleKind(ModuleKind.ESModule)
   )
 
 // Pseudo-project to limit usage of Atlassian repo
