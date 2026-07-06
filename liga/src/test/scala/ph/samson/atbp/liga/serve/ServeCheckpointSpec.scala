@@ -40,7 +40,10 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
 
   private def parseTournament(body: String): Task[TournamentResponse] =
     ZIO.fromEither(
-      body.fromJson[TournamentResponse].left.map(msg => new RuntimeException(msg))
+      body
+        .fromJson[TournamentResponse]
+        .left
+        .map(msg => new RuntimeException(msg))
     )
 
   private def withTempDataDir[R, A](
@@ -148,7 +151,9 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
   private def playAllReadyMatches(
       ctx: ServeContext
   ): ZIO[Scope, Throwable, TournamentResponse] = {
-    def loop(state: TournamentResponse): ZIO[Scope, Throwable, TournamentResponse] = {
+    def loop(
+        state: TournamentResponse
+    ): ZIO[Scope, Throwable, TournamentResponse] = {
       val readyIds =
         state.bracket.toList
           .flatMap(_.matches)
