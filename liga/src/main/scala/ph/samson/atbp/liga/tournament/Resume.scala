@@ -19,9 +19,7 @@ object Resume {
   private val DateFormat = DateTimeFormatter.BASIC_ISO_DATE
 
   def slugify(name: String): String = {
-    val collapsed = name
-      .trim
-      .toLowerCase
+    val collapsed = name.trim.toLowerCase
       .replaceAll("[^a-z0-9]+", "-")
     collapsed.stripPrefix("-").stripSuffix("-")
   }
@@ -104,7 +102,9 @@ object Resume {
         exists <- ZIO.attemptBlocking(dir.exists)
         _ <- ZIO.when(exists) {
           ZIO.fail(
-            ResumeError(s"tournament directory already exists: ${dir.pathAsString}")
+            ResumeError(
+              s"tournament directory already exists: ${dir.pathAsString}"
+            )
           )
         }
         _ <- ZIO.attemptBlocking(

@@ -59,7 +59,8 @@ object ResumeSpec extends ZIOSpecDefault {
           root
         )
         for {
-          dir <- Resume.resolve(root, newName = None, createdOn = createdOn, at = at)
+          dir <- Resume
+            .resolve(root, newName = None, createdOn = createdOn, at = at)
         } yield assertTrue(dir.name == "tournament-20260315-spring-open")
       }
     },
@@ -100,7 +101,12 @@ object ResumeSpec extends ZIOSpecDefault {
           root
         )
         for {
-          dir <- Resume.resolve(root, newName = None, createdOn = createdOn, at = at)
+          dir <- Resume.resolve(
+            root,
+            newName = None,
+            createdOn = createdOn,
+            at = at
+          )
         } yield assertTrue(dir.name == "tournament-20260316-fall-league")
       }
     },

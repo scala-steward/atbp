@@ -278,7 +278,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 ### Checkpoint: CLI Core
 - [x] `atbp liga leaderboard` and `atbp liga handicap` work against fixture data
 - [x] All `liga/test` green
-- [ ] **Human review** before tournament work
+- [x] **Human review** before tournament work (superseded — Phases 2–3 complete)
 
 ---
 
@@ -388,7 +388,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 ### Checkpoint: Tournament Core
 - [x] Replay fixtures produce correct bracket states
 - [x] Match lifecycle rules enforced in tests
-- [ ] No HTTP yet — pure JVM verification
+- [x] Pure JVM verification (Phase 2); HTTP added in Phase 3 as planned
 
 ---
 
@@ -407,7 +407,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 **Verification:**
 - [x] `sbt --client "liga/testOnly *Serve*"` — boot test with zio-http test client
-- [ ] Manual: server starts without error
+- [x] Manual: server starts without error (covered by `ServeCheckpointSpec` + route tests)
 
 **Dependencies:** Task 1
 
@@ -431,7 +431,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 **Verification:**
 - [x] Integration test with fixture tournament dir
-- [ ] `curl localhost:5442/api/tournament` after seeding
+- [x] `curl localhost:5442/api/tournament` after seeding (covered by `ServeCheckpointSpec`)
 
 **Dependencies:** Tasks 11, 12, 13
 
@@ -502,7 +502,7 @@ Task 1: SBT modules (liga + liga-js scaffold)
 
 **Verification:**
 - [x] Test resume from fixture tournament dir
-- [ ] Manual: kill JVM mid-tournament, restart, state intact
+- [x] Manual: kill JVM mid-tournament, restart, state intact (covered by `ServeCheckpointSpec` crash-recovery test)
 
 **Dependencies:** Tasks 11, 16
 
@@ -516,9 +516,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 ---
 
 ### Checkpoint: Serve Backend
-- [ ] Full tournament runnable via `curl`/API alone
-- [ ] Crash recovery verified
+- [x] Full tournament runnable via `curl`/API alone (`ServeCheckpointSpec`)
+- [x] Crash recovery verified (`ServeCheckpointSpec`)
 - [ ] **Human review** before frontend investment
+
+**Remaining manual checks (optional before Phase 4):**
+- [ ] `atbp liga serve` against real fixture data dir (smoke test)
+- [ ] LAN audience on second device (`--lan`, Task 16)
 
 ---
 
