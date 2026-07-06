@@ -560,13 +560,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Scala.js HTTP client wrapping `GET /api/tournament`, `GET /api/leaderboard`, and director `POST` endpoints. Shared JSON types (or mirror) for API responses.
 
 **Acceptance criteria:**
-- [ ] Fetch client returns typed responses
-- [ ] Error handling for network failures
-- [ ] Works against running serve instance
+- [x] Fetch client returns typed responses
+- [x] Error handling for network failures
+- [x] Works against running serve instance
 
 **Verification:**
-- [ ] Manual: client fetches tournament state in browser console
-- [ ] (Automated JS tests deferred per spec)
+- [x] Manual: client fetches tournament state in browser console
+- [x] (Automated JS tests deferred per spec)
 
 **Dependencies:** Tasks 14, 18
 

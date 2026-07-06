@@ -1,0 +1,73 @@
+package ph.samson.atbp.liga.js.api
+
+import zio.json.*
+
+/** JSON shapes mirrored from `liga.serve.ApiJson` and `DirectorRoutes`. */
+object Models {
+
+  final case class Player(name: String)
+
+  final case class PlayerRating(
+      player: Player,
+      rating: Double,
+      rd: Double,
+      wins: Int,
+      losses: Int
+  )
+
+  final case class MatchResult(
+      scoreA: Int,
+      scoreB: Int
+  )
+
+  enum BracketMatchState {
+    case Pending, Ready, Started, Completed
+  }
+
+  final case class BracketMatch(
+      id: String,
+      playerA: Option[Player],
+      playerB: Option[Player],
+      state: BracketMatchState,
+      raceTo: Option[Int] = None,
+      handicapSuggested: Option[Int] = None,
+      handicapApplied: Option[Int] = None,
+      result: Option[MatchResult] = None
+  )
+
+  final case class Bracket(
+      size: Int,
+      matches: List[BracketMatch]
+  )
+
+  final case class TournamentResponse(
+      name: String,
+      players: List[Player],
+      completed: Boolean,
+      roundRaceTo: Map[Int, Int],
+      bracket: Option[Bracket],
+      frozenRatings: List[PlayerRating]
+  )
+
+  final case class LeaderboardResponse(
+      ratings: List[PlayerRating]
+  )
+
+  final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
+
+  final case class HandicapRequest(handicap: Int)
+
+  final case class ResultRequest(scoreA: Int, scoreB: Int)
+
+  given JsonCodec[Player] = DeriveJsonCodec.gen
+  given JsonCodec[PlayerRating] = DeriveJsonCodec.gen
+  given JsonCodec[MatchResult] = DeriveJsonCodec.gen
+  given JsonCodec[BracketMatchState] = DeriveJsonCodec.gen
+  given JsonCodec[BracketMatch] = DeriveJsonCodec.gen
+  given JsonCodec[Bracket] = DeriveJsonCodec.gen
+  given JsonCodec[TournamentResponse] = DeriveJsonCodec.gen
+  given JsonCodec[LeaderboardResponse] = DeriveJsonCodec.gen
+  given JsonEncoder[SeedRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[HandicapRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[ResultRequest] = DeriveJsonEncoder.gen
+}

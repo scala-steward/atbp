@@ -69,6 +69,7 @@ object Dependencies {
     val zioHttp = "dev.zio" %% "zio-http" % ZioHttp
 
     val zioJson = "dev.zio" %% "zio-json" % "0.9.2"
+    val zioJsonJs = Def.setting("dev.zio" %%% "zio-json" % "0.9.2")
 
     val zioLogging = "dev.zio" %% "zio-logging" % ZioLogging
     val zioLoggingSlf4j2 = "dev.zio" %% "zio-logging-slf4j2" % ZioLogging
@@ -243,6 +244,7 @@ object Dependencies {
 
   val ligaJs = libraryDependencies ++= Seq(
     glicko2.value,
-    laminar.value
+    laminar.value,
+    zioJsonJs.value
   )
 }

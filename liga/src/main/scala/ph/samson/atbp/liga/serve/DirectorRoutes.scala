@@ -14,9 +14,9 @@ object DirectorRoutes {
   final case class HandicapRequest(handicap: Int)
   final case class ResultRequest(scoreA: Int, scoreB: Int)
 
-  given JsonDecoder[SeedRequest] = DeriveJsonDecoder.gen
-  given JsonDecoder[HandicapRequest] = DeriveJsonDecoder.gen
-  given JsonDecoder[ResultRequest] = DeriveJsonDecoder.gen
+  given JsonCodec[SeedRequest] = DeriveJsonCodec.gen
+  given JsonCodec[HandicapRequest] = DeriveJsonCodec.gen
+  given JsonCodec[ResultRequest] = DeriveJsonCodec.gen
 
   def routes(ctx: ServeContext): Routes[Any, Response] =
     zio.http.Routes(
