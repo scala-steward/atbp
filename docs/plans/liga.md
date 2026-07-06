@@ -495,13 +495,13 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Wire `atbp liga serve [--data] [--port] [--lan] [--new]`. On startup: scan for incomplete `tournament-*` dirs — resume if exactly one, fail if >1, allow `--new` if zero.
 
 **Acceptance criteria:**
-- [ ] Auto-resume sole incomplete tournament
-- [ ] Multiple incomplete → error listing dirs
-- [ ] `--new` creates `tournament-<YYYYMMDD>-<slug>/` (e.g. `tournament-20260315-spring-open/`) from director-provided name + creation timestamp
-- [ ] `--data` defaults to CWD
+- [x] Auto-resume sole incomplete tournament
+- [x] Multiple incomplete → error listing dirs
+- [x] `--new` creates `tournament-<YYYYMMDD>-<slug>/` (e.g. `tournament-20260315-spring-open/`) from director-provided name + creation timestamp
+- [x] `--data` defaults to CWD
 
 **Verification:**
-- [ ] Test resume from fixture tournament dir
+- [x] Test resume from fixture tournament dir
 - [ ] Manual: kill JVM mid-tournament, restart, state intact
 
 **Dependencies:** Tasks 11, 16
