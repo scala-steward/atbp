@@ -59,6 +59,12 @@ object Models {
 
   final case class ResultRequest(scoreA: Int, scoreB: Int)
 
+  final case class HandicapSuggestion(
+      weakerPlayer: Player,
+      handicap: Int,
+      raceTo: Int
+  )
+
   given JsonCodec[Player] = DeriveJsonCodec.gen
   given JsonCodec[PlayerRating] = DeriveJsonCodec.gen
   given JsonCodec[MatchResult] = DeriveJsonCodec.gen

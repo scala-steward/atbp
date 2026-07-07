@@ -583,11 +583,11 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Laminar SPA at `/` — tournament setup (player list, seed), per-round race-to, bracket tree view, match panel (handicap suggest/override, start, score entry). Instant handicap preview via client-side glicko2.
 
 **Acceptance criteria:**
-- [ ] Director can seed bracket from UI
-- [ ] Handicap suggestion shown; override editable until start
-- [ ] Start locks handicap; result entry advances bracket
-- [ ] Client-side preview matches server suggestion (approximately)
-- [ ] 8–64 player bracket navigable without getting lost
+- [x] Director can seed bracket from UI
+- [x] Handicap suggestion shown; override editable until start
+- [x] Start locks handicap; result entry advances bracket
+- [x] Client-side preview matches server suggestion (approximately)
+- [x] 8–64 player bracket navigable without getting lost
 
 **Verification:**
 - [ ] Manual: run 8-player tournament end-to-end through UI
