@@ -2,13 +2,46 @@
 
 ## Scala tooling
 
-- If you do need to use `sbt`, use `sbt --client` instead of `sbt` to connect
-    to a running sbt server for faster execution.
-    - Except if you have made changes to the build definition. If there are
-        changes to `*.sbt` files or files under `project/`,
-        use `sbt --batch` instead of `sbt --client`.
-- To verify that the app starts use `sbt run`, WITHOUT `--client`, as it
-  prevents interrupting the process.
+### Default: always `sbt --client`
+
+Use `sbt --client` for **every** sbt invocation unless one of the exceptions
+below applies. This includes `compile`, `test`, `testOnly`, `fixup`, and
+project-scoped tasks — not only `fixup`.
+
+```bash
+sbt --client compile
+sbt --client "liga/test"
+sbt --client "liga/testOnly *handicap*"
+sbt --client fixup
+```
+
+**Do not use `sbt --batch` for routine compile/test work.** Common wrong
+reasons that do **not** justify `--batch`:
+
+- "I'm not sure the sbt server is running" — use `--client` anyway; it starts
+  one if needed.
+- "This is a one-off command" — still `--client`.
+- "Only source files changed" — still `--client`.
+- `git status` shows unrelated local changes under `project/` from a previous
+  session — still `--client` unless **you** edited build files in this task.
+
+### Exception: `sbt --batch` after build-definition edits
+
+Use `sbt --batch` **only when you have changed** `*.sbt` files or files under
+`project/` **in the current task** (e.g. `build.sbt`, `project/plugins.sbt`,
+`project/Dependencies.scala`). A clean tree or stale uncommitted build edits
+you did not touch does not switch the default.
+
+```bash
+# After editing build.sbt or project/*
+sbt --batch compile
+sbt --batch fixup
+```
+
+### Exception: `sbt run` (no `--client`)
+
+To verify that the app starts, use `sbt run` **without** `--client` — the client
+mode prevents interrupting the process.
 
 ### Commit workflow (required — never skip)
 
