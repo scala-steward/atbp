@@ -109,10 +109,11 @@ lazy val hubad = atbpModule("hubad")
   .settings(Dependencies.hubad)
 
 lazy val liga = atbpModule("liga")
-  .dependsOn(http)
+  .dependsOn(http, ligaJs)
   .settings(Dependencies.liga)
   .settings(
     Compile / resourceGenerators += Def.task {
+      val _ = (ligaJs / Compile / fastLinkJS).value
       val linkerOut =
         (ligaJs / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
       val jsDest = (Compile / resourceManaged).value / "liga" / "web" / "js"
