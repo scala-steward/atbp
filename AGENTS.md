@@ -2,10 +2,13 @@
 
 ## Scala tooling
 
-- if you do need to use `sbt`, use `sbt --client` instead of `sbt` to connect to
-  a running sbt server for faster execution
-- to verify that the app starts use `sbt run`, WITHOUT `--client`, as it
-  prevents interrupting the process
+- If you do need to use `sbt`, use `sbt --client` instead of `sbt` to connect
+    to a running sbt server for faster execution.
+    - Except if you have made changes to the build definition. If there are
+        changes to `*.sbt` files or files under `project/`,
+        use `sbt --batch` instead of `sbt --client`.
+- To verify that the app starts use `sbt run`, WITHOUT `--client`, as it
+  prevents interrupting the process.
 
 ### Commit workflow (required — never skip)
 
