@@ -298,6 +298,79 @@ object TournamentSpec extends ZIOSpecDefault {
             .isLeft
         )
       }
+    ),
+    suite("wizard")(
+      test("create produces TournamentCreated with empty players") {
+        val result = Tournament.create("Spring Open", seq = 1, at)
+        assertTrue(
+          result.isRight,
+          result.toOption.get.payload.name == "Spring Open",
+          result.toOption.get.payload.players.isEmpty
+        )
+      },
+      test("create rejects blank tournament name") {
+        assertTrue(Tournament.create("  ", seq = 1, at).isLeft)
+      },
+      test("setPlayers rejects when roster is locked") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList,
+          playersLocked = true
+        )
+        assertTrue(
+          Tournament
+            .setPlayers(state, List(Player("Guest")), seq = 2, at)
+            .isLeft
+        )
+      },
+      test("setPlayers rejects after bracket is seeded") {
+        val state = seededState()
+        assertTrue(
+          Tournament
+            .setPlayers(state, List(Player("Guest")), seq = 3, at)
+            .isLeft
+        )
+      },
+      test("lockPlayers rejects invalid player count") {
+        val state = TournamentState(
+          name = "Open",
+          players = List(Player("Alice"), Player("Bob"))
+        )
+        assertTrue(Tournament.lockPlayers(state, seq = 2, at).isLeft)
+      },
+      test("lockPlayers succeeds with 8 players") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList
+        )
+        assertTrue(Tournament.lockPlayers(state, seq = 2, at).isRight)
+      },
+      test("setRoundRaceTo emits one event per round") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList,
+          playersLocked = true
+        )
+        val result =
+          Tournament.setRoundRaceTo(
+            state,
+            Map(1 -> 7, 2 -> 5),
+            startSeq = 3,
+            at
+          )
+        assertTrue(
+          result.isRight,
+          result.toOption.get.size == 2,
+          result.toOption.get.map(_.payload.round) == List(1, 2)
+        )
+      },
+      test("setRoundRaceTo rejects after bracket is seeded") {
+        assertTrue(
+          Tournament
+            .setRoundRaceTo(seededState(), Map(1 -> 7), startSeq = 3, at)
+            .isLeft
+        )
+      }
     )
   )
 }

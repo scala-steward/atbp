@@ -13,6 +13,114 @@ object Tournament {
 
   type Error = MatchLifecycle.Error
 
+  sealed trait WizardError {
+    def message: String
+  }
+
+  final case class RosterLockedError() extends WizardError {
+    val message: String = "cannot set players after roster is locked"
+  }
+
+  final case class AlreadySeededError() extends WizardError {
+    val message: String = "cannot modify tournament after bracket is seeded"
+  }
+
+  final case class RosterAlreadyLockedError() extends WizardError {
+    val message: String = "roster is already locked"
+  }
+
+  final case class NoPlayersError() extends WizardError {
+    val message: String = "cannot lock roster with no players"
+  }
+
+  final case class InvalidPlayerCountError(count: Int) extends WizardError {
+    val message: String = s"player count must be 8–64: $count"
+  }
+
+  final case class EmptyTournamentNameError() extends WizardError {
+    val message: String =
+      "tournament name must contain at least one letter or digit"
+  }
+
+  def create(
+      name: String,
+      seq: Int,
+      at: Instant
+  ): Either[WizardError, TournamentEvent.Created] =
+    if (Resume.slugify(name).isEmpty) {
+      Left(EmptyTournamentNameError())
+    } else {
+      Right(
+        TournamentEvent.Created(
+          seq = seq,
+          at = at,
+          payload = TournamentCreatedPayload(name = name.trim, players = Nil)
+        )
+      )
+    }
+
+  def setPlayers(
+      state: TournamentState,
+      players: List[Player],
+      seq: Int,
+      at: Instant
+  ): Either[WizardError, TournamentEvent.PlayersSet] =
+    if (state.playersLocked) {
+      Left(RosterLockedError())
+    } else if (state.bracket.nonEmpty) {
+      Left(AlreadySeededError())
+    } else {
+      Right(
+        TournamentEvent.PlayersSet(
+          seq = seq,
+          at = at,
+          payload = PlayersSetPayload(players = players)
+        )
+      )
+    }
+
+  def lockPlayers(
+      state: TournamentState,
+      seq: Int,
+      at: Instant
+  ): Either[WizardError, TournamentEvent.PlayersLocked] =
+    if (state.playersLocked) {
+      Left(RosterAlreadyLockedError())
+    } else if (state.players.isEmpty) {
+      Left(NoPlayersError())
+    } else if (state.players.size < 8 || state.players.size > 64) {
+      Left(InvalidPlayerCountError(state.players.size))
+    } else {
+      Right(
+        TournamentEvent.PlayersLocked(
+          seq = seq,
+          at = at,
+          payload = PlayersLockedPayload()
+        )
+      )
+    }
+
+  def setRoundRaceTo(
+      state: TournamentState,
+      roundRaceTo: Map[Int, Int],
+      startSeq: Int,
+      at: Instant
+  ): Either[WizardError, List[TournamentEvent.RoundRaceToSet]] =
+    if (state.bracket.nonEmpty) {
+      Left(AlreadySeededError())
+    } else {
+      Right(
+        roundRaceTo.toList.sortBy(_._1).zipWithIndex.map {
+          case ((round, raceTo), index) =>
+            TournamentEvent.RoundRaceToSet(
+              seq = startSeq + index,
+              at = at,
+              payload = RoundRaceToSetPayload(round = round, raceTo = raceTo)
+            )
+        }
+      )
+    }
+
   def ready(
       state: TournamentState,
       matchId: String,
