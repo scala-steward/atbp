@@ -216,7 +216,10 @@ object DirectorRoutes {
       response <- jsonState(ctx, state)
     } yield response
 
-  private def jsonState(ctx: ServeContext, state: TournamentState): Task[Response] =
+  private def jsonState(
+      ctx: ServeContext,
+      state: TournamentState
+  ): Task[Response] =
     ctx.hasActiveDir.map { hasDir =>
       Response.json(ApiJson.tournamentFrom(state, hasDir).toJson)
     }

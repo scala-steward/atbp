@@ -14,15 +14,21 @@ object DirectorApp {
 
   def apply(client: ApiClient): Div = {
     val tournament = Var[Option[TournamentResponse]](None)
+    val leaderboard = Var[Option[LeaderboardResponse]](None)
     val selectedMatchId = Var[Option[String]](None)
     val statusMessage = Var("")
     val busy = Var(false)
 
     def refresh(): Unit = {
       busy.set(true)
-      client.getTournament.onComplete {
-        case Success(value) =>
-          tournament.set(Some(value))
+      val loaded = for {
+        t <- client.getTournament
+        lb <- client.getLeaderboard
+      } yield (t, lb)
+      loaded.onComplete {
+        case Success((t, lb)) =>
+          tournament.set(Some(t))
+          leaderboard.set(Some(lb))
           busy.set(false)
           statusMessage.set("")
         case Failure(err) =>
@@ -38,6 +44,10 @@ object DirectorApp {
           tournament.set(Some(value))
           busy.set(false)
           statusMessage.set("")
+          client.getLeaderboard.onComplete {
+            case Success(lb) => leaderboard.set(Some(lb))
+            case _           => ()
+          }
         case Failure(err) =>
           busy.set(false)
           statusMessage.set(err.getMessage)
@@ -62,7 +72,10 @@ object DirectorApp {
         child <-- tournament.signal.map { maybeTournament =>
           span(
             cls := "tournament-name",
-            maybeTournament.map(_.name).getOrElse("Loading…")
+            maybeTournament
+              .map(_.name)
+              .filter(_.nonEmpty)
+              .getOrElse("No tournament")
           )
         },
         button(
@@ -75,27 +88,51 @@ object DirectorApp {
       child <-- statusMessage.signal.map { msg =>
         if (msg.nonEmpty) div(cls := "error", msg) else emptyNode
       },
-      child <-- tournament.signal.map {
-        case None =>
-          div(p("Loading tournament…"))
-        case Some(t) if t.bracket.isEmpty =>
-          setupPanel(
-            t,
-            busy.signal,
-            Observer[Unit](_ =>
-              runAction(client.seed(DirectorDefaults.defaultRoundRaceTo))
-            )
-          )
-        case Some(t) =>
-          mainLayout(
-            t,
-            selectedMatch,
-            busy.signal,
-            selectedMatchId,
-            client,
-            runAction
-          )
-      },
+      child <-- tournament.signal
+        .combineWith(leaderboard.signal)
+        .map { case (maybeTournament, maybeLeaderboard) =>
+          (maybeTournament, maybeLeaderboard) match {
+            case (None, _) =>
+              div(p("Loading…"))
+            case (Some(_), None) =>
+              div(p("Loading leaderboard…"))
+            case (Some(t), Some(lb)) =>
+              TournamentPhase.fromApi(t.phase) match {
+                case TournamentPhase.None =>
+                  LeaderboardView(
+                    lb,
+                    busy.signal,
+                    Observer[String](name =>
+                      runAction(client.createTournament(name))
+                    )
+                  )
+                case TournamentPhase.Defining | TournamentPhase.Locked |
+                    TournamentPhase.RaceTo =>
+                  WizardView(
+                    t,
+                    lb,
+                    busy.signal,
+                    Observer[List[Player]](players =>
+                      runAction(client.setPlayers(players))
+                    ),
+                    Observer[Unit](_ => runAction(client.lockPlayers())),
+                    Observer[Map[Int, Int]](roundRaceTo =>
+                      runAction(client.setRaceTo(roundRaceTo))
+                    ),
+                    Observer[Unit](_ => runAction(client.seed()))
+                  )
+                case TournamentPhase.Active | TournamentPhase.Completed =>
+                  mainLayout(
+                    t,
+                    selectedMatch,
+                    busy.signal,
+                    selectedMatchId,
+                    client,
+                    runAction
+                  )
+              }
+          }
+        },
       styleTag(directorStyles)
     )
   }
@@ -144,27 +181,6 @@ object DirectorApp {
       )
     )
 
-  private def setupPanel(
-      tournament: TournamentResponse,
-      busy: Signal[Boolean],
-      onSeed: Observer[Unit]
-  ): Div =
-    div(
-      cls := "setup-panel",
-      h2("Tournament setup"),
-      p(s"${tournament.players.size} players loaded from period data."),
-      ul(
-        tournament.players.map(p => li(p.name))
-      ),
-      p("Seed the bracket to begin (race-to 7 for all rounds)."),
-      button(
-        cls := "primary",
-        disabled <-- busy,
-        onClick.mapTo(()) --> onSeed,
-        "Seed bracket"
-      )
-    )
-
   private val directorStyles: String =
     """
       |.director-app { font-family: system-ui, sans-serif; margin: 1rem 2rem; max-width: 1200px; }
@@ -172,6 +188,14 @@ object DirectorApp {
       |.tournament-name { color: #555; }
       |.error { color: #b00020; margin-bottom: 1rem; }
       |.main-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
+      |.leaderboard-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+      |.leaderboard-table th, .leaderboard-table td { border-bottom: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; }
+      |.start-tournament, .wizard-panel { border: 1px solid #ccc; border-radius: 6px; padding: 1rem; background: #fff; }
+      |.player-picker label { display: block; margin: 0.25rem 0; }
+      |.guest-entry { display: flex; gap: 0.5rem; align-items: end; margin: 1rem 0; }
+      |.wizard-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+      |.race-to-inputs { list-style: none; padding: 0; }
+      |.race-to-inputs li { margin: 0.35rem 0; }
       |.bracket-section { margin-bottom: 1rem; }
       |.round-matches { display: flex; flex-direction: column; gap: 0.35rem; }
       |.match-row {

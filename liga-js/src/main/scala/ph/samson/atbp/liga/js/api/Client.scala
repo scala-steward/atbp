@@ -19,6 +19,27 @@ final class ApiClient private (baseUrl: String)(using ExecutionContext) {
   def getLeaderboard: Future[LeaderboardResponse] =
     get("/api/leaderboard")
 
+  def createTournament(name: String): Future[TournamentResponse] =
+    post(
+      "/api/tournament/create",
+      Some(CreateRequest(name).toJson)
+    )
+
+  def setPlayers(players: List[Player]): Future[TournamentResponse] =
+    post(
+      "/api/tournament/players",
+      Some(PlayersRequest(players).toJson)
+    )
+
+  def lockPlayers(): Future[TournamentResponse] =
+    post("/api/tournament/lock", Some("{}"))
+
+  def setRaceTo(roundRaceTo: Map[Int, Int]): Future[TournamentResponse] =
+    post(
+      "/api/tournament/race-to",
+      Some(RaceToRequest(roundRaceTo).toJson)
+    )
+
   def seed(): Future[TournamentResponse] =
     seed(Map.empty)
 

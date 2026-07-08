@@ -97,7 +97,9 @@ object WriteApiSpec extends ZIOSpecDefault {
             .copyTo(dataDir / "eight-player-seed.liga")
         }
         ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
-        playersJson = (1 to 8).map(i => s"""{"name":"P$i"}""").mkString("[", ",", "]")
+        playersJson = (1 to 8)
+          .map(i => s"""{"name":"P$i"}""")
+          .mkString("[", ",", "]")
         create <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(

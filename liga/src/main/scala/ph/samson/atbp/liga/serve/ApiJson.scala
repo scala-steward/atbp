@@ -46,12 +46,12 @@ object ApiJson {
 
   private def phaseLabel(phase: TournamentPhase): String =
     phase match {
-      case TournamentPhase.None       => "none"
-      case TournamentPhase.Defining   => "defining"
-      case TournamentPhase.Locked     => "locked"
-      case TournamentPhase.RaceTo     => "raceTo"
-      case TournamentPhase.Active     => "active"
-      case TournamentPhase.Completed  => "completed"
+      case TournamentPhase.None      => "none"
+      case TournamentPhase.Defining  => "defining"
+      case TournamentPhase.Locked    => "locked"
+      case TournamentPhase.RaceTo    => "raceTo"
+      case TournamentPhase.Active    => "active"
+      case TournamentPhase.Completed => "completed"
     }
 
   def leaderboardFrom(ratings: List[PlayerRating]): LeaderboardResponse =

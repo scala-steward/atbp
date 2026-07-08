@@ -125,6 +125,9 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       import DirectorRoutes.*
       assertTrue(
         SeedRequest(Map(1 -> 7, 2 -> 5)).toJson.contains("\"roundRaceTo\""),
+        CreateRequest("Spring Open").toJson.contains("\"name\""),
+        PlayersRequest(List(Player("Alice"))).toJson.contains("\"players\""),
+        RaceToRequest(Map(1 -> 7)).toJson.contains("\"roundRaceTo\""),
         HandicapRequest(3).toJson == """{"handicap":3}""",
         ResultRequest(7, 4).toJson == """{"scoreA":7,"scoreB":4}"""
       )

@@ -40,10 +40,28 @@ object Models {
       matches: List[BracketMatch]
   )
 
+  enum TournamentPhase {
+    case None, Defining, Locked, RaceTo, Active, Completed
+  }
+
+  object TournamentPhase {
+    def fromApi(value: String): TournamentPhase =
+      value match {
+        case "none"      => TournamentPhase.None
+        case "defining"  => TournamentPhase.Defining
+        case "locked"    => TournamentPhase.Locked
+        case "raceTo"    => TournamentPhase.RaceTo
+        case "active"    => TournamentPhase.Active
+        case "completed" => TournamentPhase.Completed
+        case _           => TournamentPhase.None
+      }
+  }
+
   final case class TournamentResponse(
       name: String,
       players: List[Player],
       completed: Boolean,
+      phase: String,
       roundRaceTo: Map[Int, Int],
       bracket: Option[Bracket],
       frozenRatings: List[PlayerRating]
@@ -54,6 +72,12 @@ object Models {
   )
 
   final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
+
+  final case class CreateRequest(name: String)
+
+  final case class PlayersRequest(players: List[Player])
+
+  final case class RaceToRequest(roundRaceTo: Map[Int, Int])
 
   final case class HandicapRequest(handicap: Int)
 
@@ -74,6 +98,9 @@ object Models {
   given JsonCodec[TournamentResponse] = DeriveJsonCodec.gen
   given JsonCodec[LeaderboardResponse] = DeriveJsonCodec.gen
   given JsonEncoder[SeedRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[CreateRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[PlayersRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[RaceToRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[HandicapRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[ResultRequest] = DeriveJsonEncoder.gen
 }
