@@ -197,6 +197,141 @@ object ReplaySpec extends ZIOSpecDefault {
           loaded <- EventLog.read(dir)
         } yield assertTrue(loaded.map(_.seq) == List(1, 2))
       }
+    },
+    test("PlayersSet replaces roster before lock") {
+      val events = List(
+        TournamentEvent.Created(
+          seq = 1,
+          at = at,
+          payload = TournamentCreatedPayload("Open", Nil)
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 2,
+          at = at,
+          payload = PlayersSetPayload(
+            players = (1 to 8).map(i => Player(s"P$i")).toList
+          )
+        )
+      )
+      for {
+        state <- ZIO.fromEither(Replay.replay(events))
+      } yield assertTrue(
+        state.players.size == 8,
+        !state.playersLocked,
+        TournamentPhase.derive(state, hasDir = true) == TournamentPhase.Defining
+      )
+    },
+    test("PlayersLocked sets playersLocked when count is valid") {
+      val players = (1 to 8).map(i => Player(s"P$i")).toList
+      val events = List(
+        TournamentEvent.Created(
+          seq = 1,
+          at = at,
+          payload = TournamentCreatedPayload("Open", Nil)
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 2,
+          at = at,
+          payload = PlayersSetPayload(players = players)
+        ),
+        TournamentEvent.PlayersLocked(
+          seq = 3,
+          at = at,
+          payload = PlayersLockedPayload()
+        )
+      )
+      for {
+        state <- ZIO.fromEither(Replay.replay(events))
+      } yield assertTrue(
+        state.playersLocked,
+        TournamentPhase.derive(state, hasDir = true) == TournamentPhase.Locked
+      )
+    },
+    test("PlayersSet after lock is rejected") {
+      val players = (1 to 8).map(i => Player(s"P$i")).toList
+      val events = List(
+        TournamentEvent.Created(
+          seq = 1,
+          at = at,
+          payload = TournamentCreatedPayload("Open", Nil)
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 2,
+          at = at,
+          payload = PlayersSetPayload(players = players)
+        ),
+        TournamentEvent.PlayersLocked(
+          seq = 3,
+          at = at,
+          payload = PlayersLockedPayload()
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 4,
+          at = at,
+          payload = PlayersSetPayload(players = Player("Guest") :: players)
+        )
+      )
+      assertTrue(Replay.replay(events).isLeft)
+    },
+    test("PlayersLocked rejects invalid player count") {
+      val events = List(
+        TournamentEvent.Created(
+          seq = 1,
+          at = at,
+          payload = TournamentCreatedPayload("Open", Nil)
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 2,
+          at = at,
+          payload = PlayersSetPayload(
+            players = List(Player("Alice"), Player("Bob"))
+          )
+        ),
+        TournamentEvent.PlayersLocked(
+          seq = 3,
+          at = at,
+          payload = PlayersLockedPayload()
+        )
+      )
+      assertTrue(Replay.replay(events).isLeft)
+    },
+    test("phase is raceTo when all required round keys are set") {
+      val players = (1 to 8).map(i => Player(s"P$i")).toList
+      val events = List(
+        TournamentEvent.Created(
+          seq = 1,
+          at = at,
+          payload = TournamentCreatedPayload("Open", Nil)
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 2,
+          at = at,
+          payload = PlayersSetPayload(players = players)
+        ),
+        TournamentEvent.PlayersLocked(
+          seq = 3,
+          at = at,
+          payload = PlayersLockedPayload()
+        )
+      ) ++ (1 to 4).map { round =>
+        TournamentEvent.RoundRaceToSet(
+          seq = 3 + round,
+          at = at,
+          payload = RoundRaceToSetPayload(round = round, raceTo = 7)
+        )
+      }
+      for {
+        state <- ZIO.fromEither(Replay.replay(events))
+      } yield assertTrue(
+        TournamentPhase.derive(state, hasDir = true) == TournamentPhase.RaceTo,
+        TournamentPhase.raceToComplete(state)
+      )
+    },
+    test("phase is none when no tournament dir exists") {
+      val state = TournamentState(name = "", players = Nil)
+      assertTrue(
+        TournamentPhase.derive(state, hasDir = false) == TournamentPhase.None
+      )
     }
   )
 }

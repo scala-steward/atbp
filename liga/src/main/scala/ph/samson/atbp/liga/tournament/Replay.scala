@@ -48,10 +48,24 @@ object Replay {
         )
 
       case TournamentEvent.PlayersSet(_, _, payload) =>
-        Right(state.copy(players = payload.players))
+        if (state.playersLocked) {
+          Left("cannot set players after roster is locked")
+        } else if (state.bracket.nonEmpty) {
+          Left("cannot set players after bracket is seeded")
+        } else {
+          Right(state.copy(players = payload.players))
+        }
 
       case TournamentEvent.PlayersLocked(_, _, _) =>
-        Right(state.copy(playersLocked = true))
+        if (state.playersLocked) {
+          Left("roster is already locked")
+        } else if (state.players.isEmpty) {
+          Left("cannot lock roster with no players")
+        } else if (state.players.size < 8 || state.players.size > 64) {
+          Left(s"player count must be 8–64: ${state.players.size}")
+        } else {
+          Right(state.copy(playersLocked = true))
+        }
 
       case TournamentEvent.RoundRaceToSet(_, _, payload) =>
         Right(
