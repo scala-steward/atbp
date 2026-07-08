@@ -16,13 +16,11 @@ import zio.test.*
 
 import java.net.InetAddress
 import java.time.Instant
-import java.time.LocalDate
 
 /** Checkpoint verification before Phase 4 frontend work. */
 object ServeCheckpointSpec extends ZIOSpecDefault {
 
   private val at = Instant.parse("2026-03-15T18:00:00Z")
-  private val createdOn = LocalDate.parse("2026-03-15")
 
   private val loopback: Option[InetAddress] =
     Some(InetAddress.getLoopbackAddress)
@@ -70,16 +68,30 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
     val tournamentDir = dataDir / tournamentDirName
     tournamentDir.createDirectoryIfNotExists()
     val players = (1 to 8).map(i => Player(s"P$i")).toList
-    val created = TournamentEvent.Created(
-      seq = 1,
-      at = at,
-      payload = TournamentCreatedPayload(
-        name = "Spring Open",
-        players = players
+    val events = List(
+      TournamentEvent.Created(
+        seq = 1,
+        at = at,
+        payload = TournamentCreatedPayload(
+          name = "Spring Open",
+          players = Nil
+        )
+      ),
+      TournamentEvent.PlayersSet(
+        seq = 2,
+        at = at,
+        payload = PlayersSetPayload(players = players)
+      ),
+      TournamentEvent.PlayersLocked(
+        seq = 3,
+        at = at,
+        payload = PlayersLockedPayload()
       )
     )
-    (tournamentDir / EventLog.filenameFor(created))
-      .write(EventCodec.encode(created))
+    events.foreach { event =>
+      (tournamentDir / EventLog.filenameFor(event))
+        .write(EventCodec.encode(event))
+    }
     tournamentDir
   }
 
@@ -91,7 +103,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
   }
 
   private def freshContext(dataDir: File, tournamentDir: File): ServeContext =
-    ServeContext(dataDir = dataDir, tournamentDir = tournamentDir)
+    ServeContext(dataDir = dataDir, tournamentDir = Some(tournamentDir))
 
   private def postTournament(
       ctx: ServeContext,
@@ -213,17 +225,12 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
         for {
           _ <- ZIO.attemptBlocking(seedPeriodFile(dataDir))
           tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
-          resolved <- Resume.resolve(
-            dataDir,
-            newName = None,
-            createdOn = createdOn,
-            at = at
-          )
-          ctx = freshContext(dataDir, resolved)
+          resolved <- Resume.resolve(dataDir)
+          ctx = freshContext(dataDir, resolved.get)
           _ <- postTournament(ctx, "/api/tournament/seed", seedBody)
           finalState <- playAllReadyMatches(ctx)
         } yield assertTrue(
-          resolved == tournamentDir,
+          resolved == Some(tournamentDir),
           finalState.bracket.exists(_.matches.size == 14),
           allMatchesCompleted(finalState)
         )
@@ -234,24 +241,19 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
         for {
           _ <- ZIO.attemptBlocking(seedPeriodFile(dataDir))
           tournamentDir <- ZIO.attemptBlocking(copyPartialFixture(dataDir))
-          resumedDir <- Resume.resolve(
-            dataDir,
-            newName = None,
-            createdOn = createdOn,
-            at = at
-          )
-          resumedCtx = freshContext(dataDir, resumedDir)
-          before <- Replay.replayDir(resumedDir)
+          resumedDir <- Resume.resolve(dataDir)
+          resumedCtx = freshContext(dataDir, resumedDir.get)
+          before <- Replay.replayDir(resumedDir.get)
           started = before.bracket
             .flatMap(_.matches.find(_.id == "wb-1-1"))
             .get
           afterCrash <- recordResult(resumedCtx, "wb-1-1")
-          restartedCtx = freshContext(dataDir, resumedDir)
+          restartedCtx = freshContext(dataDir, resumedDir.get)
           afterRestart <- routes(restartedCtx)
             .runZIO(localhostGet("/api/tournament"))
             .flatMap(r => r.body.asString.flatMap(parseTournament))
         } yield assertTrue(
-          resumedDir == tournamentDir,
+          resumedDir.contains(tournamentDir),
           started.state == BracketMatchState.Started,
           afterCrash.bracket
             .flatMap(_.matches.find(_.id == "wb-1-1"))
@@ -269,12 +271,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
           firstCtx = freshContext(dataDir, tournamentDir)
           seeded <- postTournament(firstCtx, "/api/tournament/seed", seedBody)
-          _ <- Resume.resolve(
-            dataDir,
-            newName = None,
-            createdOn = createdOn,
-            at = at
-          )
+          _ <- Resume.resolve(dataDir)
           restartedCtx = freshContext(dataDir, tournamentDir)
           afterRestart <- routes(restartedCtx)
             .runZIO(localhostGet("/api/tournament"))

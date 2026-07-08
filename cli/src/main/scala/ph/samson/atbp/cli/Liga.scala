@@ -56,22 +56,24 @@ object Liga {
   case class Serve(
       data: File,
       port: Option[Int],
-      lan: Boolean,
-      newTournament: Option[String]
+      lan: Boolean
   ) extends Action {
     override def run(conf: Conf): ZIO[Any, Throwable, Unit] =
       ZIO.logSpan("Liga.serve") {
         for {
-          tournamentDir <- Resume.resolve(data, newTournament)
+          tournamentDir <- Resume.resolve(data)
           config <- ServeConfig.load(data)
           bind = BindConfig.from(
             ServeConfig.withOverrides(config, None, port),
             lan = lan
           )
           ctx = ServeContext(data, tournamentDir)
+          tournamentLabel = tournamentDir match {
+            case Some(dir) => s"tournament: ${dir.name}"
+            case None      => "no active tournament (use Director UI to start)"
+          }
           _ <- Console.printLine(
-            s"Liga serve on http://${bind.bindHost}:${bind.port} " +
-              s"(tournament: ${tournamentDir.name})"
+            s"Liga serve on http://${bind.bindHost}:${bind.port} ($tournamentLabel)"
           )
           _ <- LigaServer.run(bind, ctx)
         } yield ()
@@ -96,9 +98,6 @@ object Liga {
     Options.boolean("lan").withDefault(false) ??
       "Expose audience routes on LAN (0.0.0.0)"
 
-  private val newTournament =
-    Options.text("new").optional ?? "Start a new tournament with this name"
-
   private val playerA = Args.text("player-a")
   private val playerB = Args.text("player-b")
 
@@ -120,9 +119,9 @@ object Liga {
       }
 
   private val serveCommand =
-    Command("serve", data ++ port ++ lan ++ newTournament).map {
-      case (dir, portOpt, lanEnabled, newName) =>
-        Serve(dataDir(dir), portOpt.map(_.toInt), lanEnabled, newName)
+    Command("serve", data ++ port ++ lan).map {
+      case (dir, portOpt, lanEnabled) =>
+        Serve(dataDir(dir), portOpt.map(_.toInt), lanEnabled)
     }
 
   private val withSubcommands =

@@ -19,7 +19,7 @@ object BindConfigSpec extends ZIOSpecDefault {
   private val ctx = ServeContext(
     dataDir = File(getClass.getResource("/periods")),
     tournamentDir =
-      File(getClass.getResource("/tournaments/eight-player-seeded"))
+      Some(File(getClass.getResource("/tournaments/eight-player-seeded")))
   )
 
   private def get(path: String, from: Option[InetAddress]): Request =

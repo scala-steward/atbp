@@ -47,34 +47,37 @@ object WriteApiSpec extends ZIOSpecDefault {
       File(getClass.getResource("/periods/eight-player-seed.liga"))
         .copyTo(dataDir / "eight-player-seed.liga")
       val players = (1 to 8).map(i => Player(s"P$i")).toList
-      val created = TournamentEvent.Created(
-        seq = 1,
-        at = at,
-        payload = TournamentCreatedPayload(
-          name = "Spring Open",
-          players = players
+      val wizardEvents = List(
+        TournamentEvent.Created(
+          seq = 1,
+          at = at,
+          payload = TournamentCreatedPayload(
+            name = "Spring Open",
+            players = Nil
+          )
+        ),
+        TournamentEvent.PlayersSet(
+          seq = 2,
+          at = at,
+          payload = PlayersSetPayload(players = players)
+        ),
+        TournamentEvent.PlayersLocked(
+          seq = 3,
+          at = at,
+          payload = PlayersLockedPayload()
         )
       )
-      (tournamentDir / "000001-created.json")
-        .write(EventCodec.encode(created))
       if (seeded) {
-        File(
-          getClass.getResource(
-            "/tournaments/eight-player-seeded/000002-seeded.json"
-          )
-        )
-          .copyTo(tournamentDir / "000002-seeded.json")
-        (1 to 3).foreach { round =>
-          val event = TournamentEvent.RoundRaceToSet(
-            seq = round + 2,
-            at = at,
-            payload = RoundRaceToSetPayload(round = round, raceTo = 7)
-          )
+        File(getClass.getResource("/tournaments/eight-player-seeded"))
+          .copyTo(tournamentDir, overwrite = true)
+      } else {
+        wizardEvents.foreach { event =>
           (tournamentDir / EventLog.filenameFor(event))
             .write(EventCodec.encode(event))
         }
       }
-      val ctx = ServeContext(dataDir = dataDir, tournamentDir = tournamentDir)
+      val ctx =
+        ServeContext(dataDir = dataDir, tournamentDir = Some(tournamentDir))
       (ctx, root)
     }
 
@@ -87,13 +90,13 @@ object WriteApiSpec extends ZIOSpecDefault {
     ) {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        seedBody = """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
+        seedBody = """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
         response <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/tournament/seed", seedBody))
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
-        seededFileExists = (ctx.tournamentDir / "000005-seeded.json").exists
+        seededFileExists = (ctx.tournamentDir.get / "000008-seeded.json").exists
         _ <- cleanup(root)
       } yield assertTrue(
         response.status == Status.Ok,
@@ -102,7 +105,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         parsed.frozenRatings.map(_.player.name).sorted == (1 to 8)
           .map(i => s"P$i")
           .toList,
-        parsed.roundRaceTo == Map(1 -> 7, 2 -> 7, 3 -> 7),
+        parsed.roundRaceTo == Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7),
         seededFileExists
       )
     },
@@ -114,7 +117,7 @@ object WriteApiSpec extends ZIOSpecDefault {
           .runZIO(
             localhostPost(
               "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
             )
           )
         ready <- LigaRoutes
@@ -170,7 +173,7 @@ object WriteApiSpec extends ZIOSpecDefault {
           .runZIO(
             remotePost(
               "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7}}"""
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
             )
           )
         _ <- cleanup(root)
@@ -178,7 +181,15 @@ object WriteApiSpec extends ZIOSpecDefault {
     },
     test("ready rejects illegal transition with 400") {
       for {
-        (ctx, root) <- withTempTournament(seeded = true)
+        (ctx, root) <- withTempTournament(seeded = false)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+            )
+          )
         response <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))

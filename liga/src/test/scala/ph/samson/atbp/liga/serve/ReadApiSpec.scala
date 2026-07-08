@@ -23,7 +23,7 @@ object ReadApiSpec extends ZIOSpecDefault {
   ): ServeContext =
     ServeContext(
       dataDir = dataDir,
-      tournamentDir = fixtureTournament(tournamentName)
+      tournamentDir = Some(fixtureTournament(tournamentName))
     )
 
   def spec = suite("ReadApi")(
@@ -80,7 +80,7 @@ object ReadApiSpec extends ZIOSpecDefault {
               "/tournaments/eight-player-seeded/000001-created.json"
             )
           ).copyTo(target / "000001-created.json")
-          ServeContext(dataDir = fixturePeriods, tournamentDir = target)
+          ServeContext(dataDir = fixturePeriods, tournamentDir = Some(target))
         }
         response <- LigaRoutes
           .routes(unseeded, BindConfig())
@@ -88,7 +88,7 @@ object ReadApiSpec extends ZIOSpecDefault {
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
         _ <- ZIO.attemptBlocking(
-          unseeded.tournamentDir.delete(swallowIOExceptions = true)
+          unseeded.tournamentDir.get.delete(swallowIOExceptions = true)
         )
       } yield assertTrue(
         parsed.ratings.nonEmpty,

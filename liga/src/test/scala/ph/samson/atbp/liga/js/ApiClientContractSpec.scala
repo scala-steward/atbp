@@ -90,7 +90,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       val ctx = ServeContext(
         dataDir = File(getClass.getResource("/periods")),
         tournamentDir =
-          File(getClass.getResource("/tournaments/eight-player-partial"))
+          Some(File(getClass.getResource("/tournaments/eight-player-partial")))
       )
       for {
         response <- LigaRoutes
