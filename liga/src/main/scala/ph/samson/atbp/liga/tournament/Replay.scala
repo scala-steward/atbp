@@ -47,6 +47,12 @@ object Replay {
           )
         )
 
+      case TournamentEvent.PlayersSet(_, _, payload) =>
+        Right(state.copy(players = payload.players))
+
+      case TournamentEvent.PlayersLocked(_, _, _) =>
+        Right(state.copy(playersLocked = true))
+
       case TournamentEvent.RoundRaceToSet(_, _, payload) =>
         Right(
           state.copy(

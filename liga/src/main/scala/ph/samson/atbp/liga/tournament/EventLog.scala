@@ -51,6 +51,8 @@ object EventLog {
   private def suffixFor(event: TournamentEvent): String =
     event match {
       case _: TournamentEvent.Created             => "created"
+      case _: TournamentEvent.PlayersSet          => "players-set"
+      case _: TournamentEvent.PlayersLocked       => "players-locked"
       case _: TournamentEvent.RoundRaceToSet      => "round-race-to"
       case _: TournamentEvent.BracketSeeded       => "seeded"
       case _: TournamentEvent.MatchReady          => "match-ready"

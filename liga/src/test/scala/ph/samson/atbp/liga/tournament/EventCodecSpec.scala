@@ -95,6 +95,46 @@ object EventCodecSpec extends ZIOSpecDefault {
       )
       assertTrue(roundTrip(event))
     },
+    test("PlayersSet round-trips through JSON") {
+      val event = TournamentEvent.PlayersSet(
+        seq = 9,
+        at = at,
+        payload = PlayersSetPayload(
+          players = List(Player("Alice"), Player("Bob"))
+        )
+      )
+      assertTrue(
+        roundTrip(event),
+        EventCodec.encode(event).contains("\"type\":\"PlayersSet\"")
+      )
+    },
+    test("PlayersLocked round-trips through JSON") {
+      val event = TournamentEvent.PlayersLocked(
+        seq = 10,
+        at = at,
+        payload = PlayersLockedPayload()
+      )
+      assertTrue(
+        roundTrip(event),
+        EventCodec.encode(event).contains("\"type\":\"PlayersLocked\"")
+      )
+    },
+    test("filenameFor PlayersSet and PlayersLocked") {
+      val playersSet = TournamentEvent.PlayersSet(
+        seq = 2,
+        at = at,
+        payload = PlayersSetPayload(players = List(Player("Alice")))
+      )
+      val playersLocked = TournamentEvent.PlayersLocked(
+        seq = 3,
+        at = at,
+        payload = PlayersLockedPayload()
+      )
+      assertTrue(
+        EventLog.filenameFor(playersSet) == "000002-players-set.json",
+        EventLog.filenameFor(playersLocked) == "000003-players-locked.json"
+      )
+    },
     test("validateMonotonicSeq accepts strictly increasing seq values") {
       val events = List(
         TournamentEvent.Created(
