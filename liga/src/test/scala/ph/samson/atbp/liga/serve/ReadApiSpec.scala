@@ -44,6 +44,7 @@ object ReadApiSpec extends ZIOSpecDefault {
           .header(Header.ContentType)
           .exists(_.mediaType == MediaType.application.json),
         parsed.name == "Spring Open",
+        parsed.phase == "active",
         parsed.players.size == 8,
         !parsed.completed,
         parsed.bracket.exists(_.size == 8),
@@ -95,11 +96,49 @@ object ReadApiSpec extends ZIOSpecDefault {
         parsed.ratings.exists(_.player.name == "Alice")
       )
     },
+    test("GET /api/tournament returns phase none without tournament dir") {
+      for {
+        dataDir <- ZIO.attemptBlocking {
+          val dir = File.newTemporaryDirectory("liga-read-api-none")
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dir / "eight-player-seed.liga")
+          dir
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/tournament"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
+        _ <- ZIO.attemptBlocking(dataDir.delete(swallowIOExceptions = true))
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.phase == "none",
+        parsed.name == "",
+        parsed.players.isEmpty,
+        parsed.bracket.isEmpty
+      )
+    },
+    test("GET /api/leaderboard returns period ratings without tournament dir") {
+      val ctx = ServeContext(dataDir = fixturePeriods, tournamentDir = None)
+      for {
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/leaderboard"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.ratings.nonEmpty,
+        parsed.ratings.exists(_.player.name == "Alice")
+      )
+    },
     test("TournamentResponse round-trips through JSON codec") {
       val sample = TournamentResponse(
         name = "Spring Open",
         players = List(Player("Alice"), Player("Bob")),
         completed = false,
+        phase = "defining",
         roundRaceTo = Map(1 -> 7),
         bracket = None,
         frozenRatings = List(

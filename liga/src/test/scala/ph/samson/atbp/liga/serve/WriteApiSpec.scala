@@ -85,6 +85,62 @@ object WriteApiSpec extends ZIOSpecDefault {
     ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
 
   def spec = suite("WriteApi")(
+    test("wizard create → players → lock → race-to → seed flow") {
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-wizard-api")
+        )
+        dataDir = root / "data"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dataDir / "eight-player-seed.liga")
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        playersJson = (1 to 8).map(i => s"""{"name":"P$i"}""").mkString("[", ",", "]")
+        create <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/create",
+              """{"name":"Spring Open"}"""
+            )
+          )
+        createdBody <- create.body.asString
+        created <- ZIO.fromEither(createdBody.fromJson[TournamentResponse])
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/players",
+              s"""{"players":$playersJson}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/tournament/lock", "{}"))
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/race-to",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+            )
+          )
+        seed <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/tournament/seed", "{}"))
+        seedBody <- seed.body.asString
+        seeded <- ZIO.fromEither(seedBody.fromJson[TournamentResponse])
+        _ <- cleanup(root)
+      } yield assertTrue(
+        create.status == Status.Ok,
+        created.phase == "defining",
+        seed.status == Status.Ok,
+        seeded.phase == "active",
+        seeded.bracket.exists(_.size == 8)
+      )
+    },
     test(
       "POST /api/tournament/seed creates bracket with frozen period ratings"
     ) {

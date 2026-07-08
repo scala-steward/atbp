@@ -20,6 +20,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       |  "name": "Spring Open",
       |  "players": [{"name": "P1"}, {"name": "P2"}],
       |  "completed": false,
+      |  "phase": "active",
       |  "roundRaceTo": {"1": 7},
       |  "bracket": {
       |    "size": 2,
@@ -110,7 +111,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       val ok =
         decodeResponse[TournamentResponse](
           200,
-          """{"name":"T","players":[],"completed":false,"roundRaceTo":{},"bracket":null,"frozenRatings":[]}"""
+          """{"name":"T","players":[],"completed":false,"phase":"none","roundRaceTo":{},"bracket":null,"frozenRatings":[]}"""
         )
       val httpErr = decodeResponse[TournamentResponse](403, "forbidden")
       val jsonErr = decodeResponse[TournamentResponse](200, "not json")

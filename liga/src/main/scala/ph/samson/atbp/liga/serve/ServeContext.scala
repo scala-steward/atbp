@@ -144,6 +144,9 @@ final case class ServeContext(
         )
     }
 
+  def hasActiveDir: Task[Boolean] =
+    activeDirOption.map(_.isDefined)
+
   private def activeDirOption: Task[Option[File]] =
     tournamentDir match {
       case Some(dir) => ZIO.succeed(Some(dir))

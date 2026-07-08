@@ -38,15 +38,18 @@ object Routes {
   private def readApi(ctx: ServeContext): Routes[Any, Response] =
     zio.http.Routes(
       Method.GET / "api" / "tournament" -> handler {
-        ctx.loadTournament
-          .map(state => Response.json(ApiJson.tournamentFrom(state).toJson))
-          .catchAll(err =>
-            ZIO.succeed(
-              Response
-                .text(err.getMessage)
-                .status(Status.InternalServerError)
-            )
+        (for {
+          state <- ctx.loadTournament
+          hasDir <- ctx.hasActiveDir
+        } yield Response.json(
+          ApiJson.tournamentFrom(state, hasDir).toJson
+        )).catchAll(err =>
+          ZIO.succeed(
+            Response
+              .text(err.getMessage)
+              .status(Status.InternalServerError)
           )
+        )
       },
       Method.GET / "api" / "leaderboard" -> handler {
         (for {

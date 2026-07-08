@@ -1,25 +1,51 @@
 package ph.samson.atbp.liga.serve
 
-import ph.samson.atbp.liga.model.TournamentState
+import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.tournament.EventCodec
 import ph.samson.atbp.liga.tournament.Tournament
 import zio.*
 import zio.http.*
 import zio.json.*
 import zio.json.EncoderOps
 
+import java.time.Instant
+
 /** Director-only POST routes (localhost). */
 object DirectorRoutes {
 
+  import EventCodec.given
+
+  final case class CreateRequest(name: String)
+  final case class PlayersRequest(players: List[Player])
+  final case class RaceToRequest(roundRaceTo: Map[Int, Int])
   final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
   final case class HandicapRequest(handicap: Int)
   final case class ResultRequest(scoreA: Int, scoreB: Int)
 
+  given JsonCodec[CreateRequest] = DeriveJsonCodec.gen
+  given JsonCodec[PlayersRequest] = DeriveJsonCodec.gen
+  given JsonCodec[RaceToRequest] = DeriveJsonCodec.gen
   given JsonCodec[SeedRequest] = DeriveJsonCodec.gen
   given JsonCodec[HandicapRequest] = DeriveJsonCodec.gen
   given JsonCodec[ResultRequest] = DeriveJsonCodec.gen
 
   def routes(ctx: ServeContext): Routes[Any, Response] =
     zio.http.Routes(
+      Method.POST / "api" / "tournament" / "create" -> handler {
+        (req: Request) =>
+          directorOnly(req)(handleCreate(ctx, req))
+      },
+      Method.POST / "api" / "tournament" / "players" -> handler {
+        (req: Request) =>
+          directorOnly(req)(handlePlayers(ctx, req))
+      },
+      Method.POST / "api" / "tournament" / "lock" -> handler { (req: Request) =>
+        directorOnly(req)(handleLock(ctx))
+      },
+      Method.POST / "api" / "tournament" / "race-to" -> handler {
+        (req: Request) =>
+          directorOnly(req)(handleRaceTo(ctx, req))
+      },
       Method.POST / "api" / "tournament" / "seed" -> handler { (req: Request) =>
         directorOnly(req)(handleSeed(ctx, req))
       },
@@ -69,6 +95,63 @@ object DirectorRoutes {
       body.fromJson[A].left.map(msg => ServeContext.CommandError(msg))
     )
 
+  private def handleCreate(ctx: ServeContext, req: Request): Task[Response] =
+    for {
+      body <- req.body.asString
+      parsed <- parseJson[CreateRequest](body)
+      state <- ctx.createTournament(parsed.name)
+      response <- jsonState(ctx, state)
+    } yield response
+
+  private def handlePlayers(ctx: ServeContext, req: Request): Task[Response] =
+    for {
+      body <- req.body.asString
+      parsed <- parseJson[PlayersRequest](body)
+      state <- ctx.loadTournament
+      seq <- ctx.nextSeq
+      at = Instant.now()
+      event <- ZIO.fromEither(
+        Tournament
+          .setPlayers(state, parsed.players, seq, at)
+          .left
+          .map(err => ServeContext.CommandError(err.message))
+      )
+      updated <- ctx.appendWizardEvent(event)
+      response <- jsonState(ctx, updated)
+    } yield response
+
+  private def handleLock(ctx: ServeContext): Task[Response] =
+    for {
+      state <- ctx.loadTournament
+      seq <- ctx.nextSeq
+      at = Instant.now()
+      event <- ZIO.fromEither(
+        Tournament
+          .lockPlayers(state, seq, at)
+          .left
+          .map(err => ServeContext.CommandError(err.message))
+      )
+      updated <- ctx.appendWizardEvent(event)
+      response <- jsonState(ctx, updated)
+    } yield response
+
+  private def handleRaceTo(ctx: ServeContext, req: Request): Task[Response] =
+    for {
+      body <- req.body.asString
+      parsed <- parseJson[RaceToRequest](body)
+      state <- ctx.loadTournament
+      seq <- ctx.nextSeq
+      at = Instant.now()
+      events <- ZIO.fromEither(
+        Tournament
+          .setRoundRaceTo(state, parsed.roundRaceTo, seq, at)
+          .left
+          .map(err => ServeContext.CommandError(err.message))
+      )
+      updated <- ctx.appendWizardEvents(events)
+      response <- jsonState(ctx, updated)
+    } yield response
+
   private def handleSeed(ctx: ServeContext, req: Request): Task[Response] =
     for {
       body <- req.body.asString
@@ -79,14 +162,16 @@ object DirectorRoutes {
           parseJson[SeedRequest](body)
         }
       state <- ctx.seedBracket(parsed.roundRaceTo)
-    } yield jsonState(state)
+      response <- jsonState(ctx, state)
+    } yield response
 
   private def handleReady(ctx: ServeContext, matchId: String): Task[Response] =
     for {
       state <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.ready(current, matchId, seq, at)
       }
-    } yield jsonState(state)
+      response <- jsonState(ctx, state)
+    } yield response
 
   private def handleHandicap(
       ctx: ServeContext,
@@ -99,14 +184,16 @@ object DirectorRoutes {
       state <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.applyHandicap(current, matchId, parsed.handicap, seq, at)
       }
-    } yield jsonState(state)
+      response <- jsonState(ctx, state)
+    } yield response
 
   private def handleStart(ctx: ServeContext, matchId: String): Task[Response] =
     for {
       state <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.start(current, matchId, seq, at)
       }
-    } yield jsonState(state)
+      response <- jsonState(ctx, state)
+    } yield response
 
   private def handleResult(
       ctx: ServeContext,
@@ -126,10 +213,13 @@ object DirectorRoutes {
           at
         )
       }
-    } yield jsonState(state)
+      response <- jsonState(ctx, state)
+    } yield response
 
-  private def jsonState(state: TournamentState): Response =
-    Response.json(ApiJson.tournamentFrom(state).toJson)
+  private def jsonState(ctx: ServeContext, state: TournamentState): Task[Response] =
+    ctx.hasActiveDir.map { hasDir =>
+      Response.json(ApiJson.tournamentFrom(state, hasDir).toJson)
+    }
 
   private def badRequest(message: String): Response =
     Response.text(message).status(Status.BadRequest)
