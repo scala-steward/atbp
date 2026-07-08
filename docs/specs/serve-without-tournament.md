@@ -2,7 +2,7 @@
 
 > **Source:** [docs/intent/serve-without-tournament.md](../intent/serve-without-tournament.md) · [docs/ideas/serve-without-tournament.md](../ideas/serve-without-tournament.md)  
 > **Parent:** [docs/specs/liga.md](liga.md)  
-> **Status:** Specify — approved (ready for Plan when requested)
+> **Status:** Done
 
 ## Assumptions (confirmed)
 
@@ -38,15 +38,15 @@ Let a tournament director run `liga serve` at the venue with **no CLI tournament
 
 ### Success criteria
 
-- [ ] `atbp liga serve [--data <dir>] [--port <n>] [--lan]` starts when **zero** incomplete `tournament-*` dirs exist (no `--new` flag).
-- [ ] `GET /api/leaderboard` returns period-file ratings when **no** tournament dir is active (HTTP 200).
-- [ ] `GET /api/tournament` returns HTTP 200 with `"phase": "none"` and empty defaults when no tournament dir exists.
-- [ ] Director wizard persists each step via append-only events; replay derives `phase` unambiguously.
-- [ ] `PlayersLocked` is **irreversible** — `PlayersSet` rejected after lock.
-- [ ] `POST /api/tournament/seed` rejected unless `PlayersLocked` is replayed.
-- [ ] Guest players not in period data seed with **1500 / RD 350 / 0–0** W–L.
-- [ ] Sole incomplete tournament still auto-resumes on serve start; multiple incomplete dirs still fail with a list.
-- [ ] All new replay/API behaviour covered by `liga/test`; `sbt --client fixup` clean before commit.
+- [x] `atbp liga serve [--data <dir>] [--port <n>] [--lan]` starts when **zero** incomplete `tournament-*` dirs exist (no `--new` flag).
+- [x] `GET /api/leaderboard` returns period-file ratings when **no** tournament dir is active (HTTP 200).
+- [x] `GET /api/tournament` returns HTTP 200 with `"phase": "none"` and empty defaults when no tournament dir exists.
+- [x] Director wizard persists each step via append-only events; replay derives `phase` unambiguously.
+- [x] `PlayersLocked` is **irreversible** — `PlayersSet` rejected after lock.
+- [x] `POST /api/tournament/seed` rejected unless `PlayersLocked` is replayed.
+- [x] Guest players not in period data seed with **1500 / RD 350 / 0–0** W–L.
+- [x] Sole incomplete tournament still auto-resumes on serve start; multiple incomplete dirs still fail with a list.
+- [x] All new replay/API behaviour covered by `liga/test`; `sbt --client fixup` clean before commit.
 
 ---
 

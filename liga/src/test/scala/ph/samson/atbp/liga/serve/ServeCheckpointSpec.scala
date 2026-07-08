@@ -220,6 +220,13 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
   }
 
   def spec = suite("ServeCheckpoint")(
+    test("resume returns none when no incomplete tournament exists") {
+      withTempDataDir { (dataDir, _) =>
+        for {
+          resolved <- Resume.resolve(dataDir)
+        } yield assertTrue(resolved.isEmpty)
+      }
+    },
     test("full eight-player tournament runnable via HTTP API alone") {
       withTempDataDir { (dataDir, _) =>
         for {
