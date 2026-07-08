@@ -18,7 +18,7 @@ Replace manual billiards standings and ad-hoc handicaps with reproducible Glicko
 
 1. As a director, I run `atbp liga leaderboard` (or `atbp liga leaderboard --data ./club/`) and get a reproducible rating table (rating, RD, career W–L) from period files discovered under `--data`.
 2. As a director, I run `atbp liga handicap "Alice" "Bob" --race 7` and get a suggested spot for Bob (weaker player) before a casual match.
-3. As a director, I run `atbp liga serve`, seed a double-elim bracket from frozen period-start ratings, set per-round race-to-N, accept or override handicap suggestions per match, enter results, and resume after a crash.
+3. As a director, I run `atbp liga serve` (no CLI tournament setup), see the period leaderboard, complete the director wizard (define roster → lock → race-to → seed), then run matches with frozen period-start ratings, accept or override handicap suggestions, enter results, and resume after a crash.
 4. As a spectator, I open `/audience` on the club TV and see live bracket progress without director controls.
 
 ### Success criteria
@@ -76,7 +76,7 @@ sbt run   # then: atbp liga serve --data ./club/
 sbt --client cli/docker:publishLocal
 
 # Fast compile loop for frontend only
-sbt --client ligaJs/fastLinkJS
+sbt --client liga-js/fastLinkJS
 ```
 
 Installed binary equivalents:
@@ -84,7 +84,7 @@ Installed binary equivalents:
 ```bash
 atbp liga leaderboard [--data <dir>]         # default: CWD; discovers period files recursively
 atbp liga handicap <player-a> <player-b> --race <n> [--data <dir>]
-atbp liga serve [--data <dir>] [--port 5442] [--lan] [--new]
+atbp liga serve [--data <dir>] [--port 5442] [--lan]
 ```
 
 **`--data` layout** (single root directory):
@@ -101,7 +101,7 @@ atbp liga serve [--data <dir>] [--port 5442] [--lan] [--new]
 - Period files: HOCON content in **`*.liga`** files (bare top-level fields, no wrapper key), discovered **recursively** under `--data`, **excluding** `tournament-*` directories.
 - Tournaments: subdirectories named `tournament-<YYYYMMDD>-<slug>/` (e.g. `tournament-20260315-spring-open/`) containing append-only JSON event files. `<slug>` is the director-provided tournament name lowercased with non-alphanumeric runs replaced by `-`.
 - **Emitted period files:** on tournament complete, write `<completed-date>-<slug>.liga` to the `--data` root (e.g. `2026-03-15-spring-open.liga`).
-- **Resume rule:** on `serve` startup, if exactly one incomplete `tournament-*` dir exists, resume it automatically. If zero, allow `--new`. If more than one, fail with a list (director must complete or remove extras).
+- **Resume rule:** on `serve` startup, if exactly one incomplete `tournament-*` dir exists, resume it automatically. If zero, serve starts with no tournament dir (period leaderboard only; director creates today's event via the UI wizard). If more than one, fail with a list (director must complete or remove extras). See [docs/specs/serve-without-tournament.md](serve-without-tournament.md).
 
 ---
 
@@ -243,7 +243,9 @@ Event types (v1):
 
 | Event | Purpose |
 |-------|---------|
-| `TournamentCreated` | Name, player list |
+| `TournamentCreated` | Tournament name (wizard emits empty player list; roster follows via `PlayersSet`) |
+| `PlayersSet` | Director-defined roster (rejected after `PlayersLocked`) |
+| `PlayersLocked` | Irreversible roster lock (8–64 players; required before seed) |
 | `RoundRaceToSet` | Per bracket round default race-to-N |
 | `BracketSeeded` | Frozen ratings snapshot + initial bracket |
 | `MatchReady` | Handicap suggested; director may still edit |
@@ -269,9 +271,13 @@ Audience poll interval: **5 seconds** (configurable in HOCON).
 
 | Method | Path | Audience | Purpose |
 |--------|------|----------|---------|
-| GET | `/api/tournament` | ✓ | Current bracket + match states |
-| GET | `/api/leaderboard` | ✓ | Period-start snapshot ratings |
-| POST | `/api/tournament/seed` | ✗ | Director: seed bracket |
+| GET | `/api/tournament` | ✓ | Current bracket, match states, and wizard `phase` |
+| GET | `/api/leaderboard` | ✓ | Period ratings (works with or without active tournament) |
+| POST | `/api/tournament/create` | ✗ | Director: create tournament dir + `TournamentCreated` |
+| POST | `/api/tournament/players` | ✗ | Director: set roster (`PlayersSet`) |
+| POST | `/api/tournament/lock` | ✗ | Director: lock roster (`PlayersLocked`) |
+| POST | `/api/tournament/race-to` | ✗ | Director: set per-round race-to (`RoundRaceToSet`) |
+| POST | `/api/tournament/seed` | ✗ | Director: seed bracket (requires `PlayersLocked`) |
 | POST | `/api/matches/:id/ready` | ✗ | Compute handicap suggestion |
 | POST | `/api/matches/:id/handicap` | ✗ | Set applied handicap |
 | POST | `/api/matches/:id/start` | ✗ | Lock handicap |
@@ -380,7 +386,7 @@ Per [docs/ideas/liga.md](../ideas/liga.md): single-elim, round-robin, auth, mult
 |---|----------|----------|
 | 1 | Period file format | **HOCON in `*.liga` files**; bare top-level fields (no `liga.period` wrapper) |
 | 2 | Glicko2 implementation | **`com.github.mrdimosthenis` `glicko2` 1.0.1** — JVM (`%%`) + Scala.js (`%%%`); handicap algorithm shared where practical |
-| 3 | Data layout | Single **`--data` flag** (default CWD). Period files anywhere recursively under `--data`. In-progress tournaments in **`tournament-<id>/`** subdirs. Auto-resume if exactly one incomplete tournament |
+| 3 | Data layout | Single **`--data` flag** (default CWD). Period files anywhere recursively under `--data`. In-progress tournaments in **`tournament-<id>/`** subdirs. Auto-resume if exactly one incomplete tournament; zero incomplete → serve with no tournament dir |
 | 4 | Serve bind | **`localhost:5442`** default. **`--lan`** exposes audience + read API on `0.0.0.0`; director stays localhost-only |
 | 5 | Audience poll interval | **5 seconds** |
 | 6 | Bracket size (v1) | **8–64** players (power of two; byes as needed) |
@@ -431,7 +437,7 @@ Carried forward from [docs/ideas/liga.md](../ideas/liga.md):
 | Glicko2 library | `mrdimosthenis/glicko2` (JVM + Scala.js) |
 | Serve port | 5442 on localhost; `--lan` for audience on LAN |
 | Bracket size | 8–64 players |
-| Resume | Auto-resume sole incomplete `tournament-*` dir |
+| Resume | Auto-resume sole incomplete `tournament-*` dir; zero incomplete → no tournament dir (wizard creates on first `POST /api/tournament/create`) |
 | Leaderboard output | Fixed-width table; rating desc; integer rating, 1-decimal RD, `12-8` W–L |
 | Tournament dir ID | `tournament-<YYYYMMDD>-<slug>/` |
 | Emitted period filename | `<completed-date>-<slug>.liga` at data root |

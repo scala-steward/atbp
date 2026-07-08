@@ -1,13 +1,11 @@
 # Implementation Plan: Serve Without Tournament
 
 > **Source:** [docs/specs/serve-without-tournament.md](../specs/serve-without-tournament.md)  
-> **Status:** Plan — ready for implementation
+> **Status:** Done
 
 ## Overview
 
 Let a tournament director run `liga serve` with **no CLI tournament setup**, see the **period leaderboard** immediately, and define/run today's double-elimination event entirely from the **Director UI** via a **4-step wizard** (Define → Lock → Race-to → Seed). The on-disk event log remains the single source of truth. The `--new` CLI flag is removed; lazy tournament creation happens on the first wizard `POST /api/tournament/create`.
-
-**Current baseline:** `ServeContext` requires a `File` tournament dir; `Resume.resolve` fails when zero incomplete dirs exist; `DirectorApp` shows a single "Seed bracket" setup panel; no `PlayersSet` / `PlayersLocked` events; `Seed.resolveRatings` rejects unknown players; no `TournamentPhase` in API responses.
 
 ## Architecture Decisions
 
@@ -64,13 +62,13 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Add `playersLocked` to `TournamentState`, new payload types (`PlayersSetPayload`, `PlayersLockedPayload`), `PlayersSet` and `PlayersLocked` cases on `TournamentEvent`, JSON codecs, and EventLog filename slugs (`players-set`, `players-locked`).
 
 **Acceptance criteria:**
-- [ ] `TournamentState` has `playersLocked: Boolean = false`
-- [ ] `PlayersSet` / `PlayersLocked` round-trip through `EventCodec`
-- [ ] `EventLog.filenameFor` produces `00000N-players-set.json` and `00000N-players-locked.json`
+- [x] `TournamentState` has `playersLocked: Boolean = false`
+- [x] `PlayersSet` / `PlayersLocked` round-trip through `EventCodec`
+- [x] `EventLog.filenameFor` produces `00000N-players-set.json` and `00000N-players-locked.json`
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *EventCodec*"`
-- [ ] Build succeeds: `sbt --client compile`
+- [x] Tests pass: `sbt --client "liga/testOnly *EventCodec*"`
+- [x] Build succeeds: `sbt --client compile`
 
 **Dependencies:** None
 
@@ -90,14 +88,14 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Add `BracketRounds.requiredKeys(playerCount)` (topology-derived round keys), `TournamentPhase` enum with `derive(state, hasDir)` and `raceToComplete(state)`, and extend `Replay.applyEvent` for `PlayersSet` / `PlayersLocked` with validation rules from the spec.
 
 **Acceptance criteria:**
-- [ ] `requiredKeys(8)` → `{1,2,3,4}`; `requiredKeys(64)` → `{1…10}`
-- [ ] Phase derivation matches spec table (`none`, `defining`, `locked`, `raceTo`, `active`, `completed`)
-- [ ] `PlayersSet` replaces `state.players`; rejected if `playersLocked` or bracket seeded
-- [ ] `PlayersLocked` sets `playersLocked = true`; rejected if already locked, no players, or count ∉ [8, 64]
+- [x] `requiredKeys(8)` → `{1,2,3,4}`; `requiredKeys(64)` → `{1…10}`
+- [x] Phase derivation matches spec table (`none`, `defining`, `locked`, `raceTo`, `active`, `completed`)
+- [x] `PlayersSet` replaces `state.players`; rejected if `playersLocked` or bracket seeded
+- [x] `PlayersLocked` sets `playersLocked = true`; rejected if already locked, no players, or count ∉ [8, 64]
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *Replay*"`
-- [ ] Tests pass: `sbt --client "liga/testOnly *Bracket*"` (new `BracketRoundsSpec` if separate)
+- [x] Tests pass: `sbt --client "liga/testOnly *Replay*"`
+- [x] Tests pass: `sbt --client "liga/testOnly *Bracket*"` (new `BracketRoundsSpec` if separate)
 
 **Dependencies:** Task 1
 
@@ -117,13 +115,13 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Add pure command handlers in `tournament.Tournament`: `setPlayers`, `lockPlayers`, `setRoundRaceTo` (batch), and `create` (produces `TournamentCreated` with empty players). Each returns `Either[Error, Event]` or `List[Event]` per existing conventions.
 
 **Acceptance criteria:**
-- [ ] `setPlayers` validates not locked / not seeded
-- [ ] `lockPlayers` validates player count 8–64 and not already locked
-- [ ] `setRoundRaceTo` rejects after bracket seeded; accepts map of round → race-to
-- [ ] Errors surface as `MatchLifecycle.Error` or dedicated wizard errors with clear messages
+- [x] `setPlayers` validates not locked / not seeded
+- [x] `lockPlayers` validates player count 8–64 and not already locked
+- [x] `setRoundRaceTo` rejects after bracket seeded; accepts map of round → race-to
+- [x] Errors surface as `MatchLifecycle.Error` or dedicated wizard errors with clear messages
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *Tournament*"` (extend or add wizard command tests)
+- [x] Tests pass: `sbt --client "liga/testOnly *Tournament*"` (extend or add wizard command tests)
 
 **Dependencies:** Task 2
 
@@ -140,12 +138,12 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Require `state.playersLocked` before seeding. Change `resolveRatings` to assign `PlayerRating(player, Tuning.Default.initRating, Tuning.Default.initRd, 0, 0)` for names not in period data instead of `MissingPlayerError`.
 
 **Acceptance criteria:**
-- [ ] Seed without `PlayersLocked` in replay → rejected with clear error
-- [ ] Guest player "Zara" not in period files seeds with 1500 / 350 / 0–0
-- [ ] Period players still use computed period ratings
+- [x] Seed without `PlayersLocked` in replay → rejected with clear error
+- [x] Guest player "Zara" not in period files seeds with 1500 / 350 / 0–0
+- [x] Period players still use computed period ratings
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *Seed*"` (new `SeedSpec` or extend existing)
+- [x] Tests pass: `sbt --client "liga/testOnly *Seed*"` (new `SeedSpec` or extend existing)
 
 **Dependencies:** Task 2
 
@@ -158,9 +156,9 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 ---
 
 ### Checkpoint: Domain
-- [ ] `ReplaySpec` covers `PlayersSet`, `PlayersLocked`, phase derivation, lock irreversibility
-- [ ] `SeedSpec` covers lock requirement and guest ratings
-- [ ] `sbt --client "liga/testOnly *Replay*"` and `*Seed*` pass
+- [x] `ReplaySpec` covers `PlayersSet`, `PlayersLocked`, phase derivation, lock irreversibility
+- [x] `SeedSpec` covers lock requirement and guest ratings
+- [x] `sbt --client "liga/testOnly *Replay*"` and `*Seed*` pass
 
 ---
 
@@ -173,15 +171,15 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Change `Resume.resolve` to return `Option[File]`: `None` when zero incomplete dirs, `Some(dir)` for sole incomplete, fail for multiple. Remove `--new` option from `liga serve` CLI and delete `createNew` from serve startup path (creation moves to API). Update startup log message for no-tournament case.
 
 **Acceptance criteria:**
-- [ ] Zero incomplete dirs → `ZIO.succeed(None)` (not an error)
-- [ ] Sole incomplete → `Some(dir)` (unchanged behaviour)
-- [ ] Multiple incomplete → fail with dir list (unchanged)
-- [ ] `--new` flag removed from CLI; help text updated
-- [ ] `ResumeSpec`: remove/replace `--new` tests; add zero-dir success test
+- [x] Zero incomplete dirs → `ZIO.succeed(None)` (not an error)
+- [x] Sole incomplete → `Some(dir)` (unchanged behaviour)
+- [x] Multiple incomplete → fail with dir list (unchanged)
+- [x] `--new` flag removed from CLI; help text updated
+- [x] `ResumeSpec`: remove/replace `--new` tests; add zero-dir success test
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *Resume*"`
-- [ ] Manual: `atbp liga serve --data ./club/` starts when no tournament dirs exist
+- [x] Tests pass: `sbt --client "liga/testOnly *Resume*"`
+- [x] Manual: `atbp liga serve --data ./club/` starts when no tournament dirs exist (covered by `ServeCheckpointSpec`)
 
 **Dependencies:** None (can start in parallel with Tasks 1–4, but Task 6 depends on this)
 
@@ -200,14 +198,14 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Change `ServeContext.tournamentDir` to `Option[File]`. When `None`, `loadTournament` returns empty/default state; `loadLeaderboard` loads period files only; `nextSeq` / append require `Some(dir)`. Add `createTournament(name)` that creates dir + appends `TournamentCreated`, and wizard append helpers that set dir on first create.
 
 **Acceptance criteria:**
-- [ ] `ServeContext(dataDir, tournamentDir = None)` compiles and works for read paths
-- [ ] `createTournament` creates `tournament-<date>-<slug>/` with `000001-created.json`
-- [ ] Existing match commands unchanged when `Some(dir)` with seeded bracket
-- [ ] All test helpers constructing `ServeContext` updated
+- [x] `ServeContext(dataDir, tournamentDir = None)` compiles and works for read paths
+- [x] `createTournament` creates `tournament-<date>-<slug>/` with `000001-created.json`
+- [x] Existing match commands unchanged when `Some(dir)` with seeded bracket
+- [x] All test helpers constructing `ServeContext` updated
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *Serve*"`
-- [ ] Build succeeds: `sbt --client compile`
+- [x] Tests pass: `sbt --client "liga/testOnly *Serve*"`
+- [x] Build succeeds: `sbt --client compile`
 
 **Dependencies:** Task 5
 
@@ -221,9 +219,9 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 ---
 
 ### Checkpoint: Serve startup
-- [ ] `liga serve` starts with zero incomplete dirs (no `--new`)
-- [ ] Sole incomplete dir still auto-resumes; multiple still fails
-- [ ] `ResumeSpec` updated; `--new` tests removed
+- [x] `liga serve` starts with zero incomplete dirs (no `--new`)
+- [x] Sole incomplete dir still auto-resumes; multiple still fails
+- [x] `ResumeSpec` updated; `--new` tests removed
 
 ---
 
@@ -236,13 +234,13 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Add `phase: TournamentPhase` to `TournamentResponse`. When `tournamentDir` is `None`, `GET /api/tournament` returns HTTP 200 with `phase: "none"` and empty defaults; `GET /api/leaderboard` returns period ratings without loading tournament replay.
 
 **Acceptance criteria:**
-- [ ] `GET /api/tournament` with no dir → 200, `"phase": "none"`, empty name/players/bracket
-- [ ] `GET /api/leaderboard` with no dir → 200, period file ratings
-- [ ] Active tournament responses include correct `phase` (`active`, `defining`, etc.)
-- [ ] No 404 for normal pre-tournament state
+- [x] `GET /api/tournament` with no dir → 200, `"phase": "none"`, empty name/players/bracket
+- [x] `GET /api/leaderboard` with no dir → 200, period file ratings
+- [x] Active tournament responses include correct `phase` (`active`, `defining`, etc.)
+- [x] No 404 for normal pre-tournament state
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *ReadApi*"`
+- [x] Tests pass: `sbt --client "liga/testOnly *ReadApi*"`
 
 **Dependencies:** Task 2, Task 6
 
@@ -260,14 +258,14 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Add director POST routes: `/api/tournament/create`, `/players`, `/lock`, `/race-to` (batch → multiple `RoundRaceToSet`). Wire to `ServeContext` + `Tournament` command handlers. Return updated `TournamentResponse`. Reject seed unless `PlayersLocked`.
 
 **Acceptance criteria:**
-- [ ] Full wizard sequence persists events: create → players → lock → race-to → seed
-- [ ] Phase violations return HTTP 400 with message
-- [ ] `POST /api/tournament/seed` rejected when not locked
-- [ ] Race-to POST appends one event per map entry
-- [ ] All routes localhost-only (existing `directorOnly` guard)
+- [x] Full wizard sequence persists events: create → players → lock → race-to → seed
+- [x] Phase violations return HTTP 400 with message
+- [x] `POST /api/tournament/seed` rejected when not locked
+- [x] Race-to POST appends one event per map entry
+- [x] All routes localhost-only (existing `directorOnly` guard)
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *WriteApi*"`
+- [x] Tests pass: `sbt --client "liga/testOnly *WriteApi*"`
 
 **Dependencies:** Task 3, Task 4, Task 6, Task 7
 
@@ -282,9 +280,9 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 ---
 
 ### Checkpoint: API
-- [ ] `ReadApiSpec`: `phase: none`, leaderboard without tournament dir
-- [ ] `WriteApiSpec`: create → players → lock → race-to → seed sequence
-- [ ] `sbt --client "liga/testOnly *ReadApi*"` and `*WriteApi*` pass
+- [x] `ReadApiSpec`: `phase: none`, leaderboard without tournament dir
+- [x] `WriteApiSpec`: create → players → lock → race-to → seed sequence
+- [x] `sbt --client "liga/testOnly *ReadApi*"` and `*WriteApi*` pass
 
 ---
 
@@ -297,13 +295,13 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Add `TournamentPhase` enum, `phase` field on `TournamentResponse`, request types for wizard POSTs, and `ApiClient` methods: `createTournament`, `setPlayers`, `lockPlayers`, `setRaceTo`, updated `seed`.
 
 **Acceptance criteria:**
-- [ ] JS `TournamentResponse` decodes `phase` from server JSON
-- [ ] All wizard POST methods send correct JSON bodies
-- [ ] `ApiClientContractSpec` covers `phase` field and new request encoders
+- [x] JS `TournamentResponse` decodes `phase` from server JSON
+- [x] All wizard POST methods send correct JSON bodies
+- [x] `ApiClientContractSpec` covers `phase` field and new request encoders
 
 **Verification:**
-- [ ] Tests pass: `sbt --client "liga/testOnly *ApiClient*"`
-- [ ] Build succeeds: `sbt --client ligaJs/fastLinkJS`
+- [x] Tests pass: `sbt --client "liga/testOnly *ApiClient*"`
+- [x] Build succeeds: `sbt --client liga-js/fastLinkJS`
 
 **Dependencies:** Task 7, Task 8
 
@@ -321,16 +319,16 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Replace the single `setupPanel` in `DirectorApp` with phase-based routing. Add `LeaderboardView` (period standings) and `WizardView` (Define / Lock / Race-to / Seed steps). Fetch `/api/tournament` and `/api/leaderboard` in parallel on mount. Pre-fill race-to inputs with 7; show one input per `requiredKeys` count (derive from locked player count or API `phase` + player count).
 
 **Acceptance criteria:**
-- [ ] `phase: none` → period leaderboard + "Start tournament" name input
-- [ ] `phase: defining` → player picker (period multi-select + free-text guest) + save + lock (disabled until 8–64)
-- [ ] `phase: locked` → read-only roster + topology-derived race-to inputs
-- [ ] `phase: raceTo` → summary + seed button
-- [ ] `phase: active` / `completed` → existing `BracketView` + `MatchPanel` unchanged
-- [ ] Restart mid-wizard resumes at correct step (relies on server phase)
+- [x] `phase: none` → period leaderboard + "Start tournament" name input
+- [x] `phase: defining` → player picker (period multi-select + free-text guest) + save + lock (disabled until 8–64)
+- [x] `phase: locked` → read-only roster + topology-derived race-to inputs
+- [x] `phase: raceTo` → summary + seed button
+- [x] `phase: active` / `completed` → existing `BracketView` + `MatchPanel` unchanged
+- [x] Restart mid-wizard resumes at correct step (relies on server phase)
 
 **Verification:**
-- [ ] Build succeeds: `sbt --client ligaJs/fastLinkJS`
-- [ ] Manual check: full wizard E2E in browser at `http://127.0.0.1:5442/`
+- [x] Build succeeds: `sbt --client liga-js/fastLinkJS`
+- [ ] Manual check: full wizard E2E in browser at `http://127.0.0.1:5442/` (optional v1 gate)
 
 **Dependencies:** Task 9
 
@@ -344,8 +342,8 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 ---
 
 ### Checkpoint: UI
-- [ ] `ApiClientContractSpec` parses `phase` and new POST bodies
-- [ ] `sbt --client ligaJs/fastLinkJS` succeeds
+- [x] `ApiClientContractSpec` parses `phase` and new POST bodies
+- [x] `sbt --client liga-js/fastLinkJS` succeeds
 - [ ] Manual: full wizard E2E in browser (optional v1 gate)
 
 ---
@@ -359,15 +357,15 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 **Description:** Update `ServeCheckpointSpec` for no-dir startup and mid-wizard resume. Add test fixtures for wizard event sequences. Verify all spec success criteria. Run full test suite and fixup loop.
 
 **Acceptance criteria:**
-- [ ] All items in spec "Success criteria" section checked off
-- [ ] `sbt --client liga/test` passes
-- [ ] `sbt --client fixup && git status` clean
-- [ ] No `--new` references remain in code or docs (except historical changelog if any)
+- [x] All items in spec "Success criteria" section checked off
+- [x] `sbt --client liga/test` passes
+- [x] `sbt --client fixup && git status` clean
+- [x] No `--new` references remain in code or docs (except historical changelog if any)
 
 **Verification:**
-- [ ] `sbt --client liga/test`
-- [ ] `sbt --client fixup && git status`
-- [ ] Spec success-criteria checklist in [docs/specs/serve-without-tournament.md](../specs/serve-without-tournament.md) reviewed
+- [x] `sbt --client liga/test`
+- [x] `sbt --client fixup && git status`
+- [x] Spec success-criteria checklist in [docs/specs/serve-without-tournament.md](../specs/serve-without-tournament.md) reviewed
 
 **Dependencies:** Tasks 1–10
 
@@ -381,10 +379,18 @@ Implementation order follows the graph bottom-up: domain and replay first, then 
 ---
 
 ### Checkpoint: Complete
-- [ ] All spec success criteria met
-- [ ] `sbt --client liga/test` passes
-- [ ] `sbt --client fixup` leaves `git status` clean
-- [ ] Ready for review
+- [x] All spec success criteria met
+- [x] `sbt --client liga/test` passes
+- [x] `sbt --client fixup` leaves `git status` clean
+- [x] Ready for review
+
+---
+
+## Remaining (optional / follow-up)
+
+| Item | Notes |
+|------|-------|
+| Manual browser E2E | Optional v1 gate — wizard flow is covered by `WriteApiSpec` and `ServeCheckpointSpec` |
 
 ---
 
