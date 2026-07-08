@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.bracket.BracketGen
+import ph.samson.atbp.liga.glicko.Tuning
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 
@@ -31,6 +32,10 @@ object Seed {
 
   final case class MissingPlayerError(name: String) extends Error {
     val message: String = s"unknown player: $name"
+  }
+
+  final case class PlayersNotLockedError() extends Error {
+    val message: String = "cannot seed bracket before roster is locked"
   }
 
   def buildEvents(
@@ -71,6 +76,8 @@ object Seed {
       Left(TournamentCompletedError())
     } else if (state.bracket.nonEmpty) {
       Left(AlreadySeededError())
+    } else if (!state.playersLocked) {
+      Left(PlayersNotLockedError())
     } else if (state.players.isEmpty) {
       Left(NoPlayersError())
     } else {
@@ -89,12 +96,20 @@ object Seed {
       periodRatings: List[PlayerRating]
   ): Either[Error, List[PlayerRating]] = {
     val byName = periodRatings.map(r => r.player.name -> r).toMap
+    val tuning = Tuning.Default
     players.foldLeft(Right(Nil): Either[Error, List[PlayerRating]]) {
       case (Right(acc), player) =>
-        byName.get(player.name) match {
-          case Some(rating) => Right(acc :+ rating)
-          case None         => Left(MissingPlayerError(player.name))
-        }
+        val rating = byName.getOrElse(
+          player.name,
+          PlayerRating(
+            player = player,
+            rating = tuning.initRating,
+            rd = tuning.maxDeviation,
+            wins = 0,
+            losses = 0
+          )
+        )
+        Right(acc :+ rating)
       case (left, _) => left
     }
   }
