@@ -87,6 +87,14 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         parsed.exists(_.ratings.head.wins == 12)
       )
     },
+    test("config fixture matches JS client JSON schema") {
+      val parsed =
+        """{"audiencePollIntervalSeconds":10}""".fromJson[ConfigResponse]
+      assertTrue(
+        parsed.isRight,
+        parsed.exists(_.audiencePollIntervalSeconds == 10)
+      )
+    },
     test("live GET /api/tournament JSON parses for JS client") {
       val ctx = ServeContext(
         dataDir = File(getClass.getResource("/periods")),

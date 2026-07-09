@@ -608,10 +608,10 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** Read-only Laminar SPA at `/audience`. Polls `/api/tournament` every 5 seconds. Shows bracket progress, match results, no director controls.
 
 **Acceptance criteria:**
-- [ ] Poll interval 5s (configurable via served HOCON)
-- [ ] No write controls visible
-- [ ] Updates when director records results
-- [ ] Works on LAN with `--lan`
+- [x] Poll interval 5s (configurable via served HOCON)
+- [x] No write controls visible
+- [x] Updates when director records results
+- [x] Works on LAN with `--lan`
 
 **Verification:**
 - [ ] Manual: director + audience in two browser windows

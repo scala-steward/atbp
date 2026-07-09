@@ -11,7 +11,8 @@ object Routes {
       bind: BindConfig
   ): Routes[Any, Response] =
     StaticAssets.assetRoutes ++ staticRoutes(bind) ++ readApi(
-      ctx
+      ctx,
+      bind
     ) ++ DirectorRoutes.routes(ctx)
 
   private def htmlResponse(html: String): Response =
@@ -35,8 +36,14 @@ object Routes {
       )
     )
 
-  private def readApi(ctx: ServeContext): Routes[Any, Response] =
+  private def readApi(
+      ctx: ServeContext,
+      bind: BindConfig
+  ): Routes[Any, Response] =
     zio.http.Routes(
+      Method.GET / "api" / "config" -> handler(
+        Response.json(ApiJson.configFrom(bind).toJson)
+      ),
       Method.GET / "api" / "tournament" -> handler {
         (for {
           state <- ctx.loadTournament

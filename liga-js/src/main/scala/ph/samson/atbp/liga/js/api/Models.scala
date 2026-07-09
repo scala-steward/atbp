@@ -71,6 +71,10 @@ object Models {
       ratings: List[PlayerRating]
   )
 
+  final case class ConfigResponse(
+      audiencePollIntervalSeconds: Int
+  )
+
   final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
 
   final case class CreateRequest(name: String)
@@ -97,6 +101,7 @@ object Models {
   given JsonCodec[Bracket] = DeriveJsonCodec.gen
   given JsonCodec[TournamentResponse] = DeriveJsonCodec.gen
   given JsonCodec[LeaderboardResponse] = DeriveJsonCodec.gen
+  given JsonCodec[ConfigResponse] = DeriveJsonCodec.gen
   given JsonEncoder[SeedRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[CreateRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[PlayersRequest] = DeriveJsonEncoder.gen

@@ -24,8 +24,13 @@ object ApiJson {
       ratings: List[PlayerRating]
   )
 
+  final case class ConfigResponse(
+      audiencePollIntervalSeconds: Int
+  )
+
   given JsonCodec[TournamentResponse] = DeriveJsonCodec.gen
   given JsonCodec[LeaderboardResponse] = DeriveJsonCodec.gen
+  given JsonCodec[ConfigResponse] = DeriveJsonCodec.gen
 
   def sortRatings(ratings: List[PlayerRating]): List[PlayerRating] =
     ratings.sortBy(-_.rating)
@@ -56,4 +61,9 @@ object ApiJson {
 
   def leaderboardFrom(ratings: List[PlayerRating]): LeaderboardResponse =
     LeaderboardResponse(ratings = sortRatings(ratings))
+
+  def configFrom(bind: BindConfig): ConfigResponse =
+    ConfigResponse(
+      audiencePollIntervalSeconds = bind.audiencePollIntervalSeconds
+    )
 }

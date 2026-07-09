@@ -56,10 +56,14 @@ object BindConfigSpec extends ZIOSpecDefault {
         leaderboard <- LigaRoutes
           .routes(ctx, bind)
           .runZIO(get("/api/leaderboard", remote))
+        config <- LigaRoutes
+          .routes(ctx, bind)
+          .runZIO(get("/api/config", remote))
       } yield assertTrue(
         tournament.status == Status.Ok,
         audience.status == Status.Ok,
-        leaderboard.status == Status.Ok
+        leaderboard.status == Status.Ok,
+        config.status == Status.Ok
       )
     },
     test("--lan blocks director SPA from non-localhost") {

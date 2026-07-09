@@ -6,7 +6,8 @@ import zio.http.Request
 final case class BindConfig(
     host: String = "127.0.0.1",
     port: Int = 5442,
-    lan: Boolean = false
+    lan: Boolean = false,
+    audiencePollIntervalSeconds: Int = 5
 ) {
 
   /** Socket bind address: all interfaces when `--lan`, otherwise `host`. */
@@ -20,7 +21,12 @@ final case class BindConfig(
 object BindConfig {
 
   def from(config: ServeConfig, lan: Boolean): BindConfig =
-    BindConfig(host = config.host, port = config.port, lan = lan)
+    BindConfig(
+      host = config.host,
+      port = config.port,
+      lan = lan,
+      audiencePollIntervalSeconds = config.audiencePollIntervalSeconds
+    )
 
   def isLocalDirector(req: Request): Boolean =
     req.remoteAddress.forall(_.isLoopbackAddress)

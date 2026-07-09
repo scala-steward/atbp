@@ -133,6 +133,22 @@ object ReadApiSpec extends ZIOSpecDefault {
         parsed.ratings.exists(_.player.name == "Alice")
       )
     },
+    test("GET /api/config returns audience poll interval") {
+      val bind = BindConfig(audiencePollIntervalSeconds = 10)
+      for {
+        response <- LigaRoutes
+          .routes(
+            context(fixturePeriods, "eight-player-partial"),
+            bind
+          )
+          .runZIO(Request.get("/api/config"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[ConfigResponse])
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.audiencePollIntervalSeconds == 10
+      )
+    },
     test("TournamentResponse round-trips through JSON codec") {
       val sample = TournamentResponse(
         name = "Spring Open",
