@@ -87,6 +87,8 @@ object Models {
 
   final case class ResultRequest(scoreA: Int, scoreB: Int)
 
+  final case class CompleteRequest(completed: Option[String] = None)
+
   final case class HandicapSuggestion(
       weakerPlayer: Player,
       handicap: Int,
@@ -108,4 +110,5 @@ object Models {
   given JsonEncoder[RaceToRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[HandicapRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[ResultRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[CompleteRequest] = DeriveJsonEncoder.gen
 }

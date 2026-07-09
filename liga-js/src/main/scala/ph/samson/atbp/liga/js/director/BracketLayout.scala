@@ -46,6 +46,9 @@ object BracketLayout {
     matchDef.state == BracketMatchState.Ready ||
       matchDef.state == BracketMatchState.Started
 
+  def allMatchesCompleted(matches: List[BracketMatch]): Boolean =
+    matches.nonEmpty && matches.forall(_.state == BracketMatchState.Completed)
+
   def playerLabel(
       player: Option[ph.samson.atbp.liga.js.api.Models.Player]
   ): String =

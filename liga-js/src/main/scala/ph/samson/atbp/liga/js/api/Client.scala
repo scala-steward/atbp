@@ -77,6 +77,12 @@ final class ApiClient private (baseUrl: String)(using ExecutionContext) {
       Some(ResultRequest(scoreA, scoreB).toJson)
     )
 
+  def completeTournament(): Future[TournamentResponse] =
+    post(
+      "/api/tournament/complete",
+      Some(CompleteRequest(None).toJson)
+    )
+
   private def url(path: String): String = {
     val base = if (baseUrl.endsWith("/")) baseUrl.dropRight(1) else baseUrl
     s"$base$path"

@@ -80,7 +80,9 @@ object PeriodEmission {
   private def validateReady(state: TournamentState): Either[String, Unit] =
     for {
       bracket <- state.bracket.toRight("no bracket loaded")
-      incomplete = bracket.matches.filter(_.state != BracketMatchState.Completed)
+      incomplete = bracket.matches.filter(
+        _.state != BracketMatchState.Completed
+      )
       _ <-
         if (incomplete.isEmpty) {
           Right(())
@@ -114,7 +116,10 @@ object PeriodEmission {
       result <- matchDef.result.toRight(s"missing result in ${matchDef.id}")
       ratingA <- frozenRating(state, playerA)
       ratingB <- frozenRating(state, playerB)
-      raceTo <- MatchLifecycle.resolveRaceTo(state, matchDef.id).left.map(_.message)
+      raceTo <- MatchLifecycle
+        .resolveRaceTo(state, matchDef.id)
+        .left
+        .map(_.message)
       weaker = weakerPlayer(ratingA, ratingB)
       handicapSuggested = matchDef.handicapSuggested.getOrElse(0)
       handicapApplied = matchDef.handicapApplied.getOrElse(0)

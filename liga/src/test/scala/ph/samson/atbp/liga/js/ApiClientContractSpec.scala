@@ -12,6 +12,8 @@ import zio.http.*
 import zio.json.*
 import zio.test.*
 
+import java.time.LocalDate
+
 /** JVM contract tests for `liga-js` API models and response decoding. */
 object ApiClientContractSpec extends ZIOSpecDefault {
 
@@ -137,7 +139,10 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         PlayersRequest(List(Player("Alice"))).toJson.contains("\"players\""),
         RaceToRequest(Map(1 -> 7)).toJson.contains("\"roundRaceTo\""),
         HandicapRequest(3).toJson == """{"handicap":3}""",
-        ResultRequest(7, 4).toJson == """{"scoreA":7,"scoreB":4}"""
+        ResultRequest(7, 4).toJson == """{"scoreA":7,"scoreB":4}""",
+        CompleteRequest(None).toJson == "{}",
+        CompleteRequest(Some(LocalDate.parse("2026-03-15"))).toJson ==
+          """{"completed":"2026-03-15"}"""
       )
     }
   )

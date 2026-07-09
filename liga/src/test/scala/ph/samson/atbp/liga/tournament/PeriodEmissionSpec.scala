@@ -72,7 +72,8 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
       assertTrue(rackA == 7, rackB == 0)
     },
     test("emitted handicapped match uses rack-only scores for Glicko2 games") {
-      val state = handicappedMatchState(boardA = 7, boardB = 5, handicapApplied = 2)
+      val state =
+        handicappedMatchState(boardA = 7, boardB = 5, handicapApplied = 2)
       val period = PeriodEmission.toPeriod(state, completed).toOption.get
       val matchRow = period.matches.head
       val games = ScoreExpansion.expandGames(matchRow.scoreA, matchRow.scoreB)
@@ -87,7 +88,8 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
       ZIO.acquireReleaseWith(
         ZIO.attemptBlocking(File.newTemporaryDirectory("liga-period-emission"))
       )(root => ZIO.attemptBlocking(root.delete()).ignore) { root =>
-        val state = handicappedMatchState(boardA = 7, boardB = 4, handicapApplied = 0)
+        val state =
+          handicappedMatchState(boardA = 7, boardB = 4, handicapApplied = 0)
         for {
           written <- PeriodEmission.write(root, state, completed)
           parsed <- PeriodCodec.parseFile(written)
@@ -102,11 +104,14 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
     },
     test("leaderboard discovers emitted period alongside existing files") {
       ZIO.acquireReleaseWith(
-        ZIO.attemptBlocking(File.newTemporaryDirectory("liga-period-leaderboard"))
+        ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-period-leaderboard")
+        )
       )(root => ZIO.attemptBlocking(root.delete()).ignore) { root =>
         val seed = File(getClass.getResource("/periods/eight-player-seed.liga"))
         ZIO.attemptBlocking(seed.copyTo(root / seed.name)).flatMap { _ =>
-          val state = handicappedMatchState(boardA = 7, boardB = 4, handicapApplied = 0)
+          val state =
+            handicappedMatchState(boardA = 7, boardB = 4, handicapApplied = 0)
           for {
             before <- PeriodLoader.discover(root)
             _ <- PeriodEmission.write(root, state, completed)

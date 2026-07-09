@@ -122,13 +122,16 @@ object DirectorApp {
                     Observer[Unit](_ => runAction(client.seed()))
                   )
                 case TournamentPhase.Active | TournamentPhase.Completed =>
-                  mainLayout(
-                    t,
-                    selectedMatch,
-                    busy.signal,
-                    selectedMatchId,
-                    client,
-                    runAction
+                  div(
+                    completionBar(t, busy.signal, runAction, client),
+                    mainLayout(
+                      t,
+                      selectedMatch,
+                      busy.signal,
+                      selectedMatchId,
+                      client,
+                      runAction
+                    )
                   )
               }
           }
@@ -136,6 +139,37 @@ object DirectorApp {
       styleTag(directorStyles)
     )
   }
+
+  private def completionBar(
+      tournament: TournamentResponse,
+      busy: Signal[Boolean],
+      runAction: (=> Future[TournamentResponse]) => Unit,
+      client: ApiClient
+  ): Node =
+    if (tournament.completed) {
+      div(
+        cls := "completed-banner",
+        p("Tournament complete — ratings period written to data directory.")
+      )
+    } else if (
+      tournament.bracket
+        .exists(b => BracketLayout.allMatchesCompleted(b.matches))
+    ) {
+      div(
+        cls := "complete-panel",
+        p("All bracket matches are finished."),
+        button(
+          cls := "primary",
+          disabled <-- busy,
+          onClick.mapTo(()) --> Observer[Unit](_ =>
+            runAction(client.completeTournament())
+          ),
+          "Complete tournament"
+        )
+      )
+    } else {
+      emptyNode
+    }
 
   private def mainLayout(
       tournament: TournamentResponse,
@@ -187,6 +221,11 @@ object DirectorApp {
       |.header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
       |.tournament-name { color: #555; }
       |.error { color: #b00020; margin-bottom: 1rem; }
+      |.completed-banner, .complete-panel {
+      |  border: 1px solid #2e7d32; border-radius: 6px; padding: 0.75rem 1rem;
+      |  margin-bottom: 1rem; background: #e8f5e9;
+      |}
+      |.complete-panel { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
       |.main-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
       |.leaderboard-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
       |.leaderboard-table th, .leaderboard-table td { border-bottom: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; }
