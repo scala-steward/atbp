@@ -5,6 +5,7 @@ import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 
 import java.time.Instant
+import java.time.LocalDate
 
 /** Pure tournament command handlers that validate lifecycle rules and produce
   * events.
@@ -200,6 +201,26 @@ object Tournament {
         scoreA = scoreA,
         scoreB = scoreB
       )
+    )
+
+  def complete(
+      state: TournamentState,
+      completed: LocalDate,
+      seq: Int,
+      at: Instant
+  ): Either[Error, TournamentEvent.TournamentCompleted] =
+    for {
+      _ <- MatchLifecycle.requireActive(state)
+      _ <- PeriodEmission
+        .toPeriod(state, completed)
+        .left
+        .map(message =>
+          MatchLifecycle.InvalidTransitionError("", "complete", message)
+        )
+    } yield TournamentEvent.TournamentCompleted(
+      seq = seq,
+      at = at,
+      payload = TournamentCompletedPayload(completed = completed)
     )
 
   private def frozenRating(

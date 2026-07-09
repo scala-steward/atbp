@@ -636,16 +636,16 @@ Task 1: SBT modules (liga + liga-js scaffold)
 **Description:** On `TournamentCompleted`, write a new `*.liga` file to `--data` root with all match results, handicaps, and metadata. Never mutate existing period files. Convert tournament **scoreboard** scores to **rack-only** period scores: subtract `handicap-applied` from the spotted (weaker) player's board total; handicaps are stored as metadata and do not inflate Glicko2 game counts.
 
 **Acceptance criteria:**
-- [ ] Emitted file validates against period I/O parser
-- [ ] `completed` date set appropriately
-- [ ] Re-running `liga leaderboard` includes new period
-- [ ] File written to data root as `<completed-date>-<slug>.liga` (e.g. `2026-03-15-spring-open.liga`), not inside `tournament-*`
-- [ ] Emitted `score-a` / `score-b` are racks won only (spotted games excluded); `handicap-applied` preserved
-- [ ] Handicapped match: board 7–5 with spot 2 to weaker player → emitted `score-a = 7`, `score-b = 3` (or symmetric if weaker is A)
+- [x] Emitted file validates against period I/O parser
+- [x] `completed` date set appropriately
+- [x] Re-running `liga leaderboard` includes new period
+- [x] File written to data root as `<completed-date>-<slug>.liga` (e.g. `2026-03-15-spring-open.liga`), not inside `tournament-*`
+- [x] Emitted `score-a` / `score-b` are racks won only (spotted games excluded); `handicap-applied` preserved
+- [x] Handicapped match: board 7–5 with spot 2 to weaker player → emitted `score-a = 7`, `score-b = 3` (or symmetric if weaker is A)
 
 **Verification:**
-- [ ] Integration test: complete tournament → parse emitted file → correct ratings
-- [ ] Integration test: handicapped match emission → rack-only scores → Glicko2 game count excludes spot
+- [x] Integration test: complete tournament → parse emitted file → correct ratings
+- [x] Integration test: handicapped match emission → rack-only scores → Glicko2 game count excludes spot
 - [ ] Bit-for-bit reproducibility with CLI leaderboard
 
 **Dependencies:** Tasks 4, 12, 17

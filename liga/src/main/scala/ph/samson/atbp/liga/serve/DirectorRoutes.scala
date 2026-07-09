@@ -9,6 +9,7 @@ import zio.json.*
 import zio.json.EncoderOps
 
 import java.time.Instant
+import java.time.LocalDate
 
 /** Director-only POST routes (localhost). */
 object DirectorRoutes {
@@ -20,7 +21,10 @@ object DirectorRoutes {
   final case class RaceToRequest(roundRaceTo: Map[Int, Int])
   final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
   final case class HandicapRequest(handicap: Int)
+  final case class CompleteRequest(completed: Option[LocalDate] = None)
   final case class ResultRequest(scoreA: Int, scoreB: Int)
+
+  given JsonCodec[CompleteRequest] = DeriveJsonCodec.gen
 
   given JsonCodec[CreateRequest] = DeriveJsonCodec.gen
   given JsonCodec[PlayersRequest] = DeriveJsonCodec.gen
@@ -66,6 +70,10 @@ object DirectorRoutes {
         "matchId"
       ) / "result" -> handler { (matchId: String, req: Request) =>
         directorOnly(req)(handleResult(ctx, matchId, req))
+      },
+      Method.POST / "api" / "tournament" / "complete" -> handler {
+        (req: Request) =>
+          directorOnly(req)(handleComplete(ctx, req))
       }
     )
 
@@ -213,6 +221,20 @@ object DirectorRoutes {
           at
         )
       }
+      response <- jsonState(ctx, state)
+    } yield response
+
+  private def handleComplete(ctx: ServeContext, req: Request): Task[Response] =
+    for {
+      body <- req.body.asString
+      parsed <-
+        if (body.isBlank) {
+          ZIO.succeed(CompleteRequest())
+        } else {
+          parseJson[CompleteRequest](body)
+        }
+      completed = parsed.completed.getOrElse(LocalDate.now())
+      state <- ctx.completeTournament(completed)
       response <- jsonState(ctx, state)
     } yield response
 

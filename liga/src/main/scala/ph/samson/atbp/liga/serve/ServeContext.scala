@@ -4,6 +4,7 @@ import better.files.File
 import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.EventLog
+import ph.samson.atbp.liga.tournament.PeriodEmission
 import ph.samson.atbp.liga.tournament.Replay
 import ph.samson.atbp.liga.tournament.Resume
 import ph.samson.atbp.liga.tournament.Seed
@@ -128,6 +129,23 @@ final case class ServeContext(
       )
       _ <- EventLog.append(dir, event)
       updated <- Replay.replayDir(dir)
+    } yield updated
+
+  def completeTournament(completed: LocalDate): Task[TournamentState] =
+    for {
+      state <- loadTournament
+      dir <- activeDir
+      seq <- nextSeq
+      at = Instant.now()
+      event <- ZIO.fromEither(
+        Tournament
+          .complete(state, completed, seq, at)
+          .left
+          .map(err => ServeContext.CommandError(err.message))
+      )
+      _ <- EventLog.append(dir, event)
+      updated <- Replay.replayDir(dir)
+      _ <- PeriodEmission.write(dataDir, updated, completed)
     } yield updated
 
   def withTournamentDir(dir: File): ServeContext =
