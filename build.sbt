@@ -128,7 +128,7 @@ lazy val liga = atbpModule("liga")
   .dependsOn(http, ligaCommon.jvm, ligaJs)
   .settings(Dependencies.liga)
   .settings(
-    Compile / resourceGenerators += Def.task {
+    Compile / resourceGenerators += Def.taskDyn {
       val jsDest = (Compile / resourceManaged).value / "liga" / "web" / "js"
       val linkerOutDir =
         (ligaJs / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
@@ -143,23 +143,28 @@ lazy val liga = atbpModule("liga")
         existingLinkerJs.isEmpty ||
           existingLinkerJs.map(_.lastModified).max < inputStamp
 
-      val linkerOut =
-        if (needsLink) {
-          val _ = (ligaJs / Compile / fastLinkJS).value
-          (ligaJs / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
-        } else {
-          linkerOutDir
+      def copyJs(linkerOut: File): Seq[File] = {
+        IO.createDirectory(jsDest)
+        val jsFiles = (linkerOut ** "*.js").get
+        jsFiles.foreach { src =>
+          val dest = jsDest / src.getName
+          if (!dest.exists || dest.lastModified < src.lastModified) {
+            IO.copyFile(src, dest)
+          }
         }
-
-      IO.createDirectory(jsDest)
-      val jsFiles = (linkerOut ** "*.js").get
-      jsFiles.foreach { src =>
-        val dest = jsDest / src.getName
-        if (!dest.exists || dest.lastModified < src.lastModified) {
-          IO.copyFile(src, dest)
-        }
+        jsFiles.map(src => jsDest / src.getName)
       }
-      jsFiles.map(src => jsDest / src.getName)
+
+      if (needsLink) {
+        Def.task {
+          val _ = (ligaJs / Compile / fastLinkJS).value
+          val linkerOut =
+            (ligaJs / Compile / fastLinkJS / scalaJSLinkerOutputDirectory).value
+          copyJs(linkerOut)
+        }
+      } else {
+        Def.task(copyJs(linkerOutDir))
+      }
     }.taskValue
   )
 
