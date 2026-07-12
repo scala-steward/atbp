@@ -2,6 +2,7 @@ package ph.samson.atbp.liga.serve
 
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.EventCodec
+import ph.samson.atbp.liga.tournament.PeriodEmission
 import ph.samson.atbp.liga.tournament.Tournament
 import zio.*
 import zio.http.*
@@ -15,6 +16,8 @@ import java.time.LocalDate
 object DirectorRoutes {
 
   import EventCodec.given
+
+  private val internalServerErrorBody = "internal server error"
 
   final case class CreateRequest(name: String)
   final case class PlayersRequest(players: List[Player])
@@ -84,15 +87,15 @@ object DirectorRoutes {
   ): UIO[Response] =
     if (BindConfig.isLocalDirector(req)) {
       effect
-        .catchSome { case ServeContext.CommandError(message) =>
-          ZIO.succeed(badRequest(message))
+        .catchSome {
+          case ServeContext.CommandError(message) =>
+            ZIO.succeed(badRequest(message))
+          case err: PeriodEmission.EmissionError
+              if err.message.contains("already exists") =>
+            ZIO.succeed(conflict(err.message))
         }
-        .catchAll { err =>
-          ZIO.succeed(
-            Response
-              .text(err.getMessage)
-              .status(Status.InternalServerError)
-          )
+        .catchAll { _ =>
+          ZIO.succeed(internalServerError)
         }
     } else {
       ZIO.succeed(Response.text("forbidden").status(Status.Forbidden))
@@ -248,4 +251,10 @@ object DirectorRoutes {
 
   private def badRequest(message: String): Response =
     Response.text(message).status(Status.BadRequest)
+
+  private def conflict(message: String): Response =
+    Response.text(message).status(Status.Conflict)
+
+  private def internalServerError: Response =
+    Response.text(internalServerErrorBody).status(Status.InternalServerError)
 }
