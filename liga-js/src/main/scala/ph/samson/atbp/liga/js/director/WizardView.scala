@@ -97,7 +97,11 @@ object WizardView {
         cls := "roster-summary",
         child.text <-- selected.signal.map(names =>
           s"${names.size} players selected"
-        )
+        ),
+        child <-- selected.signal.map { names =>
+          val hint = DirectorGuidance.lockRosterHint(names.size)
+          if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode
+        }
       ),
       div(
         cls := "wizard-actions",
@@ -132,13 +136,16 @@ object WizardView {
     div(
       cls := "wizard-panel",
       h2("Race-to by round"),
-      p("Set race-to for each bracket round (pre-filled to 7)."),
+      p(
+        "Set race-to for each bracket round (pre-filled to 7). " +
+          "The same round number may apply to several bracket sections."
+      ),
       ul(
         cls := "race-to-inputs",
         rounds.map { round =>
           li(
             label(
-              s"Round $round",
+              BracketLayout.raceToRoundLabel(round, tournament.players.size),
               input(
                 typ := "number",
                 controlled(
@@ -178,6 +185,7 @@ object WizardView {
       p(
         s"${tournament.players.size} players locked. Race-to configured for all rounds."
       ),
+      p(cls := "guidance", DirectorGuidance.seedHint),
       ul(
         tournament.players.map(player => li(player.name))
       ),

@@ -86,7 +86,11 @@ object DirectorApp {
         )
       ),
       child <-- statusMessage.signal.map { msg =>
-        if (msg.nonEmpty) div(cls := "error", msg) else emptyNode
+        if (msg.nonEmpty) {
+          div(cls := "error", DirectorGuidance.friendlyApiError(msg))
+        } else {
+          emptyNode
+        }
       },
       child <-- tournament.signal
         .combineWith(leaderboard.signal)
@@ -136,6 +140,7 @@ object DirectorApp {
               }
           }
         },
+      p(cls := "footer-note", DirectorGuidance.localhostNote),
       styleTag(directorStyles)
     )
   }
@@ -209,7 +214,12 @@ object DirectorApp {
           case None =>
             div(
               cls := "match-panel empty",
-              p("Select a match from the bracket.")
+              p("Select a match from the bracket."),
+              p(cls := "guidance", DirectorGuidance.matchWorkflowOverview),
+              p(
+                cls := "hint",
+                "Green border = match needs director action."
+              )
             )
         }
       )
@@ -221,6 +231,11 @@ object DirectorApp {
       |.header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
       |.tournament-name { color: #555; }
       |.error { color: #b00020; margin-bottom: 1rem; }
+      |.validation-error { color: #b00020; font-size: 0.9rem; margin: 0.5rem 0; }
+      |.guidance { color: #444; font-size: 0.9rem; margin: 0.5rem 0; }
+      |.hint { color: #666; font-size: 0.85rem; margin: 0.35rem 0; }
+      |.footer-note { color: #666; font-size: 0.85rem; margin-top: 2rem; }
+      |.match-id { color: #888; font-size: 0.8rem; margin: 0; }
       |.completed-banner, .complete-panel {
       |  border: 1px solid #2e7d32; border-radius: 6px; padding: 0.75rem 1rem;
       |  margin-bottom: 1rem; background: #e8f5e9;

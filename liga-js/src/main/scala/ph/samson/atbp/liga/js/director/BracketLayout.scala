@@ -25,6 +25,45 @@ object BracketLayout {
       case _                        => Section.GrandFinal
     }
 
+  def matchLabel(matchId: String): String =
+    sectionOf(matchId) match {
+      case Section.GrandFinal => "Grand Final"
+      case section            => s"${section.label} — round ${roundOf(matchId)}"
+    }
+
+  /** Human-readable scope for a race-to round key in the setup wizard. */
+  def raceToRoundLabel(round: Int, playerCount: Int): String = {
+    val bracketSize = bracketSizeFor(playerCount)
+    val winnersRounds = log2(bracketSize)
+    val losersRounds = (winnersRounds - 1) * 2
+    val scopes = List(
+      Option.when(round >= 1 && round <= winnersRounds)(s"Winners R$round"),
+      Option.when(round >= 1 && round <= losersRounds)(s"Losers R$round"),
+      Option.when(round == winnersRounds)("Grand Final")
+    ).flatten
+    val scopeText =
+      if (scopes.isEmpty) {
+        s"Round $round"
+      } else {
+        scopes.mkString(", ")
+      }
+    s"Round $round ($scopeText)"
+  }
+
+  private def bracketSizeFor(playerCount: Int): Int =
+    if (playerCount <= 8) {
+      8
+    } else if (playerCount <= 16) {
+      16
+    } else if (playerCount <= 32) {
+      32
+    } else {
+      64
+    }
+
+  private def log2(n: Int): Int =
+    (math.log(n) / math.log(2)).toInt
+
   def roundOf(matchId: String): Int =
     matchId match {
       case s"wb-$round-$_" => round.toIntOption.getOrElse(0)

@@ -43,8 +43,13 @@ object BracketView {
         if (isActive) (withSelected :+ "actionable").mkString(" ")
         else withSelected.mkString(" ")
       },
+      title := (if (isActive) {
+                  "Needs director action"
+                } else {
+                  BracketLayout.matchLabel(matchDef.id)
+                }),
       onClick.mapTo(matchDef.id) --> onSelect,
-      span(cls := "match-id", matchDef.id),
+      span(cls := "match-id", BracketLayout.matchLabel(matchDef.id)),
       span(
         cls := "match-players",
         s"${BracketLayout.playerLabel(matchDef.playerA)} vs ${BracketLayout.playerLabel(matchDef.playerB)}"
