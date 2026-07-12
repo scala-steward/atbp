@@ -46,29 +46,29 @@ BindConfig.isLocalDirector          StaticAssets sanitization
 
 ### Phase 1: Security (Tasks 1–2)
 
-- [ ] **Task 1:** Fix `isLocalDirector` for missing `remoteAddress`
-- [ ] **Task 2:** Sanitize static JS asset paths
+- [x] **Task 1:** Fix `isLocalDirector` for missing `remoteAddress`
+- [x] **Task 2:** Sanitize static JS asset paths
 
 **Checkpoint A:** `BindConfigSpec` + `StaticAssetsSpec` pass; LAN write block unchanged.
 
 ### Phase 2: Domain validation (Tasks 3–5)
 
-- [ ] **Task 3:** Reject duplicate roster players
-- [ ] **Task 4:** Enforce handicap bounds server-side
-- [ ] **Task 5:** Enforce race-to score rules on result
+- [x] **Task 3:** Reject duplicate roster players
+- [x] **Task 4:** Enforce handicap bounds server-side
+- [x] **Task 5:** Enforce race-to score rules on result
 
 **Checkpoint B:** `TournamentSpec` + `WriteApiSpec` pass for new rejection cases; `EndToEndSpec` still passes.
 
 ### Phase 3: Completion atomicity (Task 6)
 
-- [ ] **Task 6:** Reorder `completeTournament`; map 409/500 at HTTP
+- [x] **Task 6:** Reorder `completeTournament`; map 409/500 at HTTP
 
 **Checkpoint C:** Integration test proves no `TournamentCompleted` event when period write fails; happy-path E2E unchanged.
 
 ### Phase 4: UX polish (Tasks 7–8)
 
-- [ ] **Task 7:** Generic 500 responses (director + read API)
-- [ ] **Task 8:** `DirectorGuidance` mappings + `TournamentPhase` comment
+- [x] **Task 7:** Generic 500 responses (director + read API)
+- [x] **Task 8:** `DirectorGuidance` mappings + `TournamentPhase` comment
 
 **Checkpoint D (complete):** Full `liga/test`, `fixup`, clean `git status`.
 

@@ -86,6 +86,9 @@ object BindConfigSpec extends ZIOSpecDefault {
         body.contains("Liga Director")
       )
     },
+    test("isLocalDirector returns false when remoteAddress is absent") {
+      assertTrue(!BindConfig.isLocalDirector(Request.get("/")))
+    },
     test("--lan blocks write routes from non-localhost") {
       val bind = BindConfig(lan = true)
       for {

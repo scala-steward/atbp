@@ -24,7 +24,11 @@ object StaticAssets {
     zio.http.Routes(
       Method.GET / "assets" / "js" / string("file") -> handler {
         (fileName: String, _: Request) =>
-          serveClasspathResource(s"$JsRoot/$fileName")
+          if (fileName.contains("..") || fileName.contains("/")) {
+            ZIO.succeed(Response.notFound)
+          } else {
+            serveClasspathResource(s"$JsRoot/$fileName")
+          }
       }
     )
 

@@ -29,5 +29,5 @@ object BindConfig {
     )
 
   def isLocalDirector(req: Request): Boolean =
-    req.remoteAddress.forall(_.isLoopbackAddress)
+    req.remoteAddress.exists(_.isLoopbackAddress)
 }

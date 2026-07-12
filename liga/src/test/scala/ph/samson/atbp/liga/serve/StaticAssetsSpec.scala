@@ -36,6 +36,13 @@ object StaticAssetsSpec extends ZIOSpecDefault {
           .exists(_.mediaType == MediaType.application.javascript)
       )
     },
+    test("asset routes reject path traversal in file name") {
+      for {
+        response <- StaticAssets.assetRoutes.runZIO(
+          Request.get("/assets/js/..")
+        )
+      } yield assertTrue(response.status == Status.NotFound)
+    },
     test("asset routes return 404 for unknown JS file") {
       for {
         response <- StaticAssets.assetRoutes.runZIO(

@@ -195,26 +195,26 @@ Requirements:
 
 ### Required (Important)
 
-- [ ] **`completeTournament` atomicity:** If `PeriodEmission.write` fails, no `TournamentCompleted` event remains on disk. Verified by test simulating write failure (e.g. pre-create target file or inject failing layer). HTTP: **409** when target `.liga` exists, **500** for other I/O errors.
-- [ ] **Race-to score validation:** `Tournament.recordResult` rejects when `max(scoreA, scoreB) != raceTo` or `min(scoreA, scoreB) >= raceTo`. HTTP POST returns 400 with clear message.
-- [ ] **Duplicate roster names:** `Tournament.setPlayers` rejects when `players.distinct.size != players.size` (case-sensitive `Player` equality). HTTP POST `/api/tournament/players` returns 400.
-- [ ] **`isLocalDirector` fix:** `BindConfig.isLocalDirector` returns `false` when `remoteAddress` is `None`. Test added; existing `BindConfigSpec` LAN write-block tests still pass.
+- [x] **`completeTournament` atomicity:** If `PeriodEmission.write` fails, no `TournamentCompleted` event remains on disk. Verified by test simulating write failure (e.g. pre-create target file or inject failing layer). HTTP: **409** when target `.liga` exists, **500** for other I/O errors.
+- [x] **Race-to score validation:** `Tournament.recordResult` rejects when `max(scoreA, scoreB) != raceTo` or `min(scoreA, scoreB) >= raceTo`. HTTP POST returns 400 with clear message.
+- [x] **Duplicate roster names:** `Tournament.setPlayers` rejects when `players.distinct.size != players.size` (case-sensitive `Player` equality). HTTP POST `/api/tournament/players` returns 400.
+- [x] **`isLocalDirector` fix:** `BindConfig.isLocalDirector` returns `false` when `remoteAddress` is `None`. Test added; existing `BindConfigSpec` LAN write-block tests still pass.
 
 ### Required (handicap — promoted from Suggestion)
 
-- [ ] **Handicap bounds:** `Tournament.applyHandicap` rejects `handicap < 0` or `handicap > floor(0.75 × raceTo)` for the match's round. HTTP returns 400.
+- [x] **Handicap bounds:** `Tournament.applyHandicap` rejects `handicap < 0` or `handicap > floor(0.75 × raceTo)` for the match's round. HTTP returns 400.
 
 ### Required (formerly optional)
 
-- [ ] Static asset handler rejects `fileName` containing `..` or `/`.
-- [ ] Generic 500 message for unexpected errors (no raw exception text to client).
-- [ ] Comment on `TournamentPhase.derive` explaining `locked` vs `raceTo` naming.
+- [x] Static asset handler rejects `fileName` containing `..` or `/`.
+- [x] Generic 500 message for unexpected errors (no raw exception text to client).
+- [x] Comment on `TournamentPhase.derive` explaining `locked` vs `raceTo` naming.
 
 ### Verification gate
 
-- [ ] `sbt --client "liga/test"` passes.
-- [ ] `sbt --client fixup && git status` clean.
-- [ ] Existing `EndToEndSpec` eight- and sixteen-player flows still pass unchanged.
+- [x] `sbt --client "liga/test"` passes.
+- [x] `sbt --client fixup && git status` clean.
+- [x] Existing `EndToEndSpec` eight- and sixteen-player flows still pass unchanged.
 
 ---
 
