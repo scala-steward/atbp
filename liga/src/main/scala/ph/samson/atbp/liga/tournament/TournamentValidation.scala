@@ -53,7 +53,10 @@ object TournamentValidation {
       scoreB: Int
   ): Either[String, Unit] =
     for {
-      raceTo <- MatchLifecycle.resolveRaceTo(state, matchDef.id).left.map(_.message)
+      raceTo <- MatchLifecycle
+        .resolveRaceTo(state, matchDef.id)
+        .left
+        .map(_.message)
       _ <-
         if (scoreA == scoreB) {
           Left("scores cannot tie")

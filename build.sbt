@@ -3,6 +3,7 @@ import org.scalajs.linker.interface.ESVersion
 import org.scalajs.linker.interface.ModuleKind
 import org.scalajs.sbtplugin.ScalaJSPlugin
 import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
+import sbtcrossproject.CrossPlugin.autoImport._
 import sbtdynver.DynVer
 
 ThisBuild / organization := "samson.ph"
@@ -21,6 +22,8 @@ lazy val root = Project("atbp", file("."))
     hubad,
     jira,
     liga,
+    ligaCommon.jvm,
+    ligaCommon.js,
     ligaJs,
     md2c,
     plate,
@@ -108,8 +111,21 @@ lazy val traceviz = atbpModule("traceviz")
 lazy val hubad = atbpModule("hubad")
   .settings(Dependencies.hubad)
 
+lazy val ligaCommon = crossProject(JSPlatform, JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("liga-common"))
+  .settings(
+    name := "atbp-liga-common",
+    Compile / packageDoc / mappings := Nil,
+    scalacOptions ++= Seq("-no-indent", "-old-syntax")
+  )
+  .settings(Dependencies.ligaCommon)
+  .jsSettings(
+    scalaJSUseMainModuleInitializer := false
+  )
+
 lazy val liga = atbpModule("liga")
-  .dependsOn(http, ligaJs)
+  .dependsOn(http, ligaCommon.jvm, ligaJs)
   .settings(Dependencies.liga)
   .settings(
     Compile / resourceGenerators += Def.task {
@@ -126,6 +142,7 @@ lazy val liga = atbpModule("liga")
   )
 
 lazy val ligaJs = atbpModule("liga-js")
+  .dependsOn(ligaCommon.js)
   .enablePlugins(ScalaJSPlugin)
   .settings(Dependencies.ligaJs)
   .settings(
