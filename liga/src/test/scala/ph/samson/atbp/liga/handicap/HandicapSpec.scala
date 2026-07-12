@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.handicap
 
+import ph.samson.atbp.liga.handicap.HandicapCap
 import ph.samson.atbp.liga.model.*
 import zio.test.*
 
@@ -16,7 +17,7 @@ object HandicapSpec extends ZIOSpecDefault {
       val a = rating(alice, 2000, rd = 100)
       val b = rating(bob, 1000, rd = 100)
       val suggestion = Handicap.suggest(a, b, raceTo = 7)
-      assertTrue(suggestion.handicap <= (0.75 * 7).floor.toInt)
+      assertTrue(suggestion.handicap <= HandicapCap.capFor(7))
     },
     test("equal ratings suggest handicap 0") {
       val a = rating(alice, 1500, rd = 100)

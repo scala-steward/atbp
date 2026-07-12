@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.handicap.HandicapCap
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 
@@ -46,7 +47,7 @@ object DirectorGuidance {
     }
 
   def handicapCap(raceTo: Int): Int =
-    (0.75 * raceTo).floor.toInt
+    HandicapCap.capFor(raceTo)
 
   def handicapSpotLabel(weakerName: String, raceTo: Int, cap: Int): String =
     s"Spot for $weakerName in race-to-$raceTo (max $cap)."

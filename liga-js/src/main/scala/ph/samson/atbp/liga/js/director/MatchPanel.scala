@@ -1,8 +1,9 @@
 package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.js.api.Models.*
-import ph.samson.atbp.liga.js.glicko.HandicapPreview
+import ph.samson.atbp.liga.model as shared
 
 /** Match control panel: ready, handicap, start, and result entry. */
 object MatchPanel {
@@ -240,7 +241,27 @@ object MatchPanel {
       a <- ratingA
       b <- ratingB
       rt <- raceTo
-    } yield HandicapPreview.suggest(a, b, rt))
+    } yield toJsSuggestion(
+      Handicap.suggest(toSharedRating(a), toSharedRating(b), rt)
+    ))
       .getOrElse(HandicapSuggestion(Player("—"), handicap = 0, raceTo = 7))
   }
+
+  private def toSharedRating(rating: PlayerRating): shared.PlayerRating =
+    shared.PlayerRating(
+      shared.Player(rating.player.name),
+      rating.rating,
+      rating.rd,
+      rating.wins,
+      rating.losses
+    )
+
+  private def toJsSuggestion(
+      suggestion: shared.HandicapSuggestion
+  ): HandicapSuggestion =
+    HandicapSuggestion(
+      Player(suggestion.weakerPlayer.name),
+      suggestion.handicap,
+      suggestion.raceTo
+    )
 }

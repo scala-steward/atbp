@@ -2,18 +2,6 @@ package ph.samson.atbp.liga.model
 
 import java.time.LocalDate
 
-/** Display-name player identity (case-sensitive). */
-final case class Player(name: String)
-
-/** Glicko2 rating snapshot plus career win–loss record. */
-final case class PlayerRating(
-    player: Player,
-    rating: Double,
-    rd: Double,
-    wins: Int,
-    losses: Int
-)
-
 /** Final scores for a completed match. */
 final case class MatchResult(
     scoreA: Int,
@@ -38,13 +26,6 @@ final case class PeriodMatch(
     raceTo: Int,
     handicapSuggested: Int,
     handicapApplied: Int
-)
-
-/** Handicap suggestion for a race-to-N match. */
-final case class HandicapSuggestion(
-    weakerPlayer: Player,
-    handicap: Int,
-    raceTo: Int
 )
 
 /** Bracket match lifecycle: pending → ready → started → completed. */

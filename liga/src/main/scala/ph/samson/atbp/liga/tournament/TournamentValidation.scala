@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.tournament
 
+import ph.samson.atbp.liga.handicap.HandicapCap
 import ph.samson.atbp.liga.model.*
 
 /** Pure validators shared by command handlers and event replay. */
@@ -35,7 +36,7 @@ object TournamentValidation {
       matchDef <- MatchLifecycle.findMatch(state, matchId).left.map(_.message)
       _ <- MatchLifecycle.validateHandicap(matchDef).left.map(_.message)
       raceTo <- MatchLifecycle.resolveRaceTo(state, matchId).left.map(_.message)
-      cap = (0.75 * raceTo).floor.toInt
+      cap = HandicapCap.capFor(raceTo)
       _ <-
         if (handicap < 0) {
           Left("handicap must be non-negative")

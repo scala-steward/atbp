@@ -1,12 +1,15 @@
-package ph.samson.atbp.liga.js.glicko
+package ph.samson.atbp.liga.handicap
 
-import ph.samson.atbp.liga.js.api.Models.HandicapSuggestion
-import ph.samson.atbp.liga.js.api.Models.PlayerRating
+import ph.samson.atbp.liga.model.*
 
-/** Client-side handicap preview — mirrors `liga.handicap.Handicap` for instant
-  * director UI feedback before the server confirms.
+/** Handicap suggestion for race-to-N billiards matches.
+  *
+  * Given two period-start ratings and a race-to-N, finds the integer spot `h`
+  * for the weaker player such that P(weaker wins the match | h) ≈ 50%. The same
+  * pure function is used by the CLI (`liga handicap`), the director UI, and the
+  * server.
   */
-object HandicapPreview {
+object Handicap {
 
   def suggest(
       a: PlayerRating,
@@ -18,7 +21,7 @@ object HandicapPreview {
       HandicapSuggestion(weaker.player, handicap = 0, raceTo)
     } else {
       val (weaker, stronger) = weakerAndStronger(a, b)
-      val cap = (0.75 * raceTo).floor.toInt
+      val cap = HandicapCap.capFor(raceTo)
       val handicap = searchHandicap(weaker, stronger, raceTo, cap)
       HandicapSuggestion(weaker.player, handicap, raceTo)
     }
