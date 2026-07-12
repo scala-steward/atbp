@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.tournament
 
 import better.files.File
+import ph.samson.atbp.liga.io.PeriodCodec
 import ph.samson.atbp.liga.io.PeriodWriter
 import ph.samson.atbp.liga.model.*
 import zio.Task
@@ -76,6 +77,45 @@ object PeriodEmission {
       )
       _ <- ZIO.attemptBlocking(target.write(PeriodWriter.write(period)))
     } yield target
+
+  /** Write a new period file, or verify an existing file matches expected
+    * content.
+    *
+    * Used by tournament completion retry: if the period was written but the
+    * completion event append failed, a retry must not overwrite the file.
+    */
+  def writeOrVerify(
+      dataDir: File,
+      state: TournamentState,
+      completed: LocalDate
+  ): Task[Unit] =
+    for {
+      period <- ZIO.fromEither(
+        toPeriod(state, completed).left.map(EmissionError(_))
+      )
+      target = dataDir / periodFilename(state.name, completed)
+      exists <- ZIO.attemptBlocking(target.exists)
+      _ <-
+        if (!exists) {
+          ZIO.attemptBlocking(
+            dataDir.createDirectoryIfNotExists(createParents = true)
+          ) *> ZIO.attemptBlocking(target.write(PeriodWriter.write(period)))
+        } else {
+          for {
+            onDisk <- PeriodCodec.parseFile(target)
+            _ <-
+              if (onDisk == period) {
+                ZIO.unit
+              } else {
+                ZIO.fail(
+                  EmissionError(
+                    s"period file content mismatch: ${target.pathAsString}"
+                  )
+                )
+              }
+          } yield ()
+        }
+    } yield ()
 
   private def validateReady(state: TournamentState): Either[String, Unit] =
     for {

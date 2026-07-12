@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.serve
 
 import better.files.File
+import ph.samson.atbp.liga.io.PeriodWriter
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.serve.ApiJson.*
 import ph.samson.atbp.liga.serve.Routes as LigaRoutes
@@ -425,7 +426,56 @@ object WriteApiSpec extends ZIOSpecDefault {
       )
     },
     test(
-      "POST /api/tournament/complete returns 409 when period file already exists"
+      "POST /api/tournament/complete retries after period write without event append"
+    ) {
+      val completed = LocalDate.parse("2026-03-15")
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+            )
+          )
+        seedBody <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostGet("/api/tournament"))
+        seedText <- seedBody.body.asString
+        seeded <- ZIO.fromEither(seedText.fromJson[TournamentResponse])
+        _ <- playAllReadyMatches(ctx, seeded)
+        state <- Replay.replayDir(ctx.tournamentDir.get)
+        target <- PeriodEmission.write(ctx.dataDir, state, completed)
+        beforeModified <- ZIO.attemptBlocking(target.lastModifiedTime)
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/complete",
+              s"""{"completed":"$completed"}"""
+            )
+          )
+        body <- response.body.asString
+        completedState <- ZIO.fromEither(body.fromJson[TournamentResponse])
+        afterModified <- ZIO.attemptBlocking(target.lastModifiedTime)
+        completedEvents <- ZIO.attemptBlocking(
+          ctx.tournamentDir.get.list
+            .filter(_.name.endsWith("-completed.json"))
+            .toList
+        )
+        replayed <- Replay.replayDir(ctx.tournamentDir.get)
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.Ok,
+        completedState.completed,
+        completedEvents.size == 1,
+        Replay.isComplete(replayed),
+        beforeModified == afterModified
+      )
+    },
+    test(
+      "POST /api/tournament/complete returns 409 when period file content mismatches"
     ) {
       val completed = LocalDate.parse("2026-03-15")
       for {
@@ -448,7 +498,17 @@ object WriteApiSpec extends ZIOSpecDefault {
           "Spring Open",
           completed
         )
-        _ <- ZIO.attemptBlocking(target.write("existing"))
+        _ <- ZIO.attemptBlocking(
+          target.write(
+            PeriodWriter.write(
+              Period(
+                name = "Other Tournament",
+                completed = completed,
+                matches = Nil
+              )
+            )
+          )
+        )
         response <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(
@@ -467,7 +527,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         _ <- cleanup(root)
       } yield assertTrue(
         response.status == Status.Conflict,
-        body.contains("already exists"),
+        body.contains("mismatch"),
         completedEvents.isEmpty,
         !Replay.isComplete(replayed)
       )

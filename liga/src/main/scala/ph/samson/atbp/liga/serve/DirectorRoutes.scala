@@ -91,7 +91,8 @@ object DirectorRoutes {
           case ServeContext.CommandError(message) =>
             ZIO.succeed(badRequest(message))
           case err: PeriodEmission.EmissionError
-              if err.message.contains("already exists") =>
+              if err.message.contains("already exists") ||
+                err.message.contains("mismatch") =>
             ZIO.succeed(conflict(err.message))
         }
         .catchAll { _ =>

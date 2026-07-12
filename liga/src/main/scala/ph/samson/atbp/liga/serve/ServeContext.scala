@@ -143,7 +143,7 @@ final case class ServeContext(
           .left
           .map(err => ServeContext.CommandError(err.message))
       )
-      _ <- PeriodEmission.write(dataDir, state, completed)
+      _ <- PeriodEmission.writeOrVerify(dataDir, state, completed)
       _ <- EventLog.append(dir, event)
       updated <- Replay.replayDir(dir)
     } yield updated
