@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.serve
 
 import better.files.File
+import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.serve.ApiJson.*
 import ph.samson.atbp.liga.serve.Routes as LigaRoutes
@@ -68,6 +69,26 @@ object ReadApiSpec extends ZIOSpecDefault {
           .map(_.player.name)
           .sorted == (1 to 8).map(i => s"P$i").toList,
         parsed.ratings.find(_.player.name == "P1").exists(_.rating == 1690.0)
+      )
+    },
+    test(
+      "GET /api/leaderboard returns period-file ratings after tournament complete"
+    ) {
+      val ctx = context(fixturePeriods, "eight-player-complete")
+      for {
+        expected <- PeriodLoader
+          .loadAll(fixturePeriods)
+          .map(ApiJson.sortRatings)
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/leaderboard"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[LeaderboardResponse])
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.ratings == expected,
+        parsed.ratings.exists(_.player.name == "Alice"),
+        !parsed.ratings.exists(r => r.player.name == "P1" && r.rating == 1690.0)
       )
     },
     test("GET /api/leaderboard falls back to period files before seeding") {

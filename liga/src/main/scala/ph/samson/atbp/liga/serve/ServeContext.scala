@@ -38,10 +38,10 @@ final case class ServeContext(
     * ratings from discovered period files.
     */
   def loadLeaderboard(state: TournamentState): Task[List[PlayerRating]] =
-    if (state.frozenRatings.nonEmpty) {
-      ZIO.succeed(ApiJson.sortRatings(state.frozenRatings.values.toList))
-    } else {
+    if (state.completed || state.frozenRatings.isEmpty) {
       PeriodLoader.loadAll(dataDir).map(ApiJson.sortRatings)
+    } else {
+      ZIO.succeed(ApiJson.sortRatings(state.frozenRatings.values.toList))
     }
 
   def createTournament(name: String): Task[TournamentState] =
