@@ -9,7 +9,7 @@
 1. Scope is **remediation and hardening** from thermo findings — no unrelated new features.
 2. The v1 security model is unchanged: director writes are localhost-only; `--lan` is read-only for remote clients.
 3. Billiards rules unchanged: winner score equals race-to exactly; loser score is strictly less than race-to; handicap cap is `floor(0.75 × race-to)`.
-4. A venue may run **multiple tournaments per serve session** (same day, after complete) without restarting `liga serve`.
+4. **One tournament per serve session** — starting another event requires restarting `liga serve`; no in-session second-tournament flow.
 5. Event log is the source of truth; replay must enforce the same invariants as command handlers.
 6. `SPEC.md` is the working spec for this pass; it does not replace `docs/specs/liga.md`.
 7. `liga-common` crossProject is **in scope** as Phase 2 (thermo P0 maintainability debt).
@@ -31,18 +31,16 @@ Close the gaps identified by thermo review so that Liga is **venue-correct** aft
 
 | User | Impact |
 |------|--------|
-| Tournament director | Can start a second tournament same session; leaderboard reflects emitted period ratings after complete; clearer API errors |
+| Tournament director | Leaderboard reflects emitted period ratings after complete; clearer API errors |
 | Club organizer | Period files and completion events stay consistent; corrupt event logs cannot silently produce invalid state |
 | Spectator | Audience leaderboard shows updated ratings after tournament complete |
 
 ### User stories
 
-1. As a director who resumed an incomplete tournament via CLI, when I complete it and start another tournament, all wizard and match writes target the **new** tournament — not the completed one.
-2. As a director, after I complete a tournament, `/api/leaderboard` shows ratings from period files (including the just-emitted period), not frozen period-start snapshots.
-3. As a director viewing the completed state, I can start a **new tournament** from the UI without restarting serve.
-4. As an operator, if tournament completion fails after the period file is written but before the event is appended, I can retry `/complete` and the server verifies the existing period file matches expectations, then appends the completion event without rewriting the period.
-5. As a maintainer, replay rejects the same invalid wizard/match events that command handlers reject (scores, handicaps, duplicate players, race-to bounds).
-6. As a director, the handicap preview in the browser matches server handicap math (single shared implementation).
+1. As a director, after I complete a tournament, `/api/leaderboard` shows ratings from period files (including the just-emitted period), not frozen period-start snapshots.
+2. As an operator, if tournament completion fails after the period file is written but before the event is appended, I can retry `/complete` and the server verifies the existing period file matches expectations, then appends the completion event without rewriting the period.
+3. As a maintainer, replay rejects the same invalid wizard/match events that command handlers reject (scores, handicaps, duplicate players, race-to bounds).
+4. As a director, the handicap preview in the browser matches server handicap math (single shared implementation).
 
 ---
 
@@ -104,7 +102,7 @@ liga-common/                          # NEW (Phase 2) — shared JVM+JS crossPro
 
 liga/src/main/scala/ph/samson/atbp/liga/
   serve/
-    ServeContext.scala                  # dir resolution, leaderboard, complete atomicity
+    ServeContext.scala                  # leaderboard after complete, complete retry
     DirectorRoutes.scala                # InvalidSeq → 409
   tournament/
     Replay.scala                        # unified validation
@@ -113,7 +111,6 @@ liga/src/main/scala/ph/samson/atbp/liga/
     TournamentValidation.scala          # NEW — shared command+replay validators
 
 liga-js/src/main/scala/ph/samson/atbp/liga/js/
-  director/DirectorApp.scala            # "New tournament" UX
   glicko/                               # DELETE duplicated HandicapPreview, WinProbability, Tuning
 
 liga-js/src/test/scala/                 # NEW — parity tests for shared math
@@ -154,21 +151,7 @@ case TournamentEvent.MatchResult(_, _, payload) =>
   ...
 ```
 
-`ServeContext` dir resolution — illustrative:
-
-```scala
-private def activeDirOption: Task[Option[File]] =
-  tournamentDir match {
-    case Some(dir) =>
-      Replay.replayDir(dir).flatMap { state =>
-        if (state.completed) Resume.resolve(dataDir)
-        else ZIO.succeed(Some(dir))
-      }
-    case None => Resume.resolve(dataDir)
-  }
-```
-
-Complete retry — illustrative (`ServeContext.completeTournament`):
+`ServeContext` complete retry — illustrative:
 
 ```scala
 // 1. Build expected period content via PeriodEmission.toPeriod
@@ -181,7 +164,6 @@ Complete retry — illustrative (`ServeContext.completeTournament`):
 
 Conventions:
 
-- `createTournament` returns `(ServeContext, TournamentState)` or updates context via `withTournamentDir` at the HTTP layer.
 - `loadLeaderboard`: when `state.completed`, always load from `PeriodLoader.loadAll(dataDir)`.
 - Reuse existing error types; add `WizardError` variants for invalid race-to rather than raw strings in replay.
 - No new runtime dependencies.
@@ -192,8 +174,6 @@ Conventions:
 
 | Concern | Level | Location |
 |---------|-------|----------|
-| Pinned dir re-resolves after complete | Integration | `ServeCheckpointSpec` or new `ServeContextSpec` |
-| Create second tournament after complete (pinned context) | Integration | `WriteApiSpec` |
 | Leaderboard after HTTP complete | Integration | `ReadApiSpec` |
 | Complete retry: matching period skips write, appends event | Integration | `WriteApiSpec` / `ServeCheckpointSpec` |
 | Complete retry: mismatched period returns 409 | Integration | `WriteApiSpec` |
@@ -243,12 +223,9 @@ Requirements:
 
 ### Phase 1 — Venue correctness (required)
 
-- [ ] **Pinned dir re-resolution:** When `tournamentDir` is pinned and that tournament replays as `completed`, `activeDirOption` falls through to `Resume.resolve`. Verified with pinned-context integration test.
-- [ ] **Create updates pin:** `createTournament` (or its HTTP handler) calls `withTournamentDir(newDir)` so subsequent writes use the new tournament.
 - [ ] **Leaderboard after complete:** When `state.completed`, `loadLeaderboard` uses `PeriodLoader.loadAll(dataDir)`, not `frozenRatings`. `ReadApiSpec` proves HTTP response includes post-tournament ratings.
-- [ ] **Second-tournament UX:** Director UI shows a "New tournament" (or equivalent) action when `phase == completed` that calls create and transitions to wizard flow.
 - [ ] **Complete idempotent retry:** Keep period-write-then-append order. If period file already exists on `/complete`, verify on-disk content matches `PeriodEmission.toPeriod` output; **409 on mismatch**, skip write and append event on match. Test: simulate append failure then successful retry.
-- [ ] **Dir collision on create:** When `tournament-YYYYMMDD-slug` already exists (e.g. completed tournament same name/day), `createTournament` returns **409** with message to pick a different name.
+- [ ] **Dir collision on create:** When `tournament-YYYYMMDD-slug` already exists (e.g. prior completed tournament same name/day after serve restart), `createTournament` returns **409** with message to pick a different name.
 - [ ] **Misleading create error:** When `Resume.resolve` finds an incomplete tournament, error reads `"an incomplete tournament already exists; resume or remove it first"` (not generic "directory already exists").
 
 ### Phase 2 — Event-log integrity + shared math (required)
@@ -287,12 +264,11 @@ Requirements:
 ```
 Phase 1 (venue)          Phase 2 (integrity)       Phase 3 (hardening)
 ─────────────────        ───────────────────       ───────────────────
-1. activeDirOption       1. TournamentValidation   1. race-to bounds
-2. createTournament pin  2. Replay wiring + tests  2. Seed raceToComplete
-3. loadLeaderboard       3. liga-common extract    3. InvalidSeq → 409
-4. complete atomicity    4. Delete JS duplicates
-5. DirectorApp UX        5. JS parity tests
-6. create error message
+1. loadLeaderboard       1. TournamentValidation   1. race-to bounds
+2. complete retry        2. Replay wiring + tests  2. Seed raceToComplete
+3. create error message  3. liga-common extract    3. InvalidSeq → 409
+                         4. Delete JS duplicates
+                         5. JS parity tests
 ```
 
 All three phases ship in one PR, in dependency order below.
@@ -304,10 +280,11 @@ All three phases ship in one PR, in dependency order below.
 | # | Question | Decision |
 |---|----------|----------|
 | 1 | Complete ordering | **Keep period-write-then-append.** On retry, if period file exists: verify content matches expected (`PeriodEmission.toPeriod`); **409 on mismatch**; skip write and append `TournamentCompleted` on match. |
-| 2 | Dir collision (same name + date) | **Reject with 409** — director must pick a different tournament name. |
+| 2 | Dir collision (same name + date) | **Reject with 409** — director must pick a different tournament name (applies after serve restart). |
 | 3 | `liga-common` scope | **Math + shared types** — `Player`, `PlayerRating`, `HandicapSuggestion`, `WinProbability`, `Handicap`, `Tuning`. |
 | 4 | Race-to minimum | **Reject `< 2`**. |
 | 5 | Phase 3 timing | **Same PR** as Phase 1 and Phase 2. |
+| 6 | Second tournament | **Out of scope** — one tournament per serve session; restart `liga serve` for the next event. No pinned-dir re-resolution or "new tournament" UI. |
 
 ---
 
