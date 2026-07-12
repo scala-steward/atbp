@@ -6,6 +6,8 @@ import zio.json.EncoderOps
 
 object Routes {
 
+  private val internalServerErrorBody = "internal server error"
+
   def routes(
       ctx: ServeContext,
       bind: BindConfig
@@ -50,10 +52,10 @@ object Routes {
           hasDir <- ctx.hasActiveDir
         } yield Response.json(
           ApiJson.tournamentFrom(state, hasDir).toJson
-        )).catchAll(err =>
+        )).catchAll(_ =>
           ZIO.succeed(
             Response
-              .text(err.getMessage)
+              .text(internalServerErrorBody)
               .status(Status.InternalServerError)
           )
         )
@@ -63,10 +65,10 @@ object Routes {
           state <- ctx.loadTournament
           ratings <- ctx.loadLeaderboard(state)
         } yield Response.json(ApiJson.leaderboardFrom(ratings).toJson))
-          .catchAll(err =>
+          .catchAll(_ =>
             ZIO.succeed(
               Response
-                .text(err.getMessage)
+                .text(internalServerErrorBody)
                 .status(Status.InternalServerError)
             )
           )

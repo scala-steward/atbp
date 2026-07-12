@@ -11,6 +11,8 @@ enum TournamentPhase {
 object TournamentPhase {
 
   def derive(state: TournamentState, hasDir: Boolean): TournamentPhase =
+    // `Locked` means roster locked but race-to not yet configured for every
+    // round; `RaceTo` means race-to is complete and the bracket can be seeded.
     if (!hasDir) {
       TournamentPhase.None
     } else if (state.completed) {

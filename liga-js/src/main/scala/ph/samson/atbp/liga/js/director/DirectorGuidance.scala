@@ -65,6 +65,16 @@ object DirectorGuidance {
       "Scores cannot tie — one player must win."
     } else if (lower.contains("scores must be non-negative")) {
       "Scores must be zero or greater."
+    } else if (lower.contains("duplicate player names")) {
+      "Each player name must be unique on the roster."
+    } else if (lower.contains("handicap must be at most")) {
+      "Handicap exceeds the maximum allowed for this race-to."
+    } else if (lower.contains("handicap must be non-negative")) {
+      "Handicap cannot be negative."
+    } else if (lower.contains("winner score must be")) {
+      "Winner's scoreboard total must match the race-to for this round."
+    } else if (lower.contains("loser score must be less than")) {
+      "Loser's scoreboard total must be below the race-to."
     } else if (
       lower.contains("player count must be 8-64") ||
       lower.contains("player count must be 8–64")
