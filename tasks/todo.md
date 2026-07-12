@@ -35,7 +35,7 @@ Source: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md)
 ### Checkpoint: Complete
 - [x] `sbt --client "liga/test"` passes
 - [x] `sbt --client "liga-js/test"` passes
-- [ ] `sbt --client fixup && git status` clean
+- [x] `sbt --client fixup && git status` clean
 - [x] `EndToEndSpec` eight- and sixteen-player flows pass
 - [ ] All SPEC required success criteria checked off
 
