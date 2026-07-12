@@ -74,16 +74,20 @@ object Tournament {
       Left(RosterLockedError())
     } else if (state.bracket.nonEmpty) {
       Left(AlreadySeededError())
-    } else if (players.distinct.size != players.size) {
-      Left(DuplicatePlayersError())
     } else {
-      Right(
-        TournamentEvent.PlayersSet(
-          seq = seq,
-          at = at,
-          payload = PlayersSetPayload(players = players)
+      TournamentValidation
+        .validatePlayersSet(players)
+        .fold(
+          _ => Left(DuplicatePlayersError()),
+          _ =>
+            Right(
+              TournamentEvent.PlayersSet(
+                seq = seq,
+                at = at,
+                payload = PlayersSetPayload(players = players)
+              )
+            )
         )
-      )
     }
 
   def lockPlayers(
@@ -158,31 +162,12 @@ object Tournament {
       at: Instant
   ): Either[Error, TournamentEvent.HandicapApplied] =
     for {
-      _ <- MatchLifecycle.requireActive(state)
-      matchDef <- MatchLifecycle.findMatch(state, matchId)
-      _ <- MatchLifecycle.validateHandicap(matchDef)
-      raceTo <- MatchLifecycle.resolveRaceTo(state, matchId)
-      cap = (0.75 * raceTo).floor.toInt
-      _ <-
-        if (handicap < 0) {
-          Left(
-            MatchLifecycle.InvalidTransitionError(
-              matchId,
-              "handicap",
-              "handicap must be non-negative"
-            )
-          )
-        } else if (handicap > cap) {
-          Left(
-            MatchLifecycle.InvalidTransitionError(
-              matchId,
-              "handicap",
-              s"handicap must be at most $cap for race-to $raceTo"
-            )
-          )
-        } else {
-          Right(())
-        }
+      _ <- TournamentValidation
+        .validateHandicap(state, matchId, handicap)
+        .left
+        .map(msg =>
+          MatchLifecycle.InvalidTransitionError(matchId, "handicap", msg)
+        )
     } yield TournamentEvent.HandicapApplied(
       seq = seq,
       at = at,
@@ -220,7 +205,12 @@ object Tournament {
       _ <- MatchLifecycle.requireActive(state)
       matchDef <- MatchLifecycle.findMatch(state, matchId)
       _ <- MatchLifecycle.validateResult(matchDef)
-      _ <- validateScores(state, matchDef, scoreA, scoreB)
+      _ <- TournamentValidation
+        .validateMatchResult(state, matchDef, scoreA, scoreB)
+        .left
+        .map(msg =>
+          MatchLifecycle.InvalidTransitionError(matchDef.id, "result", msg)
+        )
     } yield TournamentEvent.MatchResult(
       seq = seq,
       at = at,
@@ -258,54 +248,4 @@ object Tournament {
     state.frozenRatings
       .get(player)
       .toRight(MatchLifecycle.MissingRatingError(player))
-
-  private def validateScores(
-      state: TournamentState,
-      matchDef: BracketMatch,
-      scoreA: Int,
-      scoreB: Int
-  ): Either[Error, Unit] =
-    for {
-      raceTo <- MatchLifecycle.resolveRaceTo(state, matchDef.id)
-      _ <-
-        if (scoreA == scoreB) {
-          Left(
-            MatchLifecycle.InvalidTransitionError(
-              matchDef.id,
-              "result",
-              "scores cannot tie"
-            )
-          )
-        } else if (scoreA < 0 || scoreB < 0) {
-          Left(
-            MatchLifecycle.InvalidTransitionError(
-              matchDef.id,
-              "result",
-              "scores must be non-negative"
-            )
-          )
-        } else {
-          val winnerScore = math.max(scoreA, scoreB)
-          val loserScore = math.min(scoreA, scoreB)
-          if (winnerScore != raceTo) {
-            Left(
-              MatchLifecycle.InvalidTransitionError(
-                matchDef.id,
-                "result",
-                s"winner score must be $raceTo"
-              )
-            )
-          } else if (loserScore >= raceTo) {
-            Left(
-              MatchLifecycle.InvalidTransitionError(
-                matchDef.id,
-                "result",
-                s"loser score must be less than $raceTo"
-              )
-            )
-          } else {
-            Right(())
-          }
-        }
-    } yield ()
 }

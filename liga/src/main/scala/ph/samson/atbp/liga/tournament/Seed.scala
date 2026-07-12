@@ -72,16 +72,13 @@ object Seed {
   private def validateState(
       state: TournamentState
   ): Either[Error, Unit] =
-    if (state.completed) {
-      Left(TournamentCompletedError())
-    } else if (state.bracket.nonEmpty) {
-      Left(AlreadySeededError())
-    } else if (!state.playersLocked) {
-      Left(PlayersNotLockedError())
-    } else if (state.players.isEmpty) {
-      Left(NoPlayersError())
-    } else {
-      Right(())
+    TournamentValidation.validateSeedState(state).left.map {
+      case "tournament is already completed" => TournamentCompletedError()
+      case "bracket is already seeded"       => AlreadySeededError()
+      case "cannot seed bracket before roster is locked" =>
+        PlayersNotLockedError()
+      case "tournament has no players" => NoPlayersError()
+      case _                           => NoPlayersError()
     }
 
   private def validatePlayerCount(count: Int): Either[Error, Unit] =
