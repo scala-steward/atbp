@@ -4,7 +4,7 @@ import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.model.*
 import zio.test.*
 
-/** JVM parity checks for client-side handicap preview (mirrors `Handicap`). */
+/** Scala.js parity checks for shared handicap preview math. */
 object HandicapPreviewParitySpec extends ZIOSpecDefault {
 
   private val alice = Player("Alice")

@@ -144,6 +144,9 @@ lazy val liga = atbpModule("liga")
 lazy val ligaJs = atbpModule("liga-js")
   .dependsOn(ligaCommon.js)
   .enablePlugins(ScalaJSPlugin)
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+  )
   .settings(Dependencies.ligaJs)
   .settings(
     Compile / packageDoc / mappings := Nil,
