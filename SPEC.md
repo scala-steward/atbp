@@ -1,7 +1,7 @@
 # Spec: Liga code-review remediation
 
 > **Source:** Five-axis review of `liga` branch vs `main` (2026-07-12)  
-> **Status:** Specify — awaiting human approval before implementation
+> **Status:** Approved — open questions resolved (2026-07-12)
 
 ## Assumptions
 
@@ -11,6 +11,10 @@
 4. Billiards scoring rules: winner's board total equals race-to; loser's board total is strictly less than race-to; scores are non-negative integers; ties are invalid.
 5. Handicap override remains director-controlled, but must be bounded server-side to `0 … floor(0.75 × race-to)` (matching `Handicap.suggest` and `DirectorGuidance.handicapCap`).
 6. `SPEC.md` lives at repo root for this remediation pass; it does not replace `docs/specs/liga.md`.
+7. Complete failure returns **409** when the period file already exists, **500** for other I/O errors.
+8. Winner's score must **equal** race-to exactly; loser score must be **strictly less** than race-to.
+9. Duplicate roster check is **case-sensitive** (`"Alice"` and `"alice"` are distinct).
+10. All former optional items (static path sanitization, generic 500s, phase naming comment) are **in scope**.
 
 ---
 
@@ -191,16 +195,16 @@ Requirements:
 
 ### Required (Important)
 
-- [ ] **`completeTournament` atomicity:** If `PeriodEmission.write` fails, no `TournamentCompleted` event remains on disk. Verified by test simulating write failure (e.g. pre-create target file or inject failing layer).
+- [ ] **`completeTournament` atomicity:** If `PeriodEmission.write` fails, no `TournamentCompleted` event remains on disk. Verified by test simulating write failure (e.g. pre-create target file or inject failing layer). HTTP: **409** when target `.liga` exists, **500** for other I/O errors.
 - [ ] **Race-to score validation:** `Tournament.recordResult` rejects when `max(scoreA, scoreB) != raceTo` or `min(scoreA, scoreB) >= raceTo`. HTTP POST returns 400 with clear message.
-- [ ] **Duplicate roster names:** `Tournament.setPlayers` rejects when `players.map(_.name).distinct.size != players.size`. HTTP POST `/api/tournament/players` returns 400.
+- [ ] **Duplicate roster names:** `Tournament.setPlayers` rejects when `players.distinct.size != players.size` (case-sensitive `Player` equality). HTTP POST `/api/tournament/players` returns 400.
 - [ ] **`isLocalDirector` fix:** `BindConfig.isLocalDirector` returns `false` when `remoteAddress` is `None`. Test added; existing `BindConfigSpec` LAN write-block tests still pass.
 
 ### Required (handicap — promoted from Suggestion)
 
 - [ ] **Handicap bounds:** `Tournament.applyHandicap` rejects `handicap < 0` or `handicap > floor(0.75 × raceTo)` for the match's round. HTTP returns 400.
 
-### Optional (Suggestion — implement only if time permits)
+### Required (formerly optional)
 
 - [ ] Static asset handler rejects `fileName` containing `..` or `/`.
 - [ ] Generic 500 message for unexpected errors (no raw exception text to client).
@@ -222,17 +226,21 @@ Requirements:
 4. `Tournament.validateScores` race-to rules + `recordResult` wiring + tests.
 5. `ServeContext.completeTournament` reorder / rollback + integration test.
 6. `DirectorGuidance` error mapping for new messages (if needed).
-7. Optional suggestion items.
+7. Static asset path sanitization + test.
+8. Generic 500 responses in `DirectorRoutes` / read API.
+9. `TournamentPhase.derive` naming comment.
 
 ---
 
-## Open Questions
+## Decisions (resolved)
 
-1. **Complete failure UX:** If period write fails after matches are done, should the API return 409 (conflict) vs 500? Default proposal: **409** when target file exists, **500** for other I/O errors.
-2. **Score semantics:** Confirm winner must reach exactly `raceTo` (not "at least raceTo"). Review assumes exact equality per standard race-to billiards.
-3. **Duplicate names case sensitivity:** `Player` identity is case-sensitive today. Should `"Alice"` and `"alice"` count as duplicates? Default proposal: **case-sensitive** (match existing `Player` equality).
-4. **Optional items:** Confirm whether static-path sanitization and generic 500s are in scope for this pass or deferred.
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Complete failure HTTP status | **409** when period file exists; **500** for other I/O errors |
+| 2 | Score vs race-to | Winner score must **equal** race-to exactly |
+| 3 | Duplicate name comparison | **Case-sensitive** (match `Player` equality) |
+| 4 | Optional items scope | **All in scope** for this pass |
 
 ---
 
-*Approve this spec (or note corrections to Open Questions) before implementation begins.*
+*Spec approved. Proceed to plan/tasks, then implementation.*
