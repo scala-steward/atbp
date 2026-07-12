@@ -29,6 +29,29 @@ object ReplaySpec extends ZIOSpecDefault {
   private def appendAll(dir: File, events: List[TournamentEvent]): Task[Unit] =
     ZIO.foreachDiscard(events)(event => EventLog.append(dir, event))
 
+  private def lockedRosterEvents(startSeq: Int): List[TournamentEvent] = {
+    val players = (1 to 8).map(i => Player(s"P$i")).toList
+    val raceToEvents = (1 to 4).map { round =>
+      TournamentEvent.RoundRaceToSet(
+        seq = startSeq + 1 + round,
+        at = at,
+        payload = RoundRaceToSetPayload(round = round, raceTo = 7)
+      )
+    }.toList
+    List(
+      TournamentEvent.PlayersSet(
+        seq = startSeq,
+        at = at,
+        payload = PlayersSetPayload(players = players)
+      ),
+      TournamentEvent.PlayersLocked(
+        seq = startSeq + 1,
+        at = at,
+        payload = PlayersLockedPayload()
+      )
+    ) ++ raceToEvents
+  }
+
   def spec = suite("Replay")(
     test("EventLog writes zero-padded filenames and never overwrites") {
       withTempDir { dir =>
@@ -84,11 +107,12 @@ object ReplaySpec extends ZIOSpecDefault {
             at = at,
             payload = TournamentCreatedPayload(
               name = "Spring Open",
-              players = eightPlayerRatings.map(_.player)
+              players = Nil
             )
-          ),
+          )
+        ) ++ lockedRosterEvents(startSeq = 2) ++ List(
           TournamentEvent.BracketSeeded(
-            seq = 2,
+            seq = 8,
             at = at,
             payload = BracketSeededPayload(
               frozenRatings = eightPlayerRatings,
@@ -96,24 +120,24 @@ object ReplaySpec extends ZIOSpecDefault {
             )
           ),
           TournamentEvent.MatchReady(
-            seq = 3,
+            seq = 9,
             at = at,
             payload =
               MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
           ),
           TournamentEvent.HandicapApplied(
-            seq = 4,
+            seq = 10,
             at = at,
             payload =
               HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
           ),
           TournamentEvent.MatchStarted(
-            seq = 5,
+            seq = 11,
             at = at,
             payload = MatchStartedPayload(matchId = "wb-1-1")
           ),
           TournamentEvent.MatchResult(
-            seq = 6,
+            seq = 12,
             at = at,
             payload =
               MatchResultPayload(matchId = "wb-1-1", scoreA = 7, scoreB = 4)
@@ -332,6 +356,155 @@ object ReplaySpec extends ZIOSpecDefault {
       assertTrue(
         TournamentPhase.derive(state, hasDir = false) == TournamentPhase.None
       )
+    },
+    test("replay rejects duplicate player names on PlayersSet from disk") {
+      withTempDir { dir =>
+        val events = List(
+          TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload("Open", Nil)
+          ),
+          TournamentEvent.PlayersSet(
+            seq = 2,
+            at = at,
+            payload = PlayersSetPayload(
+              players = List(Player("Alice"), Player("Alice"))
+            )
+          )
+        )
+        for {
+          _ <- appendAll(dir, events)
+          result <- Replay.replayDir(dir).either
+        } yield assertTrue(
+          result.isLeft,
+          result.left.exists(_.getMessage.contains("duplicate"))
+        )
+      }
+    },
+    test("replay rejects BracketSeeded before roster lock from disk") {
+      withTempDir { dir =>
+        val events = List(
+          TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload("Open", Nil)
+          ),
+          TournamentEvent.PlayersSet(
+            seq = 2,
+            at = at,
+            payload = PlayersSetPayload(
+              players = (1 to 8).map(i => Player(s"P$i")).toList
+            )
+          ),
+          TournamentEvent.BracketSeeded(
+            seq = 3,
+            at = at,
+            payload = BracketSeededPayload(
+              frozenRatings = eightPlayerRatings,
+              bracket = BracketGen.generate(eightPlayerRatings)
+            )
+          )
+        )
+        for {
+          _ <- appendAll(dir, events)
+          result <- Replay.replayDir(dir).either
+        } yield assertTrue(
+          result.isLeft,
+          result.left.exists(_.getMessage.contains("locked"))
+        )
+      }
+    },
+    test("replay rejects invalid handicap from disk") {
+      withTempDir { dir =>
+        val bracket = BracketGen.generate(eightPlayerRatings)
+        val events = List(
+          TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload("Open", Nil)
+          )
+        ) ++ lockedRosterEvents(startSeq = 2) ++ List(
+          TournamentEvent.BracketSeeded(
+            seq = 8,
+            at = at,
+            payload = BracketSeededPayload(
+              frozenRatings = eightPlayerRatings,
+              bracket = bracket
+            )
+          ),
+          TournamentEvent.MatchReady(
+            seq = 9,
+            at = at,
+            payload =
+              MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
+          ),
+          TournamentEvent.HandicapApplied(
+            seq = 10,
+            at = at,
+            payload =
+              HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 99)
+          )
+        )
+        for {
+          _ <- appendAll(dir, events)
+          result <- Replay.replayDir(dir).either
+        } yield assertTrue(
+          result.isLeft,
+          result.left.exists(_.getMessage.contains("handicap"))
+        )
+      }
+    },
+    test("replay rejects invalid match scores from disk") {
+      withTempDir { dir =>
+        val bracket = BracketGen.generate(eightPlayerRatings)
+        val events = List(
+          TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload("Open", Nil)
+          )
+        ) ++ lockedRosterEvents(startSeq = 2) ++ List(
+          TournamentEvent.BracketSeeded(
+            seq = 8,
+            at = at,
+            payload = BracketSeededPayload(
+              frozenRatings = eightPlayerRatings,
+              bracket = bracket
+            )
+          ),
+          TournamentEvent.MatchReady(
+            seq = 9,
+            at = at,
+            payload =
+              MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
+          ),
+          TournamentEvent.HandicapApplied(
+            seq = 10,
+            at = at,
+            payload =
+              HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 0)
+          ),
+          TournamentEvent.MatchStarted(
+            seq = 11,
+            at = at,
+            payload = MatchStartedPayload(matchId = "wb-1-1")
+          ),
+          TournamentEvent.MatchResult(
+            seq = 12,
+            at = at,
+            payload =
+              MatchResultPayload(matchId = "wb-1-1", scoreA = 5, scoreB = 4)
+          )
+        )
+        for {
+          _ <- appendAll(dir, events)
+          result <- Replay.replayDir(dir).either
+        } yield assertTrue(
+          result.isLeft,
+          result.left.exists(_.getMessage.contains("winner score must be 7"))
+        )
+      }
     }
   )
 }

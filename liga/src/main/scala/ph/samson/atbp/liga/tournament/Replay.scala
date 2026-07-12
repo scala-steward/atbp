@@ -53,7 +53,9 @@ object Replay {
         } else if (state.bracket.nonEmpty) {
           Left("cannot set players after bracket is seeded")
         } else {
-          Right(state.copy(players = payload.players))
+          TournamentValidation.validatePlayersSet(payload.players).map { _ =>
+            state.copy(players = payload.players)
+          }
         }
 
       case TournamentEvent.PlayersLocked(_, _, _) =>
@@ -76,11 +78,11 @@ object Replay {
         )
 
       case TournamentEvent.BracketSeeded(_, _, payload) =>
-        Right(
-          state.copy(
-            frozenRatings = payload.frozenRatings.map(r => r.player -> r).toMap,
-            bracket = Some(payload.bracket)
-          )
+        for {
+          _ <- TournamentValidation.validateSeedState(state)
+        } yield state.copy(
+          frozenRatings = payload.frozenRatings.map(r => r.player -> r).toMap,
+          bracket = Some(payload.bracket)
         )
 
       case TournamentEvent.MatchReady(_, _, payload) =>
@@ -94,9 +96,11 @@ object Replay {
 
       case TournamentEvent.HandicapApplied(_, _, payload) =>
         for {
-          _ <- MatchLifecycle.requireActive(state).left.map(_.message)
-          matchDef <- findMatch(state, payload.matchId)
-          _ <- MatchLifecycle.validateHandicap(matchDef).left.map(_.message)
+          _ <- TournamentValidation.validateHandicap(
+            state,
+            payload.matchId,
+            payload.handicapApplied
+          )
           updated <- updateMatch(state, payload.matchId) { current =>
             current.copy(handicapApplied = Some(payload.handicapApplied))
           }
@@ -117,6 +121,12 @@ object Replay {
           _ <- MatchLifecycle.requireActive(state).left.map(_.message)
           matchDef <- findMatch(state, payload.matchId)
           _ <- MatchLifecycle.validateResult(matchDef).left.map(_.message)
+          _ <- TournamentValidation.validateMatchResult(
+            state,
+            matchDef,
+            payload.scoreA,
+            payload.scoreB
+          )
           result <- applyMatchResult(state, payload)
         } yield result
 

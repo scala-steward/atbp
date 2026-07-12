@@ -1,1 +1,1 @@
-{"type":"TournamentCreated","seq":1,"at":"2026-03-15T18:00:00Z","payload":{"name":"Spring Open","players":[{"name":"P1"},{"name":"P2"},{"name":"P3"},{"name":"P4"},{"name":"P5"},{"name":"P6"},{"name":"P7"},{"name":"P8"}]}}
+{"type":"TournamentCreated","seq":1,"at":"2026-03-15T18:00:00Z","payload":{"name":"Spring Open","players":[]}}
