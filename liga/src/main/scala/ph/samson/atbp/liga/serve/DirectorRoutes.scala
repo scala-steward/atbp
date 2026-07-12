@@ -2,6 +2,7 @@ package ph.samson.atbp.liga.serve
 
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.EventCodec
+import ph.samson.atbp.liga.tournament.EventLog
 import ph.samson.atbp.liga.tournament.PeriodEmission
 import ph.samson.atbp.liga.tournament.Tournament
 import zio.*
@@ -80,7 +81,7 @@ object DirectorRoutes {
       }
     )
 
-  private def directorOnly(
+  private[serve] def directorOnly(
       req: Request
   )(
       effect: Task[Response]
@@ -92,6 +93,12 @@ object DirectorRoutes {
             ZIO.succeed(badRequest(message))
           case ServeContext.DirCollisionError(message) =>
             ZIO.succeed(conflict(message))
+          case EventLog.InvalidSeq(expected, actual) =>
+            ZIO.succeed(
+              conflict(
+                s"event seq must be $expected, got $actual; retry the request"
+              )
+            )
           case err: PeriodEmission.EmissionError
               if err.message.contains("already exists") ||
                 err.message.contains("mismatch") =>

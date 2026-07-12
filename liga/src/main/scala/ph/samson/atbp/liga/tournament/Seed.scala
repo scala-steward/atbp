@@ -38,6 +38,15 @@ object Seed {
     val message: String = "cannot seed bracket before roster is locked"
   }
 
+  final case class RaceToIncompleteError() extends Error {
+    val message: String =
+      "cannot seed bracket before race-to is set for all rounds"
+  }
+
+  final case class InvalidRaceToError(raceTo: Int) extends Error {
+    val message: String = s"race-to must be at least 2: $raceTo"
+  }
+
   def buildEvents(
       state: TournamentState,
       periodRatings: List[PlayerRating],
@@ -47,6 +56,7 @@ object Seed {
   ): Either[Error, List[TournamentEvent]] =
     for {
       _ <- validateState(state)
+      _ <- validateRoundRaceTo(roundRaceTo)
       ratings <- resolveRatings(state.players, periodRatings)
       _ <- validatePlayerCount(ratings.size)
       bracket = BracketGen.generate(ratings)
@@ -78,7 +88,21 @@ object Seed {
       case "cannot seed bracket before roster is locked" =>
         PlayersNotLockedError()
       case "tournament has no players" => NoPlayersError()
-      case _                           => NoPlayersError()
+      case "cannot seed bracket before race-to is set for all rounds" =>
+        RaceToIncompleteError()
+      case _ => NoPlayersError()
+    }
+
+  private def validateRoundRaceTo(
+      roundRaceTo: Map[Int, Int]
+  ): Either[Error, Unit] =
+    roundRaceTo.values.toList.foldLeft(Right(()): Either[Error, Unit]) {
+      case (Right(_), raceTo) =>
+        TournamentValidation
+          .validateRaceTo(raceTo)
+          .left
+          .map(_ => InvalidRaceToError(raceTo))
+      case (left, _) => left
     }
 
   private def validatePlayerCount(count: Int): Either[Error, Unit] =

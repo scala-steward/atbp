@@ -70,11 +70,10 @@ object Replay {
         }
 
       case TournamentEvent.RoundRaceToSet(_, _, payload) =>
-        Right(
-          state.copy(
-            roundRaceTo =
-              state.roundRaceTo.updated(payload.round, payload.raceTo)
-          )
+        for {
+          _ <- TournamentValidation.validateRaceTo(payload.raceTo)
+        } yield state.copy(
+          roundRaceTo = state.roundRaceTo.updated(payload.round, payload.raceTo)
         )
 
       case TournamentEvent.BracketSeeded(_, _, payload) =>

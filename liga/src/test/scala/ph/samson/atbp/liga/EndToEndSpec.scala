@@ -71,11 +71,26 @@ object EndToEndSpec extends ZIOSpecDefault {
     ()
   }
 
-  private def seedBody(playerCount: Int): String = {
+  private def raceToBody(playerCount: Int): String = {
     val rounds = BracketRounds.requiredKeys(playerCount)
     val raceTo = rounds.map(r => s""""$r":7""").mkString(",")
     s"""{"roundRaceTo":{$raceTo}}"""
   }
+
+  private def configureRaceTo(
+      ctx: ServeContext,
+      playerCount: Int
+  ): ZIO[Scope, Throwable, TournamentResponse] =
+    postTournament(ctx, "/api/tournament/race-to", raceToBody(playerCount))
+
+  private def seedTournament(
+      ctx: ServeContext,
+      playerCount: Int
+  ): ZIO[Scope, Throwable, TournamentResponse] =
+    for {
+      _ <- configureRaceTo(ctx, playerCount)
+      seeded <- postTournament(ctx, "/api/tournament/seed", "{}")
+    } yield seeded
 
   private def writeCreatedTournament(dataDir: File, playerCount: Int): File =
     writeCreatedTournament(dataDir, playerCount, "Spring Open")
@@ -220,7 +235,7 @@ object EndToEndSpec extends ZIOSpecDefault {
           )
           resolved <- Resume.resolve(dataDir)
           ctx = freshContext(dataDir, resolved.get)
-          _ <- postTournament(ctx, "/api/tournament/seed", seedBody(8))
+          _ <- seedTournament(ctx, playerCount = 8)
           finalState <- playAllReadyMatches(ctx)
           completedState <- postTournament(
             ctx,
@@ -253,7 +268,7 @@ object EndToEndSpec extends ZIOSpecDefault {
           )
           resolved <- Resume.resolve(dataDir)
           ctx = freshContext(dataDir, resolved.get)
-          seeded <- postTournament(ctx, "/api/tournament/seed", seedBody(16))
+          seeded <- seedTournament(ctx, playerCount = 16)
           finalState <- playAllReadyMatches(ctx)
         } yield assertTrue(
           resolved.contains(tournamentDir),

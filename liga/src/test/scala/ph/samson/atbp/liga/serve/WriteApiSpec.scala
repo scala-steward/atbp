@@ -92,6 +92,26 @@ object WriteApiSpec extends ZIOSpecDefault {
   private def cleanup(root: File): UIO[Unit] =
     ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
 
+  private val eightRoundRaceToBody =
+    """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+
+  private def configureRaceTo(
+      ctx: ServeContext
+  ): ZIO[Scope, Throwable, Response] =
+    LigaRoutes
+      .routes(ctx, BindConfig())
+      .runZIO(localhostPost("/api/tournament/race-to", eightRoundRaceToBody))
+
+  private def seedTournament(
+      ctx: ServeContext
+  ): ZIO[Scope, Throwable, Response] =
+    for {
+      _ <- configureRaceTo(ctx)
+      response <- LigaRoutes
+        .routes(ctx, BindConfig())
+        .runZIO(localhostPost("/api/tournament/seed", "{}"))
+    } yield response
+
   private def playMatch(
       ctx: ServeContext,
       matchId: String
@@ -297,10 +317,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     ) {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        seedBody = """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-        response <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(localhostPost("/api/tournament/seed", seedBody))
+        response <- seedTournament(ctx)
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
         seededFileExists = (ctx.tournamentDir.get / "000008-seeded.json").exists
@@ -319,14 +336,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     test("seed → ready → handicap → start → result flow") {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        seed <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(
-            localhostPost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+        seed <- seedTournament(ctx)
         ready <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
@@ -375,14 +385,10 @@ object WriteApiSpec extends ZIOSpecDefault {
     test("write routes reject non-localhost requests with 403") {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
+        _ <- configureRaceTo(ctx)
         response <- LigaRoutes
           .routes(ctx, BindConfig())
-          .runZIO(
-            remotePost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+          .runZIO(remotePost("/api/tournament/seed", "{}"))
         _ <- cleanup(root)
       } yield assertTrue(response.status == Status.Forbidden)
     },
@@ -433,14 +439,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     ) {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        _ <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(
-            localhostPost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+        _ <- seedTournament(ctx)
         _ <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
@@ -462,14 +461,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     test("POST /api/matches/{id}/result rejects invalid scores with 400") {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        _ <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(
-            localhostPost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+        _ <- seedTournament(ctx)
         _ <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
@@ -505,14 +497,7 @@ object WriteApiSpec extends ZIOSpecDefault {
       val completed = LocalDate.parse("2026-03-15")
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        _ <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(
-            localhostPost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+        _ <- seedTournament(ctx)
         seedBody <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostGet("/api/tournament"))
@@ -554,14 +539,7 @@ object WriteApiSpec extends ZIOSpecDefault {
       val completed = LocalDate.parse("2026-03-15")
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        _ <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(
-            localhostPost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+        _ <- seedTournament(ctx)
         seedBody <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostGet("/api/tournament"))
@@ -609,14 +587,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     test("ready rejects illegal transition with 400") {
       for {
         (ctx, root) <- withTempTournament(seeded = false)
-        _ <- LigaRoutes
-          .routes(ctx, BindConfig())
-          .runZIO(
-            localhostPost(
-              "/api/tournament/seed",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
-            )
-          )
+        _ <- seedTournament(ctx)
         response <- LigaRoutes
           .routes(ctx, BindConfig())
           .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
@@ -627,6 +598,21 @@ object WriteApiSpec extends ZIOSpecDefault {
       } yield assertTrue(
         response.status == Status.Ok,
         again.status == Status.BadRequest
+      )
+    },
+    test("director routes map stale event seq to 409") {
+      for {
+        response <- DirectorRoutes
+          .directorOnly(
+            Request.post("", Body.empty).copy(remoteAddress = loopback)
+          )(
+            ZIO.fail(EventLog.InvalidSeq(expected = 9, actual = 1))
+          )
+        body <- response.body.asString
+      } yield assertTrue(
+        response.status == Status.Conflict,
+        body.contains("event seq must be 9"),
+        body.contains("retry the request")
       )
     }
   )

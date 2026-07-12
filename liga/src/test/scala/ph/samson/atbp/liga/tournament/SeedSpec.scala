@@ -17,8 +17,12 @@ object SeedSpec extends ZIOSpecDefault {
     TournamentState(
       name = "Open",
       players = players,
-      playersLocked = true
+      playersLocked = true,
+      roundRaceTo = Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7)
     )
+
+  private val fullRoundRaceTo: Map[Int, Int] =
+    Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7)
 
   private val eightPlayers: List[Player] =
     (1 to 8).map(i => Player(s"P$i")).toList
@@ -35,7 +39,15 @@ object SeedSpec extends ZIOSpecDefault {
       )
       assertTrue(
         Seed
-          .buildEvents(state, periodRatings, Map(1 -> 7), startSeq = 2, at)
+          .buildEvents(state, periodRatings, fullRoundRaceTo, startSeq = 2, at)
+          .isLeft
+      )
+    },
+    test("seed rejected before race-to is complete") {
+      val state = lockedState(eightPlayers).copy(roundRaceTo = Map.empty)
+      assertTrue(
+        Seed
+          .buildEvents(state, periodRatings, fullRoundRaceTo, startSeq = 2, at)
           .isLeft
       )
     },
@@ -44,7 +56,13 @@ object SeedSpec extends ZIOSpecDefault {
       val players = guest :: eightPlayers.take(7)
       val state = lockedState(players)
       val result =
-        Seed.buildEvents(state, periodRatings, Map(1 -> 7), startSeq = 2, at)
+        Seed.buildEvents(
+          state,
+          periodRatings,
+          fullRoundRaceTo,
+          startSeq = 2,
+          at
+        )
       val tuning = Tuning.Default
       val guestRating = result.toOption.get
         .collect { case event: events.TournamentEvent.BracketSeeded =>
@@ -64,7 +82,13 @@ object SeedSpec extends ZIOSpecDefault {
     test("period players keep computed ratings at seed") {
       val state = lockedState(eightPlayers)
       val result =
-        Seed.buildEvents(state, periodRatings, Map(1 -> 7), startSeq = 2, at)
+        Seed.buildEvents(
+          state,
+          periodRatings,
+          fullRoundRaceTo,
+          startSeq = 2,
+          at
+        )
       val seeded = result.toOption.get.collect {
         case event: events.TournamentEvent.BracketSeeded => event
       }.last

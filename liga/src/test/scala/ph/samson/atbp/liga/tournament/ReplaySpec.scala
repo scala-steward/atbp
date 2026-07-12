@@ -505,6 +505,31 @@ object ReplaySpec extends ZIOSpecDefault {
           result.left.exists(_.getMessage.contains("winner score must be 7"))
         )
       }
+    },
+    test("replay rejects invalid race-to from disk") {
+      withTempDir { dir =>
+        val events = List(
+          TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload("Open", Nil)
+          ),
+          TournamentEvent.RoundRaceToSet(
+            seq = 2,
+            at = at,
+            payload = RoundRaceToSetPayload(round = 1, raceTo = 1)
+          )
+        )
+        for {
+          _ <- appendAll(dir, events)
+          result <- Replay.replayDir(dir).either
+        } yield assertTrue(
+          result.isLeft,
+          result.left.exists(
+            _.getMessage.contains("race-to must be at least 2")
+          )
+        )
+      }
     }
   )
 }

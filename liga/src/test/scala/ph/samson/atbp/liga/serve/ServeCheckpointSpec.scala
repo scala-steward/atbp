@@ -99,18 +99,6 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
     val tournamentDir = dataDir / tournamentDirName
     File(getClass.getResource("/tournaments/eight-player-partial"))
       .copyTo(tournamentDir, overwrite = true)
-    Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7).toList
-      .sortBy(_._1)
-      .zipWithIndex
-      .foreach { case ((round, raceTo), index) =>
-        val event = TournamentEvent.RoundRaceToSet(
-          seq = 6 + index,
-          at = at,
-          payload = RoundRaceToSetPayload(round = round, raceTo = raceTo)
-        )
-        (tournamentDir / EventLog.filenameFor(event))
-          .write(EventCodec.encode(event))
-      }
     tournamentDir
   }
 
@@ -204,8 +192,21 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
     } yield finalState
   }
 
-  private val seedBody =
+  private val raceToBody =
     """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7,"5":7}}"""
+
+  private def configureRaceTo(
+      ctx: ServeContext
+  ): ZIO[Scope, Throwable, TournamentResponse] =
+    postTournament(ctx, "/api/tournament/race-to", raceToBody)
+
+  private def seedTournament(
+      ctx: ServeContext
+  ): ZIO[Scope, Throwable, TournamentResponse] =
+    for {
+      _ <- configureRaceTo(ctx)
+      seeded <- postTournament(ctx, "/api/tournament/seed", "{}")
+    } yield seeded
 
   private def allMatchesCompleted(state: TournamentResponse): Boolean =
     state.bracket.exists(
@@ -246,7 +247,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
           resolved <- Resume.resolve(dataDir)
           ctx = freshContext(dataDir, resolved.get)
-          _ <- postTournament(ctx, "/api/tournament/seed", seedBody)
+          _ <- seedTournament(ctx)
           finalState <- playAllReadyMatches(ctx)
         } yield assertTrue(
           resolved == Some(tournamentDir),
@@ -289,7 +290,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           _ <- ZIO.attemptBlocking(seedPeriodFile(dataDir))
           tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
           firstCtx = freshContext(dataDir, tournamentDir)
-          seeded <- postTournament(firstCtx, "/api/tournament/seed", seedBody)
+          seeded <- seedTournament(firstCtx)
           _ <- Resume.resolve(dataDir)
           restartedCtx = freshContext(dataDir, tournamentDir)
           afterRestart <- routes(restartedCtx)
@@ -300,7 +301,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           seeded.bracket.exists(_.size == 8),
           afterRestart.bracket.exists(_.size == 8),
           afterRestart.frozenRatings.size == 8,
-          eventCount >= 5
+          eventCount >= 8
         )
       }
     }

@@ -6,6 +6,13 @@ import ph.samson.atbp.liga.model.*
 /** Pure validators shared by command handlers and event replay. */
 object TournamentValidation {
 
+  def validateRaceTo(raceTo: Int): Either[String, Unit] =
+    if (raceTo < 2) {
+      Left("race-to must be at least 2")
+    } else {
+      Right(())
+    }
+
   def validatePlayersSet(players: List[Player]): Either[String, Unit] =
     if (players.distinct.size != players.size) {
       Left("roster contains duplicate player names")
@@ -22,6 +29,8 @@ object TournamentValidation {
       Left("cannot seed bracket before roster is locked")
     } else if (state.players.isEmpty) {
       Left("tournament has no players")
+    } else if (!TournamentPhase.raceToComplete(state)) {
+      Left("cannot seed bracket before race-to is set for all rounds")
     } else {
       Right(())
     }

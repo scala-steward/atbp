@@ -29,27 +29,45 @@ object TournamentSpec extends ZIOSpecDefault {
   }
 
   private def seededState(): TournamentState =
-    seededState(Map(1 -> 7, 2 -> 7, 3 -> 7))
+    seededState(Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7))
 
-  private def seededEvents(state: TournamentState): List[TournamentEvent] =
+  private def seededEvents(state: TournamentState): List[TournamentEvent] = {
+    val players = eightPlayerRatings.map(_.player)
+    val raceToEvents = (1 to 4).map { round =>
+      TournamentEvent.RoundRaceToSet(
+        seq = 3 + round,
+        at = at,
+        payload = RoundRaceToSetPayload(round = round, raceTo = 7)
+      )
+    }.toList
     List(
       TournamentEvent.Created(
         seq = 1,
         at = at,
         payload = TournamentCreatedPayload(
           name = state.name,
-          players = state.players
+          players = Nil
         )
       ),
-      TournamentEvent.BracketSeeded(
+      TournamentEvent.PlayersSet(
         seq = 2,
         at = at,
-        payload = BracketSeededPayload(
-          frozenRatings = eightPlayerRatings,
-          bracket = state.bracket.get
-        )
+        payload = PlayersSetPayload(players = players)
+      ),
+      TournamentEvent.PlayersLocked(
+        seq = 3,
+        at = at,
+        payload = PlayersLockedPayload()
+      )
+    ) ++ raceToEvents :+ TournamentEvent.BracketSeeded(
+      seq = 8,
+      at = at,
+      payload = BracketSeededPayload(
+        frozenRatings = eightPlayerRatings,
+        bracket = state.bracket.get
       )
     )
+  }
 
   private def matchOf(state: TournamentState, id: String): BracketMatch =
     state.bracket.flatMap(_.matches.find(_.id == id)).get
@@ -207,19 +225,19 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 6,
+            seq = 12,
             at
           )
           next <- Replay.replay(
             seededEvents(base) :+
               TournamentEvent.MatchReady(
-                seq = 3,
+                seq = 9,
                 at = at,
                 payload =
                   MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
               ) :+
               TournamentEvent.HandicapApplied(
-                seq = 4,
+                seq = 10,
                 at = at,
                 payload = HandicapAppliedPayload(
                   matchId = "wb-1-1",
@@ -227,7 +245,7 @@ object TournamentSpec extends ZIOSpecDefault {
                 )
               ) :+
               TournamentEvent.MatchStarted(
-                seq = 5,
+                seq = 11,
                 at = at,
                 payload = MatchStartedPayload(matchId = "wb-1-1")
               ) :+
@@ -308,39 +326,18 @@ object TournamentSpec extends ZIOSpecDefault {
     suite("full lifecycle")(
       test("ready → handicap → start → result replays cleanly") {
         val state = seededState()
-        val seeded = seededEvents(state) ++ List(
-          TournamentEvent.RoundRaceToSet(
-            seq = 3,
-            at = at,
-            payload = RoundRaceToSetPayload(round = 1, raceTo = 7)
-          ),
-          TournamentEvent.RoundRaceToSet(
-            seq = 4,
-            at = at,
-            payload = RoundRaceToSetPayload(round = 2, raceTo = 7)
-          ),
-          TournamentEvent.RoundRaceToSet(
-            seq = 5,
-            at = at,
-            payload = RoundRaceToSetPayload(round = 3, raceTo = 7)
-          ),
-          TournamentEvent.RoundRaceToSet(
-            seq = 6,
-            at = at,
-            payload = RoundRaceToSetPayload(round = 4, raceTo = 7)
-          )
-        )
-        val ready = Tournament.ready(state, "wb-1-1", seq = 7, at).toOption.get
+        val seeded = seededEvents(state)
+        val ready = Tournament.ready(state, "wb-1-1", seq = 9, at).toOption.get
         val afterReady = Replay.replay(seeded :+ ready).toOption.get
         val handicap =
           Tournament
-            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 8, at)
+            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 10, at)
             .toOption
             .get
         val afterHandicap =
           Replay.replay(seeded :+ ready :+ handicap).toOption.get
         val started =
-          Tournament.start(afterHandicap, "wb-1-1", seq = 9, at).toOption.get
+          Tournament.start(afterHandicap, "wb-1-1", seq = 11, at).toOption.get
         val afterStart =
           Replay.replay(seeded :+ ready :+ handicap :+ started).toOption.get
         val result = Tournament
@@ -349,7 +346,7 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 10,
+            seq = 12,
             at
           )
           .toOption
@@ -374,7 +371,7 @@ object TournamentSpec extends ZIOSpecDefault {
             .replay(
               seededEvents(state) :+
                 TournamentEvent.HandicapApplied(
-                  seq = 3,
+                  seq = 9,
                   at = at,
                   payload = HandicapAppliedPayload(
                     matchId = "wb-1-1",
@@ -387,7 +384,7 @@ object TournamentSpec extends ZIOSpecDefault {
             .replay(
               seededEvents(state) :+
                 TournamentEvent.MatchStarted(
-                  seq = 3,
+                  seq = 9,
                   at = at,
                   payload = MatchStartedPayload(matchId = "wb-1-1")
                 )
@@ -457,6 +454,20 @@ object TournamentSpec extends ZIOSpecDefault {
           players = (1 to 8).map(i => Player(s"P$i")).toList
         )
         assertTrue(Tournament.lockPlayers(state, seq = 2, at).isRight)
+      },
+      test("setRoundRaceTo rejects race-to below 2") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList,
+          playersLocked = true
+        )
+        val result =
+          Tournament.setRoundRaceTo(state, Map(1 -> 1), startSeq = 3, at)
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message
+            .contains("race-to must be at least 2")
+        )
       },
       test("setRoundRaceTo emits one event per round") {
         val state = TournamentState(

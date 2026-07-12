@@ -47,6 +47,10 @@ object Tournament {
     val message: String = "roster contains duplicate player names"
   }
 
+  final case class InvalidRaceToError(raceTo: Int) extends WizardError {
+    val message: String = s"race-to must be at least 2: $raceTo"
+  }
+
   def create(
       name: String,
       seq: Int,
@@ -120,16 +124,27 @@ object Tournament {
     if (state.bracket.nonEmpty) {
       Left(AlreadySeededError())
     } else {
-      Right(
-        roundRaceTo.toList.sortBy(_._1).zipWithIndex.map {
-          case ((round, raceTo), index) =>
-            TournamentEvent.RoundRaceToSet(
-              seq = startSeq + index,
-              at = at,
-              payload = RoundRaceToSetPayload(round = round, raceTo = raceTo)
-            )
+      roundRaceTo.toList
+        .sortBy(_._1)
+        .zipWithIndex
+        .foldLeft(
+          Right(Nil): Either[WizardError, List[TournamentEvent.RoundRaceToSet]]
+        ) { case (acc, ((round, raceTo), index)) =>
+          acc.flatMap { events =>
+            TournamentValidation
+              .validateRaceTo(raceTo)
+              .left
+              .map(_ => InvalidRaceToError(raceTo))
+              .map(_ =>
+                events :+ TournamentEvent.RoundRaceToSet(
+                  seq = startSeq + index,
+                  at = at,
+                  payload =
+                    RoundRaceToSetPayload(round = round, raceTo = raceTo)
+                )
+              )
+          }
         }
-      )
     }
 
   def ready(
