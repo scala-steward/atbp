@@ -99,6 +99,18 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
     val tournamentDir = dataDir / tournamentDirName
     File(getClass.getResource("/tournaments/eight-player-partial"))
       .copyTo(tournamentDir, overwrite = true)
+    Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7).toList
+      .sortBy(_._1)
+      .zipWithIndex
+      .foreach { case ((round, raceTo), index) =>
+        val event = TournamentEvent.RoundRaceToSet(
+          seq = 6 + index,
+          at = at,
+          payload = RoundRaceToSetPayload(round = round, raceTo = raceTo)
+        )
+        (tournamentDir / EventLog.filenameFor(event))
+          .write(EventCodec.encode(event))
+      }
     tournamentDir
   }
 

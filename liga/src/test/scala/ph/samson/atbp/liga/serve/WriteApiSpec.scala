@@ -6,6 +6,8 @@ import ph.samson.atbp.liga.serve.ApiJson.*
 import ph.samson.atbp.liga.serve.Routes as LigaRoutes
 import ph.samson.atbp.liga.tournament.EventCodec
 import ph.samson.atbp.liga.tournament.EventLog
+import ph.samson.atbp.liga.tournament.PeriodEmission
+import ph.samson.atbp.liga.tournament.Replay
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 import zio.*
 import zio.http.*
@@ -14,6 +16,7 @@ import zio.test.*
 
 import java.net.InetAddress
 import java.time.Instant
+import java.time.LocalDate
 
 object WriteApiSpec extends ZIOSpecDefault {
 
@@ -29,6 +32,9 @@ object WriteApiSpec extends ZIOSpecDefault {
     Request
       .post(path, Body.fromString(body))
       .copy(remoteAddress = loopback)
+
+  private def localhostGet(path: String): Request =
+    Request.get(path).copy(remoteAddress = loopback)
 
   private def remotePost(path: String, body: String): Request =
     Request
@@ -83,6 +89,74 @@ object WriteApiSpec extends ZIOSpecDefault {
 
   private def cleanup(root: File): UIO[Unit] =
     ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
+
+  private def playMatch(
+      ctx: ServeContext,
+      matchId: String
+  ): ZIO[Scope, Throwable, TournamentResponse] =
+    for {
+      ready <- LigaRoutes
+        .routes(ctx, BindConfig())
+        .runZIO(localhostPost(s"/api/matches/$matchId/ready", ""))
+      readyBody <- ready.body.asString
+      afterReady <- ZIO.fromEither(
+        readyBody
+          .fromJson[TournamentResponse]
+          .left
+          .map(msg => new RuntimeException(msg))
+      )
+      suggested = afterReady.bracket
+        .flatMap(_.matches.find(_.id == matchId))
+        .flatMap(_.handicapSuggested)
+        .getOrElse(0)
+      _ <- LigaRoutes
+        .routes(ctx, BindConfig())
+        .runZIO(
+          localhostPost(
+            s"/api/matches/$matchId/handicap",
+            s"""{"handicap":$suggested}"""
+          )
+        )
+      _ <- LigaRoutes
+        .routes(ctx, BindConfig())
+        .runZIO(localhostPost(s"/api/matches/$matchId/start", ""))
+      result <- LigaRoutes
+        .routes(ctx, BindConfig())
+        .runZIO(
+          localhostPost(
+            s"/api/matches/$matchId/result",
+            """{"scoreA":7,"scoreB":4}"""
+          )
+        )
+      resultBody <- result.body.asString
+      finalState <- ZIO.fromEither(
+        resultBody
+          .fromJson[TournamentResponse]
+          .left
+          .map(msg => new RuntimeException(msg))
+      )
+    } yield finalState
+
+  private def playAllReadyMatches(
+      ctx: ServeContext,
+      state: TournamentResponse
+  ): ZIO[Scope, Throwable, TournamentResponse] = {
+    val readyIds =
+      state.bracket.toList
+        .flatMap(_.matches)
+        .filter(_.state == BracketMatchState.Ready)
+        .map(_.id)
+    if (readyIds.isEmpty) {
+      ZIO.succeed(state)
+    } else {
+      for {
+        afterRound <- ZIO.foldLeft(readyIds)(state) { (_, matchId) =>
+          playMatch(ctx, matchId)
+        }
+        finalState <- playAllReadyMatches(ctx, afterRound)
+      } yield finalState
+    }
+  }
 
   def spec = suite("WriteApi")(
     test("wizard create → players → lock → race-to → seed flow") {
@@ -236,6 +310,167 @@ object WriteApiSpec extends ZIOSpecDefault {
           )
         _ <- cleanup(root)
       } yield assertTrue(response.status == Status.Forbidden)
+    },
+    test("POST /api/tournament/players rejects duplicate names with 400") {
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-dup-players")
+        )
+        dataDir = root / "data"
+        tournamentDir = root / "tournament-test"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          tournamentDir.createDirectoryIfNotExists()
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dataDir / "eight-player-seed.liga")
+          val created = TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload(
+              name = "Spring Open",
+              players = Nil
+            )
+          )
+          (tournamentDir / EventLog.filenameFor(created))
+            .write(EventCodec.encode(created))
+        }
+        ctx = ServeContext(
+          dataDir = dataDir,
+          tournamentDir = Some(tournamentDir)
+        )
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/players",
+              """{"players":[{"name":"Alice"},{"name":"Alice"}]}"""
+            )
+          )
+        body <- response.body.asString
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.BadRequest,
+        body.contains("duplicate player names")
+      )
+    },
+    test(
+      "POST /api/matches/{id}/handicap rejects out-of-range values with 400"
+    ) {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/handicap",
+              """{"handicap":6}"""
+            )
+          )
+        body <- response.body.asString
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.BadRequest,
+        body.contains("handicap must be at most 5")
+      )
+    },
+    test("POST /api/matches/{id}/result rejects invalid scores with 400") {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/handicap",
+              """{"handicap":3}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-1/start", ""))
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/result",
+              """{"scoreA":999,"scoreB":0}"""
+            )
+          )
+        body <- response.body.asString
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.BadRequest,
+        body.contains("winner score must be 7")
+      )
+    },
+    test(
+      "POST /api/tournament/complete returns 409 when period file already exists"
+    ) {
+      val completed = LocalDate.parse("2026-03-15")
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/seed",
+              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+            )
+          )
+        seedBody <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostGet("/api/tournament"))
+        seedText <- seedBody.body.asString
+        seeded <- ZIO.fromEither(seedText.fromJson[TournamentResponse])
+        _ <- playAllReadyMatches(ctx, seeded)
+        target = ctx.dataDir / PeriodEmission.periodFilename(
+          "Spring Open",
+          completed
+        )
+        _ <- ZIO.attemptBlocking(target.write("existing"))
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/complete",
+              s"""{"completed":"$completed"}"""
+            )
+          )
+        body <- response.body.asString
+        completedEvents <- ZIO.attemptBlocking(
+          ctx.tournamentDir.get.list
+            .filter(_.name.endsWith("-completed.json"))
+            .toList
+        )
+        replayed <- Replay.replayDir(ctx.tournamentDir.get)
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.Conflict,
+        body.contains("already exists"),
+        completedEvents.isEmpty,
+        !Replay.isComplete(replayed)
+      )
     },
     test("ready rejects illegal transition with 400") {
       for {

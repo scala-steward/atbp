@@ -106,19 +106,12 @@ object TournamentSpec extends ZIOSpecDefault {
     ),
     suite("handicap")(
       test("HandicapApplied can differ from suggested") {
-        val base = seededState()
-        val readyState = Replay
-          .replay(
-            seededEvents(base) :+
-              TournamentEvent.MatchReady(
-                seq = 3,
-                at = at,
-                payload =
-                  MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
-              )
+        val readyState = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Ready,
+            handicapSuggested = Some(2)
           )
-          .toOption
-          .get
+        }
         val result =
           Tournament.applyHandicap(
             readyState,
@@ -130,6 +123,40 @@ object TournamentSpec extends ZIOSpecDefault {
         assertTrue(
           result.isRight,
           result.toOption.get.payload.handicapApplied == 3
+        )
+      },
+      test("handicap rejects values above race-to cap") {
+        val readyState = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Ready,
+            handicapSuggested = Some(2)
+          )
+        }
+        val result =
+          Tournament.applyHandicap(
+            readyState,
+            "wb-1-1",
+            handicap = 6,
+            seq = 4,
+            at
+          )
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message
+            .contains("handicap must be at most 5")
+        )
+      },
+      test("handicap rejects negative values") {
+        val readyState = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Ready,
+            handicapSuggested = Some(2)
+          )
+        }
+        assertTrue(
+          Tournament
+            .applyHandicap(readyState, "wb-1-1", handicap = -1, seq = 4, at)
+            .isLeft
         )
       },
       test("handicap rejects started matches") {
@@ -214,6 +241,55 @@ object TournamentSpec extends ZIOSpecDefault {
           matchOf(after, "wb-2-1").playerA.contains(Player("P1"))
         )
       },
+      test("result rejects winner score below race-to") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(
+          Tournament
+            .recordResult(state, "wb-1-1", scoreA = 6, scoreB = 4, seq = 6, at)
+            .isLeft
+        )
+      },
+      test("result rejects winner score above race-to") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(
+          Tournament
+            .recordResult(
+              state,
+              "wb-1-1",
+              scoreA = 999,
+              scoreB = 0,
+              seq = 6,
+              at
+            )
+            .isLeft
+        )
+      },
+      test("result rejects tied scores at race-to") {
+        val state = withMatch(seededState(), "wb-1-1") {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(2),
+            handicapApplied = Some(2)
+          )
+        }
+        assertTrue(
+          Tournament
+            .recordResult(state, "wb-1-1", scoreA = 7, scoreB = 7, seq = 6, at)
+            .isLeft
+        )
+      },
       test("result rejects matches that have not started") {
         val state = withMatch(seededState(), "wb-1-1") {
           _.copy(
@@ -232,18 +308,39 @@ object TournamentSpec extends ZIOSpecDefault {
     suite("full lifecycle")(
       test("ready → handicap → start → result replays cleanly") {
         val state = seededState()
-        val seeded = seededEvents(state)
-        val ready = Tournament.ready(state, "wb-1-1", seq = 3, at).toOption.get
+        val seeded = seededEvents(state) ++ List(
+          TournamentEvent.RoundRaceToSet(
+            seq = 3,
+            at = at,
+            payload = RoundRaceToSetPayload(round = 1, raceTo = 7)
+          ),
+          TournamentEvent.RoundRaceToSet(
+            seq = 4,
+            at = at,
+            payload = RoundRaceToSetPayload(round = 2, raceTo = 7)
+          ),
+          TournamentEvent.RoundRaceToSet(
+            seq = 5,
+            at = at,
+            payload = RoundRaceToSetPayload(round = 3, raceTo = 7)
+          ),
+          TournamentEvent.RoundRaceToSet(
+            seq = 6,
+            at = at,
+            payload = RoundRaceToSetPayload(round = 4, raceTo = 7)
+          )
+        )
+        val ready = Tournament.ready(state, "wb-1-1", seq = 7, at).toOption.get
         val afterReady = Replay.replay(seeded :+ ready).toOption.get
         val handicap =
           Tournament
-            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 4, at)
+            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 8, at)
             .toOption
             .get
         val afterHandicap =
           Replay.replay(seeded :+ ready :+ handicap).toOption.get
         val started =
-          Tournament.start(afterHandicap, "wb-1-1", seq = 5, at).toOption.get
+          Tournament.start(afterHandicap, "wb-1-1", seq = 9, at).toOption.get
         val afterStart =
           Replay.replay(seeded :+ ready :+ handicap :+ started).toOption.get
         val result = Tournament
@@ -252,7 +349,7 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 6,
+            seq = 10,
             at
           )
           .toOption
@@ -310,6 +407,22 @@ object TournamentSpec extends ZIOSpecDefault {
       },
       test("create rejects blank tournament name") {
         assertTrue(Tournament.create("  ", seq = 1, at).isLeft)
+      },
+      test("setPlayers rejects duplicate names") {
+        val state = TournamentState(name = "Open", players = Nil)
+        val players = List(Player("Alice"), Player("Alice"))
+        val result = Tournament.setPlayers(state, players, seq = 2, at)
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message.contains("duplicate player names")
+        )
+      },
+      test("setPlayers allows names that differ only by case") {
+        val state = TournamentState(name = "Open", players = Nil)
+        val players = List(Player("Alice"), Player("alice"))
+        assertTrue(
+          Tournament.setPlayers(state, players, seq = 2, at).isRight
+        )
       },
       test("setPlayers rejects when roster is locked") {
         val state = TournamentState(
