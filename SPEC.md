@@ -2,7 +2,7 @@
 
 > **Source:** Thermo-nuclear branch audit + code quality audit of `liga` branch vs `main` (2026-07-12)  
 > **Prior work:** First remediation pass (validation, localhost guard, static paths, generic 500s) is merged on branch  
-> **Status:** Specify — awaiting human approval before implementation
+> **Status:** Approved — open questions resolved (2026-07-12)
 
 ## Assumptions
 
@@ -15,6 +15,11 @@
 7. `liga-common` crossProject is **in scope** as Phase 2 (thermo P0 maintainability debt).
 8. API type codegen / full consolidation is **deferred** unless time permits in Phase 3.
 9. Performance work (in-memory projection cache, decoupling `liga` from `ligaJs`) is **out of scope** except where noted as optional.
+10. **Complete ordering:** keep **period write then event append**; make `/complete` **idempotent on retry** (see Resolved Decisions).
+11. **Dir collision:** same name + same `createdOn` date → **409 reject** (director picks a different name).
+12. **`liga-common` scope:** shared math **and** types (`Player`, `PlayerRating`, `HandicapSuggestion`, plus `WinProbability`, `Handicap`, `Tuning`).
+13. **Race-to minimum:** reject `raceTo < 2`.
+14. **All three phases** land in the **same PR**.
 
 ---
 
@@ -35,7 +40,7 @@ Close the gaps identified by thermo review so that Liga is **venue-correct** aft
 1. As a director who resumed an incomplete tournament via CLI, when I complete it and start another tournament, all wizard and match writes target the **new** tournament — not the completed one.
 2. As a director, after I complete a tournament, `/api/leaderboard` shows ratings from period files (including the just-emitted period), not frozen period-start snapshots.
 3. As a director viewing the completed state, I can start a **new tournament** from the UI without restarting serve.
-4. As an operator, if tournament completion fails mid-flight, the system is never left with a period file but no `TournamentCompleted` event (or vice versa).
+4. As an operator, if tournament completion fails after the period file is written but before the event is appended, I can retry `/complete` and the server verifies the existing period file matches expectations, then appends the completion event without rewriting the period.
 5. As a maintainer, replay rejects the same invalid wizard/match events that command handlers reject (scores, handicaps, duplicate players, race-to bounds).
 6. As a director, the handicap preview in the browser matches server handicap math (single shared implementation).
 
@@ -90,12 +95,12 @@ sbt --client fixup && git status
 ## Project Structure
 
 ```
-liga-common/                          # NEW (Phase 2) — shared JVM+JS
+liga-common/                          # NEW (Phase 2) — shared JVM+JS crossProject
   src/main/scala/ph/samson/atbp/liga/
     handicap/Handicap.scala
     handicap/WinProbability.scala
     glicko/Tuning.scala
-    model/Types.scala                   # types needed by both tiers (subset)
+    model/Types.scala                   # Player, PlayerRating, HandicapSuggestion (shared subset)
 
 liga/src/main/scala/ph/samson/atbp/liga/
   serve/
@@ -163,6 +168,17 @@ private def activeDirOption: Task[Option[File]] =
   }
 ```
 
+Complete retry — illustrative (`ServeContext.completeTournament`):
+
+```scala
+// 1. Build expected period content via PeriodEmission.toPeriod
+// 2. If target file exists:
+//    - compare on-disk content to expected → 409 on mismatch
+//    - skip write if match
+// 3. Else: PeriodEmission.write(...)
+// 4. EventLog.append(TournamentCompleted)
+```
+
 Conventions:
 
 - `createTournament` returns `(ServeContext, TournamentState)` or updates context via `withTournamentDir` at the HTTP layer.
@@ -179,7 +195,9 @@ Conventions:
 | Pinned dir re-resolves after complete | Integration | `ServeCheckpointSpec` or new `ServeContextSpec` |
 | Create second tournament after complete (pinned context) | Integration | `WriteApiSpec` |
 | Leaderboard after HTTP complete | Integration | `ReadApiSpec` |
-| Complete: period write then append failure | Integration | `WriteApiSpec` / `ServeCheckpointSpec` |
+| Complete retry: matching period skips write, appends event | Integration | `WriteApiSpec` / `ServeCheckpointSpec` |
+| Complete retry: mismatched period returns 409 | Integration | `WriteApiSpec` |
+| Create same name/date after complete returns 409 | Integration | `WriteApiSpec` |
 | Replay rejects invalid scores, handicap, duplicates | Unit | `ReplaySpec` |
 | Race-to bounds + seed without race-to | Unit | `TournamentSpec`, `SeedSpec` |
 | InvalidSeq → 409 not 500 | Integration | `WriteApiSpec` |
@@ -229,7 +247,8 @@ Requirements:
 - [ ] **Create updates pin:** `createTournament` (or its HTTP handler) calls `withTournamentDir(newDir)` so subsequent writes use the new tournament.
 - [ ] **Leaderboard after complete:** When `state.completed`, `loadLeaderboard` uses `PeriodLoader.loadAll(dataDir)`, not `frozenRatings`. `ReadApiSpec` proves HTTP response includes post-tournament ratings.
 - [ ] **Second-tournament UX:** Director UI shows a "New tournament" (or equivalent) action when `phase == completed` that calls create and transitions to wizard flow.
-- [ ] **Complete atomicity (inverse case):** If `EventLog.append` fails after `PeriodEmission.write`, the period file is rolled back (or write is deferred until after append). Retry does not leave orphan period file. Test simulates append failure.
+- [ ] **Complete idempotent retry:** Keep period-write-then-append order. If period file already exists on `/complete`, verify on-disk content matches `PeriodEmission.toPeriod` output; **409 on mismatch**, skip write and append event on match. Test: simulate append failure then successful retry.
+- [ ] **Dir collision on create:** When `tournament-YYYYMMDD-slug` already exists (e.g. completed tournament same name/day), `createTournament` returns **409** with message to pick a different name.
 - [ ] **Misleading create error:** When `Resume.resolve` finds an incomplete tournament, error reads `"an incomplete tournament already exists; resume or remove it first"` (not generic "directory already exists").
 
 ### Phase 2 — Event-log integrity + shared math (required)
@@ -237,13 +256,13 @@ Requirements:
 - [ ] **Replay score validation:** Replay rejects `MatchResult` events where winner score ≠ race-to or loser score ≥ race-to (same rules as `Tournament.validateScores`).
 - [ ] **Replay handicap validation:** Replay rejects `HandicapApplied` outside `0 … floor(0.75 × race-to)`.
 - [ ] **Replay wizard validation:** Replay rejects `PlayersSet` with duplicate names; rejects seed-related preconditions matching `Seed.validateState`.
-- [ ] **`liga-common` crossProject:** `Handicap`, `WinProbability`, `Tuning` live in one module; JVM and JS depend on it; duplicated `liga-js/glicko/*` copies removed.
+- [ ] **`liga-common` crossProject:** `Handicap`, `WinProbability`, `Tuning`, and shared model types (`Player`, `PlayerRating`, `HandicapSuggestion`) live in one module; JVM and JS depend on it; duplicated `liga-js/glicko/*` copies removed.
 - [ ] **Handicap cap constant:** `0.75` race-to factor defined once in shared code (not four copies).
 - [ ] **Minimal JS tests:** At least one `liga-js` test proves handicap preview matches JVM for a representative fixture.
 
 ### Phase 3 — API hardening (required)
 
-- [ ] **Race-to bounds:** `setRoundRaceTo` and `Seed.buildEvents` reject `raceTo < 1` (or document and enforce minimum of 1).
+- [ ] **Race-to bounds:** `setRoundRaceTo` and `Seed.buildEvents` reject `raceTo < 2`.
 - [ ] **Seed guard:** `Seed.validateState` requires `TournamentPhase.raceToComplete(state)` before seeding.
 - [ ] **InvalidSeq → 409:** `EventLog.InvalidSeq` maps to HTTP 409 with retryable message, not generic 500.
 
@@ -276,18 +295,20 @@ Phase 1 (venue)          Phase 2 (integrity)       Phase 3 (hardening)
 6. create error message
 ```
 
-Phases 1 and 2 should land before merge; Phase 3 can follow in the same PR or a fast-follow.
+All three phases ship in one PR, in dependency order below.
 
 ---
 
-## Open Questions
+## Resolved Decisions
 
-1. **Complete ordering:** Thermo found period-before-event ordering risk. Prior remediation fixed event-before-period. Confirm final order: **append `TournamentCompleted` first, then write period file** (with rollback on write failure)? Or temp-file rename after both succeed?
-2. **Second tournament same name/date:** `Resume.tournamentDirName` may collide. Should create auto-suffix (`-2`) or reject with 409? Default proposal: **reject with clear message** if dir exists.
-3. **`liga-common` scope:** Move only handicap/glicko/tuning, or also shared `Player`/`BracketMatch` types? Default proposal: **minimal move** — only duplicated math + types it needs; keep full `Types.scala` on JVM for now.
-4. **Race-to minimum:** Reject `< 1` or `< 2`? Default proposal: **reject `< 1`** (allow race-to 1 for edge cases).
-5. **Phase 3 in same PR?** Default proposal: **yes** if small; otherwise fast-follow within same merge window.
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Complete ordering | **Keep period-write-then-append.** On retry, if period file exists: verify content matches expected (`PeriodEmission.toPeriod`); **409 on mismatch**; skip write and append `TournamentCompleted` on match. |
+| 2 | Dir collision (same name + date) | **Reject with 409** — director must pick a different tournament name. |
+| 3 | `liga-common` scope | **Math + shared types** — `Player`, `PlayerRating`, `HandicapSuggestion`, `WinProbability`, `Handicap`, `Tuning`. |
+| 4 | Race-to minimum | **Reject `< 2`**. |
+| 5 | Phase 3 timing | **Same PR** as Phase 1 and Phase 2. |
 
 ---
 
-*Approve this spec (or note corrections to Open Questions) before implementation begins.*
+*Spec approved. Proceed to `/plan` and implementation.*
