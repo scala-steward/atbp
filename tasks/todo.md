@@ -5,7 +5,7 @@ Source: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md)
 ## Phase 1: Venue Correctness
 
 - [x] **Task 1:** Fix `loadLeaderboard` for completed state + `ReadApiSpec`
-- [ ] **Task 2:** Complete idempotent retry (verify/skip/append) + tests
+- [x] **Task 2:** Complete idempotent retry (verify/skip/append) + tests
 - [ ] **Task 3:** Create error messages + dir collision 409 + `WriteApiSpec`
 
 ### Checkpoint: Phase 1

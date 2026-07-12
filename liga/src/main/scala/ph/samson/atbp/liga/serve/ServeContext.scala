@@ -20,6 +20,8 @@ import java.time.LocalDate
 object ServeContext {
   final case class CommandError(message: String) extends Exception(message)
 
+  final case class DirCollisionError(message: String) extends Exception(message)
+
   private val emptyState: TournamentState =
     TournamentState(name = "", players = Nil)
 }
@@ -49,7 +51,9 @@ final case class ServeContext(
       existing <- Resume.resolve(dataDir)
       _ <- ZIO.when(existing.nonEmpty) {
         ZIO.fail(
-          ServeContext.CommandError("tournament directory already exists")
+          ServeContext.CommandError(
+            "an incomplete tournament already exists; resume or remove it first"
+          )
         )
       }
       createdOn = LocalDate.now()
@@ -65,8 +69,8 @@ final case class ServeContext(
       exists <- ZIO.attemptBlocking(dir.exists)
       _ <- ZIO.when(exists) {
         ZIO.fail(
-          ServeContext.CommandError(
-            s"tournament directory already exists: ${dir.pathAsString}"
+          ServeContext.DirCollisionError(
+            "tournament name and date already used; pick a different tournament name"
           )
         )
       }

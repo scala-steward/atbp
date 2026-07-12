@@ -9,6 +9,7 @@ import ph.samson.atbp.liga.tournament.EventCodec
 import ph.samson.atbp.liga.tournament.EventLog
 import ph.samson.atbp.liga.tournament.PeriodEmission
 import ph.samson.atbp.liga.tournament.Replay
+import ph.samson.atbp.liga.tournament.Resume
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 import zio.*
 import zio.http.*
@@ -160,6 +161,79 @@ object WriteApiSpec extends ZIOSpecDefault {
   }
 
   def spec = suite("WriteApi")(
+    test("POST /api/tournament/create rejects incomplete tournament with 400") {
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-create-incomplete")
+        )
+        dataDir = root / "data"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dataDir / "eight-player-seed.liga")
+          val tournamentDir =
+            dataDir / Resume.tournamentDirName("Spring Open", LocalDate.now())
+          tournamentDir.createDirectoryIfNotExists()
+          val created = TournamentEvent.Created(
+            seq = 1,
+            at = at,
+            payload = TournamentCreatedPayload(
+              name = "Spring Open",
+              players = Nil
+            )
+          )
+          (tournamentDir / EventLog.filenameFor(created))
+            .write(EventCodec.encode(created))
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/create",
+              """{"name":"Another Open"}"""
+            )
+          )
+        body <- response.body.asString
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.BadRequest,
+        body.contains(
+          "an incomplete tournament already exists; resume or remove it first"
+        )
+      )
+    },
+    test(
+      "POST /api/tournament/create returns 409 when tournament dir already exists"
+    ) {
+      val createdOn = LocalDate.now()
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-create-collision")
+        )
+        dataDir = root / "data"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          val dirName = Resume.tournamentDirName("Spring Open", createdOn)
+          File(getClass.getResource("/tournaments/eight-player-complete"))
+            .copyTo(dataDir / dirName, overwrite = true)
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/create",
+              """{"name":"Spring Open"}"""
+            )
+          )
+        body <- response.body.asString
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.Conflict,
+        body.contains("pick a different tournament name")
+      )
+    },
     test("wizard create → players → lock → race-to → seed flow") {
       for {
         root <- ZIO.attemptBlocking(

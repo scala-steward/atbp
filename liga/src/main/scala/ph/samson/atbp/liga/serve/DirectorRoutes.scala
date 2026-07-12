@@ -90,6 +90,8 @@ object DirectorRoutes {
         .catchSome {
           case ServeContext.CommandError(message) =>
             ZIO.succeed(badRequest(message))
+          case ServeContext.DirCollisionError(message) =>
+            ZIO.succeed(conflict(message))
           case err: PeriodEmission.EmissionError
               if err.message.contains("already exists") ||
                 err.message.contains("mismatch") =>
