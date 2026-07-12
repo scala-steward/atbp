@@ -33,7 +33,12 @@ object MatchPanel {
 
     div(
       cls := "match-panel",
-      h2(BracketLayout.matchLabel(matchDef.id)),
+      h2(
+        BracketLayout.matchLabel(
+          matchDef.id,
+          tournament.bracket.map(_.size).getOrElse(8)
+        )
+      ),
       p(cls := "match-id", matchDef.id),
       p(
         s"${BracketLayout.playerLabel(matchDef.playerA)} vs ${BracketLayout.playerLabel(matchDef.playerB)}"

@@ -12,7 +12,7 @@ object Routes {
       ctx: ServeContext,
       bind: BindConfig
   ): Routes[Any, Response] =
-    StaticAssets.assetRoutes ++ staticRoutes(bind) ++ readApi(
+    StaticAssets.assetRoutes(bind) ++ staticRoutes(bind) ++ readApi(
       ctx,
       bind
     ) ++ DirectorRoutes.routes(ctx)

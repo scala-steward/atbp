@@ -8,7 +8,7 @@ import ph.samson.atbp.liga.js.director.BracketLayout
 object AudienceBracketView {
 
   def apply(bracket: Bracket): Div = {
-    val groups = BracketLayout.groupMatches(bracket.matches)
+    val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
     div(
       cls := "audience-bracket",
       groups.map { group =>

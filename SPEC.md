@@ -245,10 +245,10 @@ Requirements:
 
 ### Optional (implement if time permits)
 
-- [ ] Extract inline CSS from `DirectorApp.scala` to static asset.
-- [ ] Fix `BracketLayout.roundOf("gf-1")` to match server round semantics for display.
-- [ ] Cache `fastLinkJS` in `resourceGenerators` (devex).
-- [ ] Block `director.js` on non-loopback in `--lan` mode.
+- [x] Extract inline CSS from `DirectorApp.scala` to static asset.
+- [x] Fix `BracketLayout.roundOf("gf-1")` to match server round semantics for display.
+- [x] Cache `fastLinkJS` in `resourceGenerators` (devex).
+- [x] Block `director.js` on non-loopback in `--lan` mode.
 
 ### Verification gate
 

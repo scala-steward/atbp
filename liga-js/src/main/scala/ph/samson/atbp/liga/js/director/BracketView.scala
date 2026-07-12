@@ -11,7 +11,7 @@ object BracketView {
       selectedMatchId: Signal[Option[String]],
       onSelect: Observer[String]
   ): Div = {
-    val groups = BracketLayout.groupMatches(bracket.matches)
+    val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
     div(
       cls := "bracket",
       groups.map { group =>
@@ -21,7 +21,7 @@ object BracketView {
           div(
             cls := "round-matches",
             group.matches.map { matchDef =>
-              matchRow(matchDef, selectedMatchId, onSelect)
+              matchRow(matchDef, bracket.size, selectedMatchId, onSelect)
             }
           )
         )
@@ -31,6 +31,7 @@ object BracketView {
 
   private def matchRow(
       matchDef: BracketMatch,
+      bracketSize: Int,
       selectedMatchId: Signal[Option[String]],
       onSelect: Observer[String]
   ): Div = {
@@ -46,10 +47,13 @@ object BracketView {
       title := (if (isActive) {
                   "Needs director action"
                 } else {
-                  BracketLayout.matchLabel(matchDef.id)
+                  BracketLayout.matchLabel(matchDef.id, bracketSize)
                 }),
       onClick.mapTo(matchDef.id) --> onSelect,
-      span(cls := "match-id", BracketLayout.matchLabel(matchDef.id)),
+      span(
+        cls := "match-id",
+        BracketLayout.matchLabel(matchDef.id, bracketSize)
+      ),
       span(
         cls := "match-players",
         s"${BracketLayout.playerLabel(matchDef.playerA)} vs ${BracketLayout.playerLabel(matchDef.playerB)}"

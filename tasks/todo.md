@@ -41,7 +41,7 @@ Source: [SPEC.md](../SPEC.md) · Plan: [plan.md](plan.md)
 
 ## Optional (not blocking PR)
 
-- [ ] Extract inline CSS from `DirectorApp.scala`
-- [ ] Fix `BracketLayout.roundOf("gf-1")` display semantics
-- [ ] Cache `fastLinkJS` in `resourceGenerators`
-- [ ] Block `director.js` on non-loopback in `--lan` mode
+- [x] Extract inline CSS from `DirectorApp.scala`
+- [x] Fix `BracketLayout.roundOf("gf-1")` display semantics
+- [x] Cache `fastLinkJS` in `resourceGenerators`
+- [x] Block `director.js` on non-loopback in `--lan` mode

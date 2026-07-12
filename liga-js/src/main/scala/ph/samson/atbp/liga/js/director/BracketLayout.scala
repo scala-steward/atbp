@@ -25,10 +25,11 @@ object BracketLayout {
       case _                        => Section.GrandFinal
     }
 
-  def matchLabel(matchId: String): String =
+  def matchLabel(matchId: String, bracketSize: Int): String =
     sectionOf(matchId) match {
       case Section.GrandFinal => "Grand Final"
-      case section            => s"${section.label} — round ${roundOf(matchId)}"
+      case section            =>
+        s"${section.label} — round ${roundOf(matchId, bracketSize)}"
     }
 
   /** Human-readable scope for a race-to round key in the setup wizard. */
@@ -64,17 +65,24 @@ object BracketLayout {
   private def log2(n: Int): Int =
     (math.log(n) / math.log(2)).toInt
 
-  def roundOf(matchId: String): Int =
+  /** Bracket round encoded in match ids (`wb-2-1`, `lb-3-2`, `gf-1`). */
+  def bracketRound(matchId: String, bracketSize: Int): Option[Int] =
     matchId match {
-      case s"wb-$round-$_" => round.toIntOption.getOrElse(0)
-      case s"lb-$round-$_" => round.toIntOption.getOrElse(0)
-      case "gf-1"          => 1
-      case _               => 0
+      case s"wb-$round-$_" => round.toIntOption
+      case s"lb-$round-$_" => round.toIntOption
+      case "gf-1"          => Some(log2(bracketSize))
+      case _               => None
     }
 
-  def groupMatches(matches: List[BracketMatch]): List[RoundGroup] =
+  def roundOf(matchId: String, bracketSize: Int): Int =
+    bracketRound(matchId, bracketSize).getOrElse(0)
+
+  def groupMatches(
+      matches: List[BracketMatch],
+      bracketSize: Int
+  ): List[RoundGroup] =
     matches
-      .groupBy(m => (sectionOf(m.id), roundOf(m.id)))
+      .groupBy(m => (sectionOf(m.id), roundOf(m.id, bracketSize)))
       .toList
       .sortBy { case ((section, round), _) => (section.order, round) }
       .map { case ((section, round), grouped) =>
@@ -105,16 +113,6 @@ object BracketLayout {
       matchId: String,
       bracketSize: Int,
       roundRaceTo: Map[Int, Int]
-  ): Option[Int] = {
-    val round =
-      matchId match {
-        case s"wb-$r-$_" => r.toIntOption
-        case s"lb-$r-$_" => r.toIntOption
-        case "gf-1"      =>
-          val winnersRounds = (math.log(bracketSize) / math.log(2)).toInt
-          Some(winnersRounds)
-        case _ => None
-      }
-    round.flatMap(roundRaceTo.get)
-  }
+  ): Option[Int] =
+    bracketRound(matchId, bracketSize).flatMap(roundRaceTo.get)
 }

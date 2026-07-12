@@ -1,0 +1,39 @@
+package ph.samson.atbp.liga.js.director
+
+import ph.samson.atbp.liga.js.api.Models.*
+import zio.test.*
+
+object BracketLayoutSpec extends ZIOSpecDefault {
+
+  def spec = suite("BracketLayout")(
+    test("bracketRound for gf-1 matches server winners-round semantics") {
+      assertTrue(
+        BracketLayout.bracketRound("gf-1", bracketSize = 8) == Some(3),
+        BracketLayout.bracketRound("gf-1", bracketSize = 16) == Some(4),
+        BracketLayout.bracketRound("wb-2-1", bracketSize = 8) == Some(2),
+        BracketLayout.bracketRound("lb-3-2", bracketSize = 8) == Some(3)
+      )
+    },
+    test("roundOf delegates to bracketRound for grand final") {
+      assertTrue(
+        BracketLayout.roundOf("gf-1", bracketSize = 8) == 3,
+        BracketLayout.roundOf("wb-1-1", bracketSize = 8) == 1
+      )
+    },
+    test("groupMatches uses bracket size for grand final round grouping") {
+      val gf = BracketMatch(
+        id = "gf-1",
+        playerA = None,
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val groups =
+        BracketLayout.groupMatches(matches = List(gf), bracketSize = 8)
+      assertTrue(
+        groups.length == 1,
+        groups.head.section == BracketLayout.Section.GrandFinal,
+        groups.head.round == 3
+      )
+    }
+  )
+}

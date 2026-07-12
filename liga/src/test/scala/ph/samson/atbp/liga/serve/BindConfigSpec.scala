@@ -103,6 +103,24 @@ object BindConfigSpec extends ZIOSpecDefault {
               .copy(remoteAddress = remote)
           )
       } yield assertTrue(response.status == Status.Forbidden)
+    },
+    test("--lan blocks director JS bundle from non-localhost") {
+      val bind = BindConfig(lan = true)
+      val path = StaticAssets.jsAssetPath(StaticAssets.directorScriptName)
+      for {
+        response <- LigaRoutes
+          .routes(ctx, bind)
+          .runZIO(get(path, remote))
+      } yield assertTrue(response.status == Status.Forbidden)
+    },
+    test("--lan still allows audience JS bundle from non-localhost") {
+      val bind = BindConfig(lan = true)
+      val path = StaticAssets.jsAssetPath(StaticAssets.audienceScriptName)
+      for {
+        response <- LigaRoutes
+          .routes(ctx, bind)
+          .runZIO(get(path, remote))
+      } yield assertTrue(response.status == Status.Ok)
     }
   )
 }
