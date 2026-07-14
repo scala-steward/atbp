@@ -4,7 +4,7 @@ See [tasks/plan.md](plan.md) for acceptance criteria and verification steps.
 
 ## Phase 1: Paste safety
 
-- [ ] **Task 1:** Guard empty apply + prefill textarea on resume (`WizardView.scala`)
+- [x] **Task 1:** Guard empty apply + prefill textarea on resume (`WizardView.scala`)
 
 ## Phase 2: RosterPaste hardening
 

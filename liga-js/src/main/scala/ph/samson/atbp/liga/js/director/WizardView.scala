@@ -38,7 +38,7 @@ object WizardView {
       onLock: Observer[Unit]
   ): Div = {
     val names = Var(tournament.players.map(_.name))
-    val pasteText = Var("")
+    val pasteText = Var(tournament.players.map(_.name).mkString("\n"))
 
     val periodByName: Map[String, Double] =
       leaderboard.ratings.map(r => r.player.name -> r.rating).toMap
@@ -69,6 +69,7 @@ object WizardView {
           )
         ),
         button(
+          disabled <-- pasteText.signal.map(_.trim.isEmpty),
           onClick.mapTo(()) --> Observer[Unit] { _ =>
             names.set(RosterPaste.parsePaste(pasteText.now()))
           },
