@@ -9,7 +9,8 @@ final case class RosterEntry(name: String, rating: Double, guest: Boolean)
   */
 object RosterPaste {
 
-  /** Same as JVM Glicko initRating; display-only — do not drift without asking. */
+  /** Same as JVM Glicko initRating; display-only — do not drift without asking.
+    */
   val GuestDisplayRating: Double = 1500.0
 
   def parsePaste(raw: String): List[String] =
