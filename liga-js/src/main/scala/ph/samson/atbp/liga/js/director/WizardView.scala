@@ -97,7 +97,7 @@ object WizardView {
       ),
       div(
         cls := "roster-summary",
-        child.text <-- names.signal.map(ns => s"${ns.size} players selected"),
+        child.text <-- names.signal.map(ns => s"${ns.size} players in roster"),
         child <-- names.signal.map { ns =>
           val hint = DirectorGuidance.lockRosterHint(ns.size)
           if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode

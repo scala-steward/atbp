@@ -8,7 +8,7 @@ See [tasks/plan.md](plan.md) for acceptance criteria and verification steps.
 
 ## Phase 2: RosterPaste hardening
 
-- [ ] **Task 2:** `Tuning.Default.initRating`, `parsePaste("")` test, "players in roster" copy
+- [x] **Task 2:** `Tuning.Default.initRating`, `parsePaste("")` test, "players in roster" copy
 
 ## Checkpoint (after Tasks 1–2)
 

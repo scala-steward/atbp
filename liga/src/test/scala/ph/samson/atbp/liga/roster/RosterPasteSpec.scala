@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.roster
 
+import ph.samson.atbp.liga.glicko.Tuning
 import zio.test.*
 
 object RosterPasteSpec extends ZIOSpecDefault {
@@ -20,10 +21,13 @@ object RosterPasteSpec extends ZIOSpecDefault {
         assertTrue(
           RosterPaste.parsePaste("Alice\r\nBob\r\n") == List("Alice", "Bob")
         )
+      },
+      test("empty paste yields no names") {
+        assertTrue(RosterPaste.parsePaste("") == Nil)
       }
     ),
     suite("resolveRoster")(
-      test("exact match keeps period rating; unknown is guest at 1500") {
+      test("exact match keeps period rating; unknown is guest at initRating") {
         val period = Map("Alice" -> 1800.0, "Bob" -> 1600.0)
         val roster = RosterPaste.resolveRoster(
           List("Bob", "Carol", "Alice"),
@@ -33,7 +37,7 @@ object RosterPasteSpec extends ZIOSpecDefault {
           roster == List(
             RosterEntry("Alice", 1800, guest = false),
             RosterEntry("Bob", 1600, guest = false),
-            RosterEntry("Carol", RosterPaste.GuestDisplayRating, guest = true)
+            RosterEntry("Carol", Tuning.Default.initRating, guest = true)
           )
         )
       },
@@ -46,7 +50,7 @@ object RosterPasteSpec extends ZIOSpecDefault {
         assertTrue(
           roster == List(
             RosterEntry("Amy", 1500, guest = false),
-            RosterEntry("Ned", RosterPaste.GuestDisplayRating, guest = true),
+            RosterEntry("Ned", Tuning.Default.initRating, guest = true),
             RosterEntry("Zoe", 1500, guest = false)
           )
         )
@@ -56,7 +60,7 @@ object RosterPasteSpec extends ZIOSpecDefault {
         val roster = RosterPaste.resolveRoster(List("alice"), period)
         assertTrue(
           roster == List(
-            RosterEntry("alice", RosterPaste.GuestDisplayRating, guest = true)
+            RosterEntry("alice", Tuning.Default.initRating, guest = true)
           )
         )
       }
