@@ -47,31 +47,45 @@ mode prevents interrupting the process.
 
 Before **every** commit that touches Scala (or `build.sbt` / `project/`):
 
-1. Run `sbt --client fixup` on the whole project. No arguments. Not just changed files.
-2. Run `git status` — if **any** file is modified, stage it and go back to step 1.
-3. Repeat until `fixup` succeeds **and** `git status` shows no unstaged changes.
-4. `git add` **all** source changes **and** any files modified by `fixup`.
-5. Commit once — the commit must contain both the logic change and the `fixup` output.
+1. `git add` **all** files that belong in the commit (including **new/untracked**
+   Scala sources). Untracked files are not formatted until they are part of the
+   tree fixup will compile — do not leave them untracked through the loop.
+2. Run `sbt --client fixup` on the whole project. No arguments. Not just changed files.
+3. Run `git status` — if **any** file is modified **or** still untracked that you
+   intend to commit, `git add` it and go back to step 2.
+4. Repeat until **both** are true in the **same** shell check:
+   - `fixup` exits successfully
+   - `git status` shows a clean working tree (nothing modified, nothing untracked
+     that belongs in this commit)
+5. Commit once — the commit must contain both the logic change and the `fixup`
+   output.
 
-**Never commit while `git status` still lists modified files after `fixup`.** A
-successful `fixup` exit is not enough: compile can trigger another scalafmt pass, so
-formatting changes may appear only on the next run.
+**A successful `fixup` exit code alone never means you are done.** Scalafmt often
+rewrites files only on a later pass (e.g. after compile picks up a newly added
+source). The gate is `git status`, not the exit code.
 
-**Never** commit until step 5 is done. Running `fixup` once and committing without
-completing the loop is a workflow violation — amend or add a follow-up commit if that
-happens.
+**Common failure mode (do not repeat):** run `fixup` once → see `[success]` →
+commit new Scala files that were still untracked or never re-checked → next
+`fixup` produces a leftover formatting diff. That is a workflow violation.
+
+**Never** claim the loop is done, and **never** commit, until step 4’s dual
+condition holds. If you already committed without it: amend (only if still
+allowed) or add a follow-up commit that completes the loop.
 
 `fixup` results must land in the **same** commit as the change they format, not in a
-later commit.
+later commit — except when the commit was already pushed and amend is forbidden;
+then a follow-up formatting commit is required immediately.
 
 Verify with this loop (do not skip `git status`):
 
 ```bash
+git add -A   # or add the specific paths for this commit, including new files
 sbt --client fixup && git status
 ```
 
-If `git status` lists modified files, `git add` them, run the command again, and repeat
-until `git status` is clean. Only then stage everything and commit.
+If `git status` lists modified or relevant untracked files, `git add` them, run
+`sbt --client fixup && git status` again, and repeat until the working tree is
+clean for this commit. **Only then** commit.
 
-In user-facing verification or commit summaries, do **not** claim `fixup` is clean unless
-the last iteration of this loop left `git status` clean.
+In user-facing verification or commit summaries, do **not** claim `fixup` is clean
+unless the last `sbt --client fixup && git status` left the working tree clean.
