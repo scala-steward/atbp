@@ -18,7 +18,7 @@ See [tasks/plan.md](plan.md) for acceptance criteria and verification steps.
 
 ## Phase 3: Seed-order parity
 
-- [ ] **Task 3:** `RatingOrder` helper + RD-aware `resolveRoster` + WizardView map + tests
+- [x] **Task 3:** `RatingOrder` helper + RD-aware `resolveRoster` + WizardView map + tests
 
 ## Phase 4: Director guardrails
 

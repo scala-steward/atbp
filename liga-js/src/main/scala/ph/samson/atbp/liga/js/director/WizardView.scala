@@ -2,6 +2,8 @@ package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.api.Models.*
+import ph.samson.atbp.liga.model.Player as CommonPlayer
+import ph.samson.atbp.liga.model.PlayerRating as CommonPlayerRating
 import ph.samson.atbp.liga.roster.RosterEntry
 import ph.samson.atbp.liga.roster.RosterPaste
 
@@ -40,8 +42,18 @@ object WizardView {
     val names = Var(tournament.players.map(_.name))
     val pasteText = Var(tournament.players.map(_.name).mkString("\n"))
 
-    val periodByName: Map[String, Double] =
-      leaderboard.ratings.map(r => r.player.name -> r.rating).toMap
+    val periodByName: Map[String, CommonPlayerRating] =
+      leaderboard.ratings
+        .map(r =>
+          r.player.name -> CommonPlayerRating(
+            player = CommonPlayer(r.player.name),
+            rating = r.rating,
+            rd = r.rd,
+            wins = r.wins,
+            losses = r.losses
+          )
+        )
+        .toMap
 
     val rosterSignal: Signal[List[RosterEntry]] =
       names.signal.map(RosterPaste.resolveRoster(_, periodByName))

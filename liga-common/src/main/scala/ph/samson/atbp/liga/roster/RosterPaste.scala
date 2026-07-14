@@ -1,6 +1,8 @@
 package ph.samson.atbp.liga.roster
 
 import ph.samson.atbp.liga.glicko.Tuning
+import ph.samson.atbp.liga.model.Player
+import ph.samson.atbp.liga.model.PlayerRating
 
 /** One row in the director define-step roster preview. */
 final case class RosterEntry(name: String, rating: Double, guest: Boolean)
@@ -20,21 +22,26 @@ object RosterPaste {
 
   def resolveRoster(
       names: List[String],
-      periodByName: Map[String, Double]
-  ): List[RosterEntry] =
-    resolveRoster(names, periodByName, GuestDisplayRating)
-
-  def resolveRoster(
-      names: List[String],
-      periodByName: Map[String, Double],
-      guestRating: Double
-  ): List[RosterEntry] =
-    names
-      .map { name =>
-        periodByName.get(name) match {
-          case Some(rating) => RosterEntry(name, rating, guest = false)
-          case None         => RosterEntry(name, guestRating, guest = true)
-        }
+      periodByName: Map[String, PlayerRating]
+  ): List[RosterEntry] = {
+    val tuning = Tuning.Default
+    val ratings = names.map { name =>
+      periodByName.getOrElse(
+        name,
+        PlayerRating(
+          player = Player(name),
+          rating = tuning.initRating,
+          rd = tuning.maxDeviation,
+          wins = 0,
+          losses = 0
+        )
+      )
+    }
+    RatingOrder
+      .sortBestFirst(ratings)
+      .map { rating =>
+        val guest = !periodByName.contains(rating.player.name)
+        RosterEntry(rating.player.name, rating.rating, guest = guest)
       }
-      .sortBy(e => (-e.rating, e.name))
+  }
 }
