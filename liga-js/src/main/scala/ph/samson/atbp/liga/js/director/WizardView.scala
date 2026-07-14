@@ -42,6 +42,8 @@ object WizardView {
     val names = Var(tournament.players.map(_.name))
     val pasteText = Var(tournament.players.map(_.name).mkString("\n"))
 
+    val savedNames = tournament.players.map(_.name).toSet
+
     val periodByName: Map[String, CommonPlayerRating] =
       leaderboard.ratings
         .map(r =>
@@ -86,7 +88,15 @@ object WizardView {
             names.set(RosterPaste.parsePaste(pasteText.now()))
           },
           "Apply paste"
-        )
+        ),
+        child <-- pasteText.signal.map { text =>
+          val count = RosterPaste.parsePaste(text).size
+          if (count > 64) {
+            p(cls := "hint", DirectorGuidance.lockRosterHint(count))
+          } else {
+            emptyNode
+          }
+        }
       ),
       div(
         cls := "roster-list",
@@ -110,6 +120,13 @@ object WizardView {
       div(
         cls := "roster-summary",
         child.text <-- names.signal.map(ns => s"${ns.size} players in roster"),
+        child <-- names.signal.map { ns =>
+          if (ns.toSet != savedNames) {
+            p(cls := "hint", DirectorGuidance.saveBeforeLockHint)
+          } else {
+            emptyNode
+          }
+        },
         child <-- names.signal.map { ns =>
           val hint = DirectorGuidance.lockRosterHint(ns.size)
           if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode

@@ -26,6 +26,9 @@ object DirectorGuidance {
       ""
     }
 
+  val saveBeforeLockHint: String =
+    "Save roster before locking — the server still uses the last saved player list."
+
   def seedHint: String =
     "Seeding freezes each player's rating from the period leaderboard. " +
       "Guests receive default ratings."

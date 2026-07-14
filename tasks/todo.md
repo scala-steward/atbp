@@ -12,8 +12,8 @@ See [tasks/plan.md](plan.md) for acceptance criteria and verification steps.
 
 ## Checkpoint (after Tasks 1–2)
 
-- [ ] `sbt --client "liga/testOnly *RosterPaste*"`
-- [ ] `sbt --client "ligaJS/compile"`
+- [x] `sbt --client "liga/testOnly *RosterPaste*"`
+- [x] `sbt --client "liga-js/compile"`
 - [ ] Manual smoke: paste → apply → save
 
 ## Phase 3: Seed-order parity
@@ -22,7 +22,7 @@ See [tasks/plan.md](plan.md) for acceptance criteria and verification steps.
 
 ## Phase 4: Director guardrails
 
-- [ ] **Task 4:** Unsaved-roster hint + oversize paste warning
+- [x] **Task 4:** Unsaved-roster hint + oversize paste warning
 
 ## Checkpoint (complete)
 
