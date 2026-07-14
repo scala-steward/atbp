@@ -2,6 +2,8 @@ package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.api.Models.*
+import ph.samson.atbp.liga.roster.RosterEntry
+import ph.samson.atbp.liga.roster.RosterPaste
 
 /** Define → Lock → Race-to → Seed wizard steps. */
 object WizardView {
@@ -35,71 +37,68 @@ object WizardView {
       onSetPlayers: Observer[List[Player]],
       onLock: Observer[Unit]
   ): Div = {
-    val selected = Var(tournament.players.map(_.name).toSet)
-    val guestName = Var("")
+    val names = Var(tournament.players.map(_.name))
+    val pasteText = Var("")
 
-    def currentPlayers: List[Player] =
-      selected.now().toList.sorted.map(Player(_))
+    val periodByName: Map[String, Double] =
+      leaderboard.ratings.map(r => r.player.name -> r.rating).toMap
+
+    val rosterSignal: Signal[List[RosterEntry]] =
+      names.signal.map(RosterPaste.resolveRoster(_, periodByName))
 
     div(
       cls := "wizard-panel",
       h2("Define roster"),
       p(tournament.name).amend(cls := "tournament-title"),
       p(
-        "Select period players and add guests. Lock when you have 8–64 players."
+        "Paste the signup list (one name per line). " +
+          "Exact matches keep period ratings; others show as guests. " +
+          "Lock when you have 8–64 players."
       ),
       div(
-        cls := "player-picker",
-        h3("Period players"),
-        leaderboard.ratings.map { rating =>
-          label(
-            input(
-              typ := "checkbox",
-              checked <-- selected.signal.map(_.contains(rating.player.name)),
-              onClick.mapTo(rating.player.name) --> Observer[String] { name =>
-                selected.update { current =>
-                  if (current.contains(name)) {
-                    current - name
-                  } else {
-                    current + name
-                  }
-                }
-              }
-            ),
-            span(rating.player.name)
-          )
-        }
-      ),
-      div(
-        cls := "guest-entry",
+        cls := "roster-paste",
         label(
-          "Add guest",
-          input(
-            typ := "text",
+          "Signup names",
+          textArea(
+            rows := 8,
+            placeholder := "Alice\nBob\nCarol",
             controlled(
-              value <-- guestName.signal,
-              onInput.mapToValue --> guestName.writer
+              value <-- pasteText.signal,
+              onInput.mapToValue --> pasteText.writer
             )
           )
         ),
         button(
           onClick.mapTo(()) --> Observer[Unit] { _ =>
-            val name = guestName.now().trim
-            if (name.nonEmpty) {
-              selected.update(_ + name)
-              guestName.set("")
-            }
+            names.set(RosterPaste.parsePaste(pasteText.now()))
           },
-          "Add"
+          "Apply paste"
         )
       ),
       div(
+        cls := "roster-list",
+        h3("Roster"),
+        children <-- rosterSignal.map { entries =>
+          if (entries.isEmpty) {
+            List(p(cls := "hint", "No players yet — paste a signup list."))
+          } else {
+            entries.map { entry =>
+              div(
+                cls := (if (entry.guest) "roster-row guest" else "roster-row"),
+                span(cls := "roster-name", entry.name),
+                span(cls := "roster-rating", f"${entry.rating}%.0f"),
+                if (entry.guest) span(cls := "guest-badge", "guest")
+                else emptyNode
+              )
+            }
+          }
+        }
+      ),
+      div(
         cls := "roster-summary",
-        child.text <-- selected.signal.map(names =>
-          s"${names.size} players selected"
-        ),
-        child <-- selected.signal.map { names =>
-          val hint = DirectorGuidance.lockRosterHint(names.size)
+        child.text <-- names.signal.map(ns => s"${ns.size} players selected"),
+        child <-- names.signal.map { ns =>
+          val hint = DirectorGuidance.lockRosterHint(ns.size)
           if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode
         }
       ),
@@ -108,15 +107,14 @@ object WizardView {
         button(
           cls := "primary",
           disabled <-- busy,
-          onClick.mapTo(()) --> Observer[Unit](_ =>
-            onSetPlayers.onNext(currentPlayers)
-          ),
+          onClick.mapTo(()) --> Observer[Unit] { _ =>
+            onSetPlayers.onNext(names.now().map(Player(_)))
+          },
           "Save roster"
         ),
         button(
-          disabled <-- busy.combineWith(selected.signal).map {
-            case (isBusy, names) =>
-              isBusy || names.size < 8 || names.size > 64
+          disabled <-- busy.combineWith(names.signal).map { case (isBusy, ns) =>
+            isBusy || ns.size < 8 || ns.size > 64
           },
           onClick.mapTo(()) --> onLock,
           "Lock roster"

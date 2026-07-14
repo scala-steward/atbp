@@ -38,7 +38,7 @@ confirm who is rated vs new before locking.
 ## Commands
 
 ```bash
-sbt --client "ligaJS/test"
+sbt --client "liga/testOnly *RosterPaste*"
 sbt --client "liga/test"
 sbt --client fixup
 ```
@@ -50,16 +50,17 @@ Manual check: `sbt run` (liga serve), open director `/`, create tournament, past
 ```
 docs/intent/paste-roster.md          → confirmed intent
 docs/specs/paste-roster.md           → this spec
+liga-common/.../roster/RosterPaste.scala → parse/resolve/sort (shared)
+liga/src/test/.../roster/RosterPasteSpec.scala → JVM unit tests
 liga-js/.../director/WizardView.scala → defining-step UI
 liga-js/.../director/DirectorGuidance.scala → copy/hints if needed
 liga/.../web/css/director.css        → roster list + guest highlight styles
-liga-js/src/test/...                 → pure logic tests for parse/match/sort
 ```
 
 ## Code Style
 
-Prefer a small pure helper for parse → resolve → sort, then wire it in Laminar.
-Match existing `WizardView` / `DirectorGuidance` style.
+Prefer a small pure helper for parse → resolve → sort in `liga-common`, then wire
+it in Laminar. Match existing `WizardView` / `DirectorGuidance` style.
 
 Example shape (illustrative):
 
@@ -71,13 +72,12 @@ def parsePaste(raw: String): List[String] =
 
 def resolveRoster(
     names: List[String],
-    period: List[PlayerRating],
+    periodByName: Map[String, Double],
     guestRating: Double
-): List[RosterEntry] = {
-  val byName = period.map(r => r.player.name -> r.rating).toMap
+): List[RosterEntry] =
   names
     .map { name =>
-      byName.get(name) match {
+      periodByName.get(name) match {
         case Some(rating) => RosterEntry(name, rating, guest = false)
         case None         => RosterEntry(name, guestRating, guest = true)
       }
@@ -112,7 +112,7 @@ def resolveRoster(
    guests use default 1500 and a clear visual highlight.
 4. Count + lock hint (8–64) still drive Lock enablement; Save/Lock still call
    existing observers/API.
-5. Unit tests cover parse/resolve/sort; `ligaJS/test` passes.
+5. Unit tests cover parse/resolve/sort; `liga/testOnly *RosterPaste*` passes.
 
 ## Open Questions
 
