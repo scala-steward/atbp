@@ -26,7 +26,7 @@ See [tasks/plan.md](plan.md) for acceptance criteria and verification steps.
 
 ## Checkpoint (complete)
 
-- [ ] `sbt --client "liga/test"`
-- [ ] `sbt --client fixup` until `git status` clean
+- [x] `sbt --client "liga/test"`
+- [x] `sbt --client fixup` until `git status` clean
 - [ ] Manual define-step flow (spec success criteria 1–5)
 - [ ] Re-review / merge
