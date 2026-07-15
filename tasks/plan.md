@@ -25,7 +25,7 @@ From [SPEC.md](../SPEC.md). Branch: `roster-ux`.
 ## Verification
 
 ```bash
-sbt --client "liga-commonJVM/testOnly *RatingOrder*"
+sbt --client "ligaCommonJVM/testOnly *RatingOrder*"
 sbt --client "liga/testOnly *RosterPaste*"
 sbt --client "liga/testOnly *Bracket*"
 sbt --client "liga-js/compile"

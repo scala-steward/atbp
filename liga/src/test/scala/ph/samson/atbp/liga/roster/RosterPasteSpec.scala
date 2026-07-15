@@ -27,6 +27,11 @@ object RosterPasteSpec extends ZIOSpecDefault {
           RosterPaste.parsePaste("Alice\r\nBob\r\n") == List("Alice", "Bob")
         )
       },
+      test("splits bare carriage returns from classic Mac newlines") {
+        assertTrue(
+          RosterPaste.parsePaste("Alice\rBob\r") == List("Alice", "Bob")
+        )
+      },
       test("empty paste yields no names") {
         assertTrue(RosterPaste.parsePaste("") == Nil)
       }

@@ -119,7 +119,13 @@ object DirectorApp {
                     Observer[List[Player]](players =>
                       runAction(client.setPlayers(players))
                     ),
-                    Observer[Unit](_ => runAction(client.lockPlayers())),
+                    Observer[List[Player]] { players =>
+                      runAction(
+                        client
+                          .setPlayers(players)
+                          .flatMap(_ => client.lockPlayers())
+                      )
+                    },
                     Observer[Map[Int, Int]](roundRaceTo =>
                       runAction(client.setRaceTo(roundRaceTo))
                     ),

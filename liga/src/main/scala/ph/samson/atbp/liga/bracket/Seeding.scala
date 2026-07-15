@@ -1,13 +1,14 @@
 package ph.samson.atbp.liga.bracket
 
 import ph.samson.atbp.liga.model.PlayerRating
+import ph.samson.atbp.liga.roster.RatingOrder
 
 /** Rating-based seeding for double-elimination brackets. */
 object Seeding {
 
   /** Players sorted best-first (seed 1 = highest rating). */
   def seedOrder(players: List[PlayerRating]): List[PlayerRating] =
-    players.sortWith(compareRatings)
+    RatingOrder.sortBestFirst(players)
 
   /** Standard tournament bracket slot order (1-based seed numbers). */
   def bracketSlotSeeds(bracketSize: Int): List[Int] = {
@@ -29,24 +30,6 @@ object Seeding {
       s"player count must be 8–64: $playerCount"
     )
     nextPowerOfTwo(playerCount)
-  }
-
-  private def compareRatings(a: PlayerRating, b: PlayerRating): Boolean = {
-    val byRating = a.rating.compare(b.rating)
-    if (byRating > 0) {
-      true
-    } else if (byRating < 0) {
-      false
-    } else {
-      val byRd = a.rd.compare(b.rd)
-      if (byRd < 0) {
-        true
-      } else if (byRd > 0) {
-        false
-      } else {
-        a.player.name < b.player.name
-      }
-    }
   }
 
   private def isPowerOfTwo(n: Int): Boolean =

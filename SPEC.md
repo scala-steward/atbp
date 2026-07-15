@@ -83,12 +83,12 @@ Same as paste-roster intent: director during the defining wizard step.
 sbt --client compile
 
 # Unit tests — rating order (liga-common) + roster + bracket
-sbt --client "liga-commonJVM/testOnly *RatingOrder*"
+sbt --client "ligaCommonJVM/testOnly *RatingOrder*"
 sbt --client "liga/testOnly *RosterPaste*"
 sbt --client "liga/testOnly *Bracket*"
 
 # Full suites
-sbt --client "liga-commonJVM/test"
+sbt --client "ligaCommonJVM/test"
 sbt --client "liga/test"
 
 # Frontend compile

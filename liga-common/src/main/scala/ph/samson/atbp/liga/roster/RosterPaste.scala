@@ -18,29 +18,41 @@ object RosterPaste {
   val GuestDisplayRating: Double = Tuning.Default.initRating
 
   def parsePaste(raw: String): List[String] =
-    raw.split("\n").iterator.map(_.trim).filter(_.nonEmpty).toList.distinct
+    raw
+      .split("\\r\\n|\\r|\\n")
+      .iterator
+      .map(_.trim)
+      .filter(_.nonEmpty)
+      .toList
+      .distinct
 
   def resolveRoster(
       names: List[String],
       periodByName: Map[String, PlayerRating]
   ): List[RosterEntry] = {
     val tuning = Tuning.Default
-    val ratings = names.map { name =>
-      periodByName.getOrElse(
-        name,
-        PlayerRating(
-          player = Player(name),
-          rating = tuning.initRating,
-          rd = tuning.maxDeviation,
-          wins = 0,
-          losses = 0
-        )
-      )
+    val resolved = names.map { name =>
+      periodByName.get(name) match {
+        case Some(rating) =>
+          (rating, false)
+        case None =>
+          (
+            PlayerRating(
+              player = Player(name),
+              rating = tuning.initRating,
+              rd = tuning.maxDeviation,
+              wins = 0,
+              losses = 0
+            ),
+            true
+          )
+      }
     }
-    RatingOrder
-      .sortBestFirst(ratings)
-      .map { rating =>
-        val guest = !periodByName.contains(rating.player.name)
+    resolved
+      .sortWith((left, right) =>
+        RatingOrder.compareBestFirst(left._1, right._1)
+      )
+      .map { case (rating, guest) =>
         RosterEntry(rating.player.name, rating.rating, guest = guest)
       }
   }

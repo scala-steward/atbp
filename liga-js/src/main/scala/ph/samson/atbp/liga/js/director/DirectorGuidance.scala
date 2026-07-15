@@ -26,8 +26,11 @@ object DirectorGuidance {
       ""
     }
 
-  val saveBeforeLockHint: String =
-    "Save roster before locking — the server still uses the last saved player list."
+  val lockSavesHint: String =
+    "Lock saves your roster."
+
+  val applyPasteHint: String =
+    "Apply paste to update the preview — or Lock will use your pasted list."
 
   def seedHint: String =
     "Seeding freezes each player's rating from the period leaderboard. " +

@@ -120,6 +120,9 @@ lazy val ligaCommon = crossProject(JSPlatform, JVMPlatform)
     scalacOptions ++= Seq("-no-indent", "-old-syntax")
   )
   .settings(Dependencies.ligaCommon)
+  .jvmSettings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+  )
   .jsSettings(
     scalaJSUseMainModuleInitializer := false
   )

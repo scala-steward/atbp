@@ -15,14 +15,14 @@ object WizardView {
       leaderboard: LeaderboardResponse,
       busy: Signal[Boolean],
       onSetPlayers: Observer[List[Player]],
-      onLock: Observer[Unit],
+      onSaveAndLock: Observer[List[Player]],
       onSetRaceTo: Observer[Map[Int, Int]],
       onSeed: Observer[Unit]
   ): Div = {
     val phase = TournamentPhase.fromApi(tournament.phase)
     phase match {
       case TournamentPhase.Defining =>
-        definingStep(tournament, leaderboard, busy, onSetPlayers, onLock)
+        definingStep(tournament, leaderboard, busy, onSetPlayers, onSaveAndLock)
       case TournamentPhase.Locked =>
         raceToStep(tournament, busy, onSetRaceTo)
       case TournamentPhase.RaceTo =>
@@ -37,12 +37,20 @@ object WizardView {
       leaderboard: LeaderboardResponse,
       busy: Signal[Boolean],
       onSetPlayers: Observer[List[Player]],
-      onLock: Observer[Unit]
+      onSaveAndLock: Observer[List[Player]]
   ): Div = {
     val names = Var(tournament.players.map(_.name))
     val pasteText = Var(tournament.players.map(_.name).mkString("\n"))
 
-    val savedNames = tournament.players.map(_.name).toSet
+    val pasteDirty: Signal[Boolean] =
+      pasteText.signal
+        .combineWith(names.signal)
+        .map { case (text, applied) =>
+          RosterPaste.parsePaste(text) != applied
+        }
+
+    val lockCount: Signal[Int] =
+      pasteText.signal.map(text => RosterPaste.parsePaste(text).size)
 
     val periodByName: Map[String, CommonPlayerRating] =
       leaderboard.ratings
@@ -89,13 +97,18 @@ object WizardView {
           },
           "Apply paste"
         ),
-        child <-- pasteText.signal.map { text =>
-          val count = RosterPaste.parsePaste(text).size
-          if (count > 64) {
-            p(cls := "hint", DirectorGuidance.lockRosterHint(count))
-          } else {
-            emptyNode
-          }
+        child <-- pasteText.signal.combineWith(pasteDirty).map {
+          case (text, dirty) =>
+            val count = RosterPaste.parsePaste(text).size
+            val hints = List.newBuilder[Node]
+            if (dirty) {
+              hints += p(cls := "hint", DirectorGuidance.applyPasteHint)
+            }
+            if (count > 64) {
+              hints += p(cls := "hint", DirectorGuidance.lockRosterHint(count))
+            }
+            if (hints.result().isEmpty) emptyNode
+            else div(hints.result())
         }
       ),
       div(
@@ -120,16 +133,20 @@ object WizardView {
       div(
         cls := "roster-summary",
         child.text <-- names.signal.map(ns => s"${ns.size} players in roster"),
-        child <-- names.signal.map { ns =>
-          if (ns.toSet != savedNames) {
-            p(cls := "hint", DirectorGuidance.saveBeforeLockHint)
+        child <-- pasteDirty.map { dirty =>
+          if (!dirty) {
+            p(cls := "hint", DirectorGuidance.lockSavesHint)
           } else {
             emptyNode
           }
         },
-        child <-- names.signal.map { ns =>
-          val hint = DirectorGuidance.lockRosterHint(ns.size)
-          if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode
+        child <-- names.signal.combineWith(pasteDirty).map { case (ns, dirty) =>
+          if (!dirty) {
+            val hint = DirectorGuidance.lockRosterHint(ns.size)
+            if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode
+          } else {
+            emptyNode
+          }
         }
       ),
       div(
@@ -143,10 +160,14 @@ object WizardView {
           "Save roster"
         ),
         button(
-          disabled <-- busy.combineWith(names.signal).map { case (isBusy, ns) =>
-            isBusy || ns.size < 8 || ns.size > 64
+          disabled <-- busy.combineWith(lockCount).map { case (isBusy, count) =>
+            isBusy || count < 8 || count > 64
           },
-          onClick.mapTo(()) --> onLock,
+          onClick.mapTo(()) --> Observer[Unit] { _ =>
+            val rosterNames = RosterPaste.parsePaste(pasteText.now())
+            names.set(rosterNames)
+            onSaveAndLock.onNext(rosterNames.map(Player(_)))
+          },
           "Lock roster"
         )
       )
