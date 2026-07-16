@@ -12,7 +12,9 @@ The CLI (`atbp liga`) is the source-of-truth engine: read ordered period files, 
 
 **Rating periods.** A tournament is one Glicko2 rating period. Ratings are frozen at period start (carried forward from prior completed periods) and do not update as match results come in. Glicko2 runs only when a period completes and its period file is finalized. Bracket seeding and all handicap suggestions within a tournament use this same frozen snapshot.
 
-**Race-to-N.** The director sets a race-to-N per bracket round (e.g. early rounds to 5, later rounds to 7). Per-match override is available as an escape hatch when a specific matchup needs a different race. Handicap suggestions use the effective N for that match: match override if set, otherwise the round default.
+**Race-to-N.** The director sets race-to-N per bracket scope (Winners round,
+Losers round, Grand Final — see `docs/ideas/section-aware-race-to.md`). Handicap
+suggestions use the race-to for that match's scope.
 
 **Handicaps as suggestions.** When the director sets a match ready to play, the system shows a suggested handicap derived from period-start ratings and the match's effective race-to-N (75% cap). The director and players may accept it or adjust manually before play begins. The agreed handicap is locked once the match starts and stored on the match record (`handicap_suggested` vs `handicap_applied`). Game results drive Glicko2 updates at period end; handicaps are match metadata, not rating inputs. The CLI `liga handicap` mode uses the same suggestion algorithm for ad-hoc lookups.
 
@@ -40,7 +42,7 @@ The audience gets a **separate URL** (e.g. `/audience`) opened in a second brows
 - `liga` CLI: read period file(s) or directory; leaderboard (rating, RD, W–L); handicap suggestion mode (two players + race-to-N).
 - Period file format: player display names, matches with final scores, effective race-to-N, `handicap_suggested` / `handicap_applied`, optional presentation metadata.
 - Glicko2 engine: game outcomes derived from final scores; ratings advance only at period boundaries; reproducible replay across periods in order.
-- `liga serve`: ZIO HTTP backend; Laminar director UI; double-elim bracket; rating-seeded draw; per-round race-to-N with per-match override; suggested handicaps with manual override; match result entry; append-only JSON directory persistence + crash recovery.
+- `liga serve`: ZIO HTTP backend; Laminar director UI; double-elim bracket; rating-seeded draw; per-scope race-to-N; suggested handicaps with manual override; match result entry; append-only JSON directory persistence + crash recovery.
 - Audience route at separate URL: read-only bracket/standings, poll-based refresh.
 - Emit finalized period file on tournament completion.
 
@@ -71,6 +73,7 @@ The audience gets a **separate URL** (e.g. `/audience`) opened in a second brows
 - **Player ID system** — display names + find-and-replace on files is enough for one club.
 - **Mutable state files** — append-only JSON avoids corruption on crash; no in-place updates.
 - **SQLite for tournament state** — directory replay is simpler and matches the files-first philosophy.
+- **Per-match race-to override** — per-scope wizard config is sufficient; misconfiguration requires a new tournament.
 
 ## Open Questions
 
@@ -89,5 +92,5 @@ _(None — ready for spec.)_
 | Format metadata | Presentation only; not used in rating/ranking |
 | Player identity | Display-name strings; find-and-replace on period files for corrections |
 | Serve runtime | Single JVM on director's laptop |
-| Race-to-N | Per bracket round; per-match override as escape hatch |
+| Race-to-N | Per bracket scope (Winners / Losers / GF); no per-match override |
 | Tournament persistence | Append-only directory of JSON files, one dir per tournament; no in-place updates; replay on resume |

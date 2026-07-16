@@ -121,11 +121,10 @@ Helper text under Grand Final: "usually longer than finals — set explicitly."
 - [x] **Breaking `roundRaceTo` / old events is OK** — no production migration
 - [x] **Cascade reduces friction** — directors mostly edit `wb-1`, `wb-2`, `lb-1`,
   and `gf` rather than every field
-- [ ] **Per-match override gap is acceptable for v1** — documented in
-  `docs/ideas/liga.md` but not implemented; section-aware wizard is the only path
-  today
-- [ ] **Post-seed race-to edits remain out of scope** — misconfiguration requires
-  re-seed / new tournament (current behavior)
+- [x] **No per-match race-to override** — race-to is set per scope in the wizard
+  only; get it right before seed
+- [x] **Misconfiguration requires new tournament** — no post-seed race-to edits;
+  re-seed / new tournament is acceptable
 
 ## MVP Scope
 
@@ -147,9 +146,9 @@ Helper text under Grand Final: "usually longer than finals — set explicitly."
 
 - Migration of old tournament directories
 - Server-side cascade / sparse anchor storage
-- Per-match race-to override at ready time
+- Per-match race-to override (scope keys + cascade are sufficient)
 - Bulk "copy winners → losers" button (cascade replaces it)
-- Post-seed race-to changes
+- Post-seed race-to changes (misconfiguration → new tournament)
 - Changing bracket match ID format (`wb-2-1` stays as-is)
 
 ## Not Doing (and Why)
@@ -161,6 +160,8 @@ Helper text under Grand Final: "usually longer than finals — set explicitly."
   two representations to keep in sync; string keys are simpler end-to-end
 - **Flat wizard list at 64 players** — section headings essential at scale
 - **Smart GF default (9/11)** — director bumps GF manually; helper text only
+- **Per-match race-to override** — scope keys and wizard cascade cover all cases;
+  no escape hatch at match ready time
 
 ## Open Questions
 
@@ -191,9 +192,7 @@ onEdit(scope, value):
       gfPinned := true; set gf
 ```
 
-**Codebase gap:** `MatchReady` only stores `handicapSuggested`; `BracketMatch.raceTo`
-is never set during replay. Do not defer GF/losers separation to "override at
-ready time."
-
-**Docs drift:** update `docs/ideas/liga.md` race-to bullet when shipping — either
-implement per-match override later or remove the escape-hatch claim.
+**Race-to resolves from scope keys only.** `MatchReady` snapshots
+`handicapSuggested`; effective race-to for a match always comes from
+`raceToByScope(keyForMatch(matchId))` at resolve time. The wizard must be
+correct before seed — there is no per-match race-to override.
