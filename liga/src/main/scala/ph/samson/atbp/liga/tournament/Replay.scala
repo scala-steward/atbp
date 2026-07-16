@@ -69,11 +69,12 @@ object Replay {
           Right(state.copy(playersLocked = true))
         }
 
-      case TournamentEvent.RoundRaceToSet(_, _, payload) =>
+      case TournamentEvent.RaceToSet(_, _, payload) =>
         for {
           _ <- TournamentValidation.validateRaceTo(payload.raceTo)
         } yield state.copy(
-          roundRaceTo = state.roundRaceTo.updated(payload.round, payload.raceTo)
+          raceToByScope =
+            state.raceToByScope.updated(payload.scope, payload.raceTo)
         )
 
       case TournamentEvent.BracketSeeded(_, _, payload) =>

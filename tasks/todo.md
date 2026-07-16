@@ -17,13 +17,13 @@ Source: [`SPEC.md`](../SPEC.md) · Plan: [`tasks/plan.md`](plan.md)
 
 ## Phase 2: Server Domain
 
-- [ ] **Task 3:** State, events, replay (`raceToByScope`, `RaceToSet`, EventLog `race-to`)
-- [ ] **Task 4:** Resolve, phase gating, seed (MatchLifecycle, TournamentPhase, Seed)
+- [x] **Task 3:** State, events, replay (`raceToByScope`, `RaceToSet`, EventLog `race-to`)
+- [x] **Task 4:** Resolve, phase gating, seed (MatchLifecycle, TournamentPhase, Seed)
 - [ ] **Task 5:** Delete `BracketRounds`; update domain test helpers
 
 ### Checkpoint: Server Domain
-- [ ] No `roundRaceTo` / `RoundRaceToSet` in `liga/` main sources
-- [ ] `sbt --client "liga/testOnly *Seed*"` and `*EventCodec*` pass
+- [x] No `roundRaceTo` / `RoundRaceToSet` in `liga/` main sources
+- [x] `sbt --client "liga/testOnly *Seed*"` and `*EventCodec*` pass
 - [ ] Review before API layer
 
 ---

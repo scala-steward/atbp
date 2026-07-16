@@ -23,7 +23,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       |  "players": [{"name": "P1"}, {"name": "P2"}],
       |  "completed": false,
       |  "phase": "active",
-      |  "roundRaceTo": {"1": 7},
+      |  "raceToByScope": {"wb-1": 7},
       |  "bracket": {
       |    "size": 2,
       |    "matches": [{
@@ -72,7 +72,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       assertTrue(
         parsed.isRight,
         parsed.exists(_.name == "Spring Open"),
-        parsed.exists(_.roundRaceTo == Map(1 -> 7)),
+        parsed.exists(_.raceToByScope == Map("wb-1" -> 7)),
         parsed.exists(
           _.bracket.exists(_.matches.head.state == BracketMatchState.Started)
         ),
@@ -121,7 +121,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       val ok =
         decodeResponse[TournamentResponse](
           200,
-          """{"name":"T","players":[],"completed":false,"phase":"none","roundRaceTo":{},"bracket":null,"frozenRatings":[]}"""
+          """{"name":"T","players":[],"completed":false,"phase":"none","raceToByScope":{},"bracket":null,"frozenRatings":[]}"""
         )
       val httpErr = decodeResponse[TournamentResponse](403, "forbidden")
       val jsonErr = decodeResponse[TournamentResponse](200, "not json")
@@ -134,10 +134,11 @@ object ApiClientContractSpec extends ZIOSpecDefault {
     test("director POST request bodies match JS client encodings") {
       import DirectorRoutes.*
       assertTrue(
-        SeedRequest(Map(1 -> 7, 2 -> 5)).toJson.contains("\"roundRaceTo\""),
+        SeedRequest(Map("wb-1" -> 7, "wb-2" -> 5)).toJson
+          .contains("\"raceToByScope\""),
         CreateRequest("Spring Open").toJson.contains("\"name\""),
         PlayersRequest(List(Player("Alice"))).toJson.contains("\"players\""),
-        RaceToRequest(Map(1 -> 7)).toJson.contains("\"roundRaceTo\""),
+        RaceToRequest(Map("wb-1" -> 7)).toJson.contains("\"raceToByScope\""),
         HandicapRequest(3).toJson == """{"handicap":3}""",
         ResultRequest(7, 4).toJson == """{"scoreA":7,"scoreB":4}""",
         CompleteRequest(None).toJson == "{}",

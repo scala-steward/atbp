@@ -103,7 +103,7 @@ final case class ServeContext(
       events <- EventLog.read(dir)
     } yield events.map(_.seq).maxOption.getOrElse(0) + 1
 
-  def seedBracket(roundRaceTo: Map[Int, Int]): Task[TournamentState] =
+  def seedBracket(raceToByScope: Map[String, Int]): Task[TournamentState] =
     for {
       state <- loadTournament
       periodRatings <- PeriodLoader.loadAll(dataDir)
@@ -111,7 +111,7 @@ final case class ServeContext(
       at = Instant.now()
       events <- ZIO.fromEither(
         Seed
-          .buildEvents(state, periodRatings, roundRaceTo, startSeq, at)
+          .buildEvents(state, periodRatings, raceToByScope, startSeq, at)
           .left
           .map(err => ServeContext.CommandError(err.message))
       )

@@ -1,7 +1,7 @@
 package ph.samson.atbp.liga
 
 import better.files.File
-import ph.samson.atbp.liga.bracket.BracketRounds
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.cli.LeaderboardRenderer
 import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
@@ -72,9 +72,9 @@ object EndToEndSpec extends ZIOSpecDefault {
   }
 
   private def raceToBody(playerCount: Int): String = {
-    val rounds = BracketRounds.requiredKeys(playerCount)
-    val raceTo = rounds.map(r => s""""$r":7""").mkString(",")
-    s"""{"roundRaceTo":{$raceTo}}"""
+    val scopes = RaceToScopes.requiredKeys(playerCount)
+    val raceTo = scopes.map(scope => s""""$scope":7""").mkString(",")
+    s"""{"raceToByScope":{$raceTo}}"""
   }
 
   private def configureRaceTo(

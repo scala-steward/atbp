@@ -15,7 +15,7 @@ object ApiJson {
       players: List[Player],
       completed: Boolean,
       phase: String,
-      roundRaceTo: Map[Int, Int],
+      raceToByScope: Map[String, Int],
       bracket: Option[Bracket],
       frozenRatings: List[PlayerRating]
   )
@@ -44,7 +44,7 @@ object ApiJson {
       players = state.players,
       completed = state.completed,
       phase = phaseLabel(TournamentPhase.derive(state, hasDir)),
-      roundRaceTo = state.roundRaceTo,
+      raceToByScope = state.raceToByScope,
       bracket = state.bracket,
       frozenRatings = sortRatings(state.frozenRatings.values.toList)
     )

@@ -1,6 +1,6 @@
 package ph.samson.atbp.liga.tournament
 
-import ph.samson.atbp.liga.bracket.BracketRounds
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.model.TournamentState
 
 /** Wizard / runtime phase derived from replay state. */
@@ -28,7 +28,7 @@ object TournamentPhase {
     }
 
   def raceToComplete(state: TournamentState): Boolean = {
-    val required = BracketRounds.requiredKeys(state.players.size)
-    required.forall(round => state.roundRaceTo.contains(round))
+    val required = RaceToScopes.requiredKeys(state.players.size)
+    required.forall(scope => state.raceToByScope.contains(scope))
   }
 }

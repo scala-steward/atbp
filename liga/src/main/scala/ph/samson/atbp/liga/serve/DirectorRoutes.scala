@@ -22,8 +22,8 @@ object DirectorRoutes {
 
   final case class CreateRequest(name: String)
   final case class PlayersRequest(players: List[Player])
-  final case class RaceToRequest(roundRaceTo: Map[Int, Int])
-  final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
+  final case class RaceToRequest(raceToByScope: Map[String, Int])
+  final case class SeedRequest(raceToByScope: Map[String, Int] = Map.empty)
   final case class HandicapRequest(handicap: Int)
   final case class CompleteRequest(completed: Option[LocalDate] = None)
   final case class ResultRequest(scoreA: Int, scoreB: Int)
@@ -165,7 +165,7 @@ object DirectorRoutes {
       at = Instant.now()
       events <- ZIO.fromEither(
         Tournament
-          .setRoundRaceTo(state, parsed.roundRaceTo, seq, at)
+          .setRaceToByScope(state, parsed.raceToByScope, seq, at)
           .left
           .map(err => ServeContext.CommandError(err.message))
       )
@@ -182,7 +182,7 @@ object DirectorRoutes {
         } else {
           parseJson[SeedRequest](body)
         }
-      state <- ctx.seedBracket(parsed.roundRaceTo)
+      state <- ctx.seedBracket(parsed.raceToByScope)
       response <- jsonState(ctx, state)
     } yield response
 
