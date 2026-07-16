@@ -60,6 +60,14 @@ object RaceToScopesSpec extends ZIOSpecDefault {
           )
         )
       },
+      test("requiredKeys(32) returns fourteen scope keys") {
+        assertTrue(
+          RaceToScopes.requiredKeys(32) ==
+            (1 to 5).map(n => s"wb-$n").toList ++
+            (1 to 8).map(n => s"lb-$n").toList :+
+            "gf"
+        )
+      },
       test("requiredKeys(64) returns seventeen scope keys") {
         assertTrue(
           RaceToScopes.requiredKeys(64) ==

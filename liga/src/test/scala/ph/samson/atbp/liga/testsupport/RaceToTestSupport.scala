@@ -14,6 +14,17 @@ object RaceToTestSupport {
   def uniformRaceTo(playerCount: Int): Map[String, Int] =
     uniformRaceTo(playerCount, raceTo = 7)
 
+  /** Winners 7, losers 5, grand final 9 — exercises per-section resolution. */
+  def differentiatedRaceTo(playerCount: Int): Map[String, Int] =
+    RaceToScopes
+      .requiredKeys(playerCount)
+      .map {
+        case scope if scope.startsWith("lb-") => scope -> 5
+        case scope if scope == "gf"           => scope -> 9
+        case scope                            => scope -> 7
+      }
+      .toMap
+
   def raceToSetEvents(
       playerCount: Int,
       startSeq: Int,

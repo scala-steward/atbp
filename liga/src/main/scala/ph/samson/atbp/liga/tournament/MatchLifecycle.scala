@@ -173,18 +173,6 @@ object MatchLifecycle {
       )
     }
 
-  /** Bracket round encoded in match ids (`wb-2-1`, `lb-3-2`, `gf-1`). */
-  def bracketRound(matchId: String, bracketSize: Int): Option[Int] =
-    matchId match {
-      case s"wb-$round-$_" =>
-        round.toIntOption
-      case s"lb-$round-$_" =>
-        round.toIntOption
-      case "gf-1" =>
-        Some(log2(bracketSize))
-      case _ => None
-    }
-
   def resolveRaceTo(
       state: TournamentState,
       matchId: String
@@ -203,7 +191,4 @@ object MatchLifecycle {
         .get(scope)
         .toRight(MissingRaceToError(matchId, scope))
     } yield raceTo
-
-  private def log2(n: Int): Int =
-    (math.log(n) / math.log(2)).toInt
 }

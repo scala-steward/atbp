@@ -451,6 +451,21 @@ object TournamentSpec extends ZIOSpecDefault {
         )
         assertTrue(Tournament.lockPlayers(state, seq = 2, at).isRight)
       },
+      test("setRaceToByScope rejects incomplete scope map") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList,
+          playersLocked = true
+        )
+        val incomplete = RaceToTestSupport.uniformRaceTo(8) - "gf"
+        val result =
+          Tournament.setRaceToByScope(state, incomplete, startSeq = 3, at)
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message
+            .contains("every scope is configured")
+        )
+      },
       test("setRaceToByScope rejects race-to below 2") {
         val state = TournamentState(
           name = "Open",
@@ -498,6 +513,39 @@ object TournamentSpec extends ZIOSpecDefault {
               startSeq = 3,
               at
             )
+            .isLeft
+        )
+      }
+    ),
+    suite("resolveRaceTo")(
+      test("uses per-section values from raceToByScope") {
+        val raceTo = RaceToTestSupport.differentiatedRaceTo(8)
+        val state = seededState(raceTo)
+        assertTrue(
+          MatchLifecycle.resolveRaceTo(state, "wb-1-1") == Right(7),
+          MatchLifecycle.resolveRaceTo(state, "lb-1-1") == Right(5),
+          MatchLifecycle.resolveRaceTo(state, "gf-1") == Right(9)
+        )
+      }
+    ),
+    suite("result with differentiated race-to")(
+      test("enforces losers-bracket race-to on result") {
+        val state = withMatch(
+          seededState(RaceToTestSupport.differentiatedRaceTo(8)),
+          "lb-1-1"
+        ) {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(0),
+            handicapApplied = Some(0)
+          )
+        }
+        assertTrue(
+          Tournament
+            .recordResult(state, "lb-1-1", scoreA = 5, scoreB = 3, seq = 6, at)
+            .isRight,
+          Tournament
+            .recordResult(state, "lb-1-1", scoreA = 7, scoreB = 3, seq = 6, at)
             .isLeft
         )
       }
