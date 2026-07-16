@@ -77,14 +77,15 @@ the backend stores one value per scope key with no anchor/sparse semantics.
 section.
 
 **`wb-1` special case:** uses the general winners rule **plus** sets `lb-1` to
-the same value. It does **not** cascade to `lb-2`..`lb-M`.
+the same value, which cascades to `lb-2`..`lb-M` (same as editing `lb-1`
+directly).
 
 **Grand Final:** tracks `wb-N` until the director edits `gf` directly (pin). When
 pinned, later `wb-*` edits do not change `gf`.
 
 | Edit | Winners | Losers | GF (unpinned) |
 |------|---------|--------|---------------|
-| `wb-1` | `wb-1`..`wb-N` | `lb-1` only | `wb-N` |
+| `wb-1` | `wb-1`..`wb-N` | `lb-1`..`lb-M` (via `lb-1` cascade) | `wb-N` |
 | `wb-k` (k ≥ 2) | `wb-k`..`wb-N` | — | `wb-N` if changed |
 | `lb-k` | — | `lb-k`..`lb-M` | — |
 | `gf` | — | — | value set; GF pinned |
@@ -98,10 +99,11 @@ pinned, later `wb-*` edits do not change `gf`.
 | `lb-2`..`lb-M` | = `lb-1` | cascade on load |
 | `gf` | = `wb-N` | sync on load; unpinned |
 
-**Typical director flow (3 edits for 8 players):**
+**Typical director flow (2–3 edits for 8 players):**
 
-1. `lb-1` → 5 — all losers `5,5,5,5`
-2. `wb-2` → 5 — winners `7,5,5`; GF unpinned → `5`
+1. `wb-1` → 7 (default) then `lb-1` → 5 — all losers `5,5,5,5` (or `wb-1` → 5
+   to set all winners and all losers in one edit)
+2. `wb-2` → 5 — winners `7,5,5` if step 1 only touched losers; GF unpinned → `5`
 3. `gf` → 9 — pins GF
 
 Helper text under Grand Final: "usually longer than finals — set explicitly."
@@ -164,8 +166,8 @@ Helper text under Grand Final: "usually longer than finals — set explicitly."
 
 - **Seed/race-to POST:** single payload with full `raceToByScope` map (one save
   action) — same as today, more keys. **Resolved: yes.**
-- **`wb-1` → `lb-1` only (not `lb-2`..`lb-M`):** intentional; director uses
-  `lb-1` to cascade all losers. **Resolved: yes.**
+- **`wb-1` → losers cascade:** `wb-1` sets `lb-1`, which cascades to
+  `lb-2`..`lb-M`. **Resolved: yes.**
 
 ## Implementation Notes
 
@@ -178,7 +180,7 @@ gfPinned: Var[Boolean] = false
 onEdit(scope, value):
   scope match
     case "wb-1" =>
-      set wb-1..wb-N; set lb-1
+      set wb-1..wb-N; set lb-1..lb-M
       if !gfPinned => gf := wb-N
     case s"wb-$k" =>
       set wb-k..wb-N
