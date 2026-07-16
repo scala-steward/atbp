@@ -3,6 +3,8 @@ package ph.samson.atbp.liga.tournament
 import better.files.File
 import ph.samson.atbp.liga.bracket.BracketGen
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.testsupport.RaceToTestSupport
+import ph.samson.atbp.liga.tournament.EventCodec
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 
 import java.time.Instant
@@ -41,15 +43,10 @@ object ReplayFixtureWriter {
       at = at,
       payload = PlayersLockedPayload()
     )
-    val raceToEvents = (1 to 4).map { round =>
-      TournamentEvent.RoundRaceToSet(
-        seq = 3 + round,
-        at = at,
-        payload = RoundRaceToSetPayload(round = round, raceTo = 7)
-      )
-    }.toList
+    val raceToEvents =
+      RaceToTestSupport.raceToSetEvents(playerCount = 8, startSeq = 4, at = at)
     val seeded = TournamentEvent.BracketSeeded(
-      seq = 8,
+      seq = 12,
       at = at,
       payload = BracketSeededPayload(
         frozenRatings = players,
@@ -58,24 +55,24 @@ object ReplayFixtureWriter {
     )
     val lifecycle = List(
       TournamentEvent.MatchReady(
-        seq = 9,
+        seq = 13,
         at = at,
         payload = MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
       ),
       TournamentEvent.HandicapApplied(
-        seq = 10,
+        seq = 14,
         at = at,
         payload =
           HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
       ),
       TournamentEvent.MatchStarted(
-        seq = 11,
+        seq = 15,
         at = at,
         payload = MatchStartedPayload(matchId = "wb-1-1")
       )
     )
     val completed = TournamentEvent.TournamentCompleted(
-      seq = 12,
+      seq = 16,
       at = at,
       payload =
         TournamentCompletedPayload(completed = LocalDate.parse("2026-03-15"))

@@ -3,6 +3,7 @@ package ph.samson.atbp.liga.tournament
 import better.files.File
 import ph.samson.atbp.liga.bracket.BracketGen
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.testsupport.RaceToTestSupport
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 import zio.*
 import zio.test.*
@@ -29,15 +30,17 @@ object ReplaySpec extends ZIOSpecDefault {
   private def appendAll(dir: File, events: List[TournamentEvent]): Task[Unit] =
     ZIO.foreachDiscard(events)(event => EventLog.append(dir, event))
 
+  private def seededSeqAfterLockedRoster(startSeq: Int): Int =
+    startSeq + 2 + RaceToTestSupport.uniformRaceTo(8).size
+
   private def lockedRosterEvents(startSeq: Int): List[TournamentEvent] = {
     val players = (1 to 8).map(i => Player(s"P$i")).toList
-    val raceToEvents = (1 to 4).map { round =>
-      TournamentEvent.RoundRaceToSet(
-        seq = startSeq + 1 + round,
-        at = at,
-        payload = RoundRaceToSetPayload(round = round, raceTo = 7)
+    val raceToEvents =
+      RaceToTestSupport.raceToSetEvents(
+        playerCount = 8,
+        startSeq = startSeq + 2,
+        at = at
       )
-    }.toList
     List(
       TournamentEvent.PlayersSet(
         seq = startSeq,
@@ -112,7 +115,7 @@ object ReplaySpec extends ZIOSpecDefault {
           )
         ) ++ lockedRosterEvents(startSeq = 2) ++ List(
           TournamentEvent.BracketSeeded(
-            seq = 8,
+            seq = seededSeqAfterLockedRoster(startSeq = 2),
             at = at,
             payload = BracketSeededPayload(
               frozenRatings = eightPlayerRatings,
@@ -120,24 +123,24 @@ object ReplaySpec extends ZIOSpecDefault {
             )
           ),
           TournamentEvent.MatchReady(
-            seq = 9,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 1,
             at = at,
             payload =
               MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
           ),
           TournamentEvent.HandicapApplied(
-            seq = 10,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 2,
             at = at,
             payload =
               HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
           ),
           TournamentEvent.MatchStarted(
-            seq = 11,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 3,
             at = at,
             payload = MatchStartedPayload(matchId = "wb-1-1")
           ),
           TournamentEvent.MatchResult(
-            seq = 12,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 4,
             at = at,
             payload =
               MatchResultPayload(matchId = "wb-1-1", scoreA = 7, scoreB = 4)
@@ -337,13 +340,11 @@ object ReplaySpec extends ZIOSpecDefault {
           at = at,
           payload = PlayersLockedPayload()
         )
-      ) ++ (1 to 4).map { round =>
-        TournamentEvent.RoundRaceToSet(
-          seq = 3 + round,
-          at = at,
-          payload = RoundRaceToSetPayload(round = round, raceTo = 7)
-        )
-      }
+      ) ++ RaceToTestSupport.raceToSetEvents(
+        playerCount = 8,
+        startSeq = 4,
+        at = at
+      )
       for {
         state <- ZIO.fromEither(Replay.replay(events))
       } yield assertTrue(
@@ -426,7 +427,7 @@ object ReplaySpec extends ZIOSpecDefault {
           )
         ) ++ lockedRosterEvents(startSeq = 2) ++ List(
           TournamentEvent.BracketSeeded(
-            seq = 8,
+            seq = seededSeqAfterLockedRoster(startSeq = 2),
             at = at,
             payload = BracketSeededPayload(
               frozenRatings = eightPlayerRatings,
@@ -434,13 +435,13 @@ object ReplaySpec extends ZIOSpecDefault {
             )
           ),
           TournamentEvent.MatchReady(
-            seq = 9,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 1,
             at = at,
             payload =
               MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
           ),
           TournamentEvent.HandicapApplied(
-            seq = 10,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 2,
             at = at,
             payload =
               HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 99)
@@ -466,7 +467,7 @@ object ReplaySpec extends ZIOSpecDefault {
           )
         ) ++ lockedRosterEvents(startSeq = 2) ++ List(
           TournamentEvent.BracketSeeded(
-            seq = 8,
+            seq = seededSeqAfterLockedRoster(startSeq = 2),
             at = at,
             payload = BracketSeededPayload(
               frozenRatings = eightPlayerRatings,
@@ -474,24 +475,24 @@ object ReplaySpec extends ZIOSpecDefault {
             )
           ),
           TournamentEvent.MatchReady(
-            seq = 9,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 1,
             at = at,
             payload =
               MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
           ),
           TournamentEvent.HandicapApplied(
-            seq = 10,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 2,
             at = at,
             payload =
               HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 0)
           ),
           TournamentEvent.MatchStarted(
-            seq = 11,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 3,
             at = at,
             payload = MatchStartedPayload(matchId = "wb-1-1")
           ),
           TournamentEvent.MatchResult(
-            seq = 12,
+            seq = seededSeqAfterLockedRoster(startSeq = 2) + 4,
             at = at,
             payload =
               MatchResultPayload(matchId = "wb-1-1", scoreA = 5, scoreB = 4)
@@ -514,10 +515,10 @@ object ReplaySpec extends ZIOSpecDefault {
             at = at,
             payload = TournamentCreatedPayload("Open", Nil)
           ),
-          TournamentEvent.RoundRaceToSet(
+          TournamentEvent.RaceToSet(
             seq = 2,
             at = at,
-            payload = RoundRaceToSetPayload(round = 1, raceTo = 1)
+            payload = RaceToSetPayload(scope = "wb-1", raceTo = 1)
           )
         )
         for {

@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.bracket.BracketGen
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.glicko.Tuning
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
@@ -40,7 +41,7 @@ object Seed {
 
   final case class RaceToIncompleteError() extends Error {
     val message: String =
-      "cannot seed bracket before race-to is set for all rounds"
+      "cannot seed bracket before race-to is set for all scopes"
   }
 
   final case class InvalidRaceToError(raceTo: Int) extends Error {
@@ -50,24 +51,42 @@ object Seed {
   def buildEvents(
       state: TournamentState,
       periodRatings: List[PlayerRating],
-      roundRaceTo: Map[Int, Int],
+      raceToByScope: Map[String, Int],
       startSeq: Int,
       at: Instant
   ): Either[Error, List[TournamentEvent]] =
     for {
       _ <- validateState(state)
-      _ <- validateRoundRaceTo(roundRaceTo)
+      effectiveRaceTo =
+        if (raceToByScope.isEmpty) {
+          state.raceToByScope
+        } else {
+          raceToByScope
+        }
+      _ <- validateRaceToByScope(effectiveRaceTo, state.players.size)
       ratings <- resolveRatings(state.players, periodRatings)
       _ <- validatePlayerCount(ratings.size)
       bracket = BracketGen.generate(ratings)
-      raceToEvents = roundRaceTo.toList.sortBy(_._1).zipWithIndex.map {
-        case ((round, raceTo), index) =>
-          TournamentEvent.RoundRaceToSet(
-            seq = startSeq + index,
-            at = at,
-            payload = RoundRaceToSetPayload(round = round, raceTo = raceTo)
-          )
-      }
+      raceToAlreadySaved =
+        raceToByScope.isEmpty && TournamentPhase.raceToComplete(state)
+      raceToEvents =
+        if (raceToAlreadySaved) {
+          Nil
+        } else {
+          RaceToScopes
+            .requiredKeys(state.players.size)
+            .zipWithIndex
+            .map { case (scope, index) =>
+              TournamentEvent.RaceToSet(
+                seq = startSeq + index,
+                at = at,
+                payload = RaceToSetPayload(
+                  scope = scope,
+                  raceTo = effectiveRaceTo(scope)
+                )
+              )
+            }
+        }
       seededSeq = startSeq + raceToEvents.size
       seeded = TournamentEvent.BracketSeeded(
         seq = seededSeq,
@@ -88,22 +107,30 @@ object Seed {
       case "cannot seed bracket before roster is locked" =>
         PlayersNotLockedError()
       case "tournament has no players" => NoPlayersError()
-      case "cannot seed bracket before race-to is set for all rounds" =>
+      case "cannot seed bracket before race-to is set for all scopes" =>
         RaceToIncompleteError()
       case _ => NoPlayersError()
     }
 
-  private def validateRoundRaceTo(
-      roundRaceTo: Map[Int, Int]
-  ): Either[Error, Unit] =
-    roundRaceTo.values.toList.foldLeft(Right(()): Either[Error, Unit]) {
-      case (Right(_), raceTo) =>
-        TournamentValidation
-          .validateRaceTo(raceTo)
-          .left
-          .map(_ => InvalidRaceToError(raceTo))
-      case (left, _) => left
+  private def validateRaceToByScope(
+      raceToByScope: Map[String, Int],
+      playerCount: Int
+  ): Either[Error, Unit] = {
+    val required = RaceToScopes.requiredKeys(playerCount)
+    val missing = required.filterNot(raceToByScope.contains)
+    if (missing.nonEmpty) {
+      Left(RaceToIncompleteError())
+    } else {
+      raceToByScope.values.toList.foldLeft(Right(()): Either[Error, Unit]) {
+        case (Right(_), raceTo) =>
+          TournamentValidation
+            .validateRaceTo(raceTo)
+            .left
+            .map(_ => InvalidRaceToError(raceTo))
+        case (left, _) => left
+      }
     }
+  }
 
   private def validatePlayerCount(count: Int): Either[Error, Unit] =
     if (count >= 8 && count <= 64) {

@@ -30,7 +30,7 @@ object TournamentValidation {
     } else if (state.players.isEmpty) {
       Left("tournament has no players")
     } else if (!TournamentPhase.raceToComplete(state)) {
-      Left("cannot seed bracket before race-to is set for all rounds")
+      Left("cannot seed bracket before race-to is set for all scopes")
     } else {
       Right(())
     }

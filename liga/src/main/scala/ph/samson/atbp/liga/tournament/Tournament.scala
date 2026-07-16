@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.tournament
 
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
@@ -49,6 +50,11 @@ object Tournament {
 
   final case class InvalidRaceToError(raceTo: Int) extends WizardError {
     val message: String = s"race-to must be at least 2: $raceTo"
+  }
+
+  final case class RaceToIncompleteError() extends WizardError {
+    val message: String =
+      "cannot save race-to before every scope is configured"
   }
 
   def create(
@@ -115,36 +121,40 @@ object Tournament {
       )
     }
 
-  def setRoundRaceTo(
+  def setRaceToByScope(
       state: TournamentState,
-      roundRaceTo: Map[Int, Int],
+      raceToByScope: Map[String, Int],
       startSeq: Int,
       at: Instant
-  ): Either[WizardError, List[TournamentEvent.RoundRaceToSet]] =
+  ): Either[WizardError, List[TournamentEvent.RaceToSet]] =
     if (state.bracket.nonEmpty) {
       Left(AlreadySeededError())
     } else {
-      roundRaceTo.toList
-        .sortBy(_._1)
-        .zipWithIndex
-        .foldLeft(
-          Right(Nil): Either[WizardError, List[TournamentEvent.RoundRaceToSet]]
-        ) { case (acc, ((round, raceTo), index)) =>
-          acc.flatMap { events =>
-            TournamentValidation
-              .validateRaceTo(raceTo)
-              .left
-              .map(_ => InvalidRaceToError(raceTo))
-              .map(_ =>
-                events :+ TournamentEvent.RoundRaceToSet(
-                  seq = startSeq + index,
-                  at = at,
-                  payload =
-                    RoundRaceToSetPayload(round = round, raceTo = raceTo)
+      val required = RaceToScopes.requiredKeys(state.players.size)
+      val missing = required.filterNot(raceToByScope.contains)
+      if (missing.nonEmpty) {
+        Left(RaceToIncompleteError())
+      } else {
+        required.zipWithIndex
+          .foldLeft(
+            Right(Nil): Either[WizardError, List[TournamentEvent.RaceToSet]]
+          ) { case (acc, (scope, index)) =>
+            acc.flatMap { events =>
+              val raceTo = raceToByScope(scope)
+              TournamentValidation
+                .validateRaceTo(raceTo)
+                .left
+                .map(_ => InvalidRaceToError(raceTo))
+                .map(_ =>
+                  events :+ TournamentEvent.RaceToSet(
+                    seq = startSeq + index,
+                    at = at,
+                    payload = RaceToSetPayload(scope = scope, raceTo = raceTo)
+                  )
                 )
-              )
+            }
           }
-        }
+      }
     }
 
   def ready(

@@ -176,7 +176,7 @@ object ReadApiSpec extends ZIOSpecDefault {
         players = List(Player("Alice"), Player("Bob")),
         completed = false,
         phase = "defining",
-        roundRaceTo = Map(1 -> 7),
+        raceToByScope = Map("wb-1" -> 7),
         bracket = None,
         frozenRatings = List(
           PlayerRating(Player("Alice"), 1500, 350, 0, 0)
@@ -184,7 +184,7 @@ object ReadApiSpec extends ZIOSpecDefault {
       )
       val json = sample.toJson
       val parsed = json.fromJson[TournamentResponse]
-      assertTrue(parsed == Right(sample), json.contains("\"roundRaceTo\""))
+      assertTrue(parsed == Right(sample), json.contains("\"raceToByScope\""))
     }
   )
 }

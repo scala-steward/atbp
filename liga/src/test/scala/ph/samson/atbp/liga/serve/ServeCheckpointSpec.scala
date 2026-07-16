@@ -193,7 +193,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
   }
 
   private val raceToBody =
-    """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7,"5":7}}"""
+    """{"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"wb-4":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"lb-5":7,"lb-6":7,"gf":7}}"""
 
   private def configureRaceTo(
       ctx: ServeContext

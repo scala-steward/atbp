@@ -38,7 +38,7 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
       players = List(alice.player, bob.player),
       bracket = Some(Bracket(size = 8, matches = List(completedMatch))),
       frozenRatings = Map(alice.player -> alice, bob.player -> bob),
-      roundRaceTo = Map(1 -> 7)
+      raceToByScope = Map("wb-1" -> 7)
     )
   }
 

@@ -37,19 +37,19 @@ final class ApiClient private (baseUrl: String)(using ExecutionContext) {
   def lockPlayers(): Future[TournamentResponse] =
     post("/api/tournament/lock", Some("{}"))
 
-  def setRaceTo(roundRaceTo: Map[Int, Int]): Future[TournamentResponse] =
+  def setRaceTo(raceToByScope: Map[String, Int]): Future[TournamentResponse] =
     post(
       "/api/tournament/race-to",
-      Some(RaceToRequest(roundRaceTo).toJson)
+      Some(RaceToRequest(raceToByScope).toJson)
     )
 
   def seed(): Future[TournamentResponse] =
     seed(Map.empty)
 
-  def seed(roundRaceTo: Map[Int, Int]): Future[TournamentResponse] =
+  def seed(raceToByScope: Map[String, Int]): Future[TournamentResponse] =
     post(
       "/api/tournament/seed",
-      Some(SeedRequest(roundRaceTo).toJson)
+      Some(SeedRequest(raceToByScope).toJson)
     )
 
   def ready(matchId: String): Future[TournamentResponse] =

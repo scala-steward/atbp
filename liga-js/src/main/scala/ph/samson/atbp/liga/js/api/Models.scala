@@ -62,7 +62,7 @@ object Models {
       players: List[Player],
       completed: Boolean,
       phase: String,
-      roundRaceTo: Map[Int, Int],
+      raceToByScope: Map[String, Int],
       bracket: Option[Bracket],
       frozenRatings: List[PlayerRating]
   )
@@ -75,13 +75,13 @@ object Models {
       audiencePollIntervalSeconds: Int
   )
 
-  final case class SeedRequest(roundRaceTo: Map[Int, Int] = Map.empty)
+  final case class SeedRequest(raceToByScope: Map[String, Int])
 
   final case class CreateRequest(name: String)
 
   final case class PlayersRequest(players: List[Player])
 
-  final case class RaceToRequest(roundRaceTo: Map[Int, Int])
+  final case class RaceToRequest(raceToByScope: Map[String, Int])
 
   final case class HandicapRequest(handicap: Int)
 

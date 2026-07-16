@@ -57,7 +57,7 @@ final case class TournamentState(
     players: List[Player],
     bracket: Option[Bracket] = None,
     frozenRatings: Map[Player, PlayerRating] = Map.empty,
-    roundRaceTo: Map[Int, Int] = Map.empty,
+    raceToByScope: Map[String, Int] = Map.empty,
     playersLocked: Boolean = false,
     completed: Boolean = false
 )
@@ -75,8 +75,8 @@ final case class PlayersSetPayload(
 
 final case class PlayersLockedPayload()
 
-final case class RoundRaceToSetPayload(
-    round: Int,
+final case class RaceToSetPayload(
+    scope: String,
     raceTo: Int
 )
 

@@ -5,6 +5,7 @@ import ph.samson.atbp.liga.io.PeriodWriter
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.serve.ApiJson.*
 import ph.samson.atbp.liga.serve.Routes as LigaRoutes
+import ph.samson.atbp.liga.testsupport.RaceToTestSupport
 import ph.samson.atbp.liga.tournament.EventCodec
 import ph.samson.atbp.liga.tournament.EventLog
 import ph.samson.atbp.liga.tournament.PeriodEmission
@@ -92,15 +93,15 @@ object WriteApiSpec extends ZIOSpecDefault {
   private def cleanup(root: File): UIO[Unit] =
     ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
 
-  private val eightRoundRaceToBody =
-    """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+  private val eightRaceToByScopeBody =
+    """{"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"gf":7}}"""
 
   private def configureRaceTo(
       ctx: ServeContext
   ): ZIO[Scope, Throwable, Response] =
     LigaRoutes
       .routes(ctx, BindConfig())
-      .runZIO(localhostPost("/api/tournament/race-to", eightRoundRaceToBody))
+      .runZIO(localhostPost("/api/tournament/race-to", eightRaceToByScopeBody))
 
   private def seedTournament(
       ctx: ServeContext
@@ -295,7 +296,7 @@ object WriteApiSpec extends ZIOSpecDefault {
           .runZIO(
             localhostPost(
               "/api/tournament/race-to",
-              """{"roundRaceTo":{"1":7,"2":7,"3":7,"4":7}}"""
+              """{"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"gf":7}}"""
             )
           )
         seed <- LigaRoutes
@@ -320,7 +321,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         response <- seedTournament(ctx)
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
-        seededFileExists = (ctx.tournamentDir.get / "000008-seeded.json").exists
+        seededFileExists = (ctx.tournamentDir.get / "000012-seeded.json").exists
         _ <- cleanup(root)
       } yield assertTrue(
         response.status == Status.Ok,
@@ -329,7 +330,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         parsed.frozenRatings.map(_.player.name).sorted == (1 to 8)
           .map(i => s"P$i")
           .toList,
-        parsed.roundRaceTo == Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7),
+        parsed.raceToByScope == RaceToTestSupport.uniformRaceTo(8),
         seededFileExists
       )
     },

@@ -228,13 +228,7 @@ object MatchPanel {
       matchDef: BracketMatch
   ): HandicapSuggestion = {
     val raceTo = matchDef.raceTo.orElse(
-      tournament.bracket.flatMap { bracket =>
-        BracketLayout.defaultRaceTo(
-          matchDef.id,
-          bracket.size,
-          tournament.roundRaceTo
-        )
-      }
+      BracketLayout.defaultRaceTo(matchDef.id, tournament.raceToByScope)
     )
     val ratingA = matchDef.playerA.flatMap(p =>
       tournament.frozenRatings.find(_.player.name == p.name)

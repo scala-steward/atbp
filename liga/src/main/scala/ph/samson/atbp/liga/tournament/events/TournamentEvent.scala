@@ -35,11 +35,11 @@ object TournamentEvent {
       payload: PlayersLockedPayload
   ) extends TournamentEvent
 
-  @jsonHint("RoundRaceToSet")
-  final case class RoundRaceToSet(
+  @jsonHint("RaceToSet")
+  final case class RaceToSet(
       seq: Int,
       at: Instant,
-      payload: RoundRaceToSetPayload
+      payload: RaceToSetPayload
   ) extends TournamentEvent
 
   @jsonHint("BracketSeeded")

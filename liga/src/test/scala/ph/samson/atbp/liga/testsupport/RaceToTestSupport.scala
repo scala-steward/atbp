@@ -1,0 +1,49 @@
+package ph.samson.atbp.liga.testsupport
+
+import ph.samson.atbp.liga.bracket.RaceToScopes
+import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.tournament.events.TournamentEvent
+
+import java.time.Instant
+
+object RaceToTestSupport {
+
+  def uniformRaceTo(playerCount: Int, raceTo: Int): Map[String, Int] =
+    RaceToScopes.requiredKeys(playerCount).map(_ -> raceTo).toMap
+
+  def uniformRaceTo(playerCount: Int): Map[String, Int] =
+    uniformRaceTo(playerCount, raceTo = 7)
+
+  /** Winners 7, losers 5, grand final 9 — exercises per-section resolution. */
+  def differentiatedRaceTo(playerCount: Int): Map[String, Int] =
+    RaceToScopes
+      .requiredKeys(playerCount)
+      .map {
+        case scope if scope.startsWith("lb-") => scope -> 5
+        case scope if scope == "gf"           => scope -> 9
+        case scope                            => scope -> 7
+      }
+      .toMap
+
+  def raceToSetEvents(
+      playerCount: Int,
+      startSeq: Int,
+      at: Instant,
+      raceTo: Int
+  ): List[TournamentEvent.RaceToSet] =
+    RaceToScopes.requiredKeys(playerCount).zipWithIndex.map {
+      case (scope, index) =>
+        TournamentEvent.RaceToSet(
+          seq = startSeq + index,
+          at = at,
+          payload = RaceToSetPayload(scope = scope, raceTo = raceTo)
+        )
+    }
+
+  def raceToSetEvents(
+      playerCount: Int,
+      startSeq: Int,
+      at: Instant
+  ): List[TournamentEvent.RaceToSet] =
+    raceToSetEvents(playerCount, startSeq, at, raceTo = 7)
+}

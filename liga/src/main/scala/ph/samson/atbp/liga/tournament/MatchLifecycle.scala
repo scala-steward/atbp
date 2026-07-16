@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.tournament
 
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.model.*
 
 /** Validates match lifecycle transitions for tournament replay and commands. */
@@ -29,10 +30,10 @@ object MatchLifecycle {
     val message: String = s"$action rejected for $matchId: $reason"
   }
 
-  final case class MissingRaceToError(matchId: String, round: Int)
+  final case class MissingRaceToError(matchId: String, scope: String)
       extends Error {
     val message: String =
-      s"no race-to configured for round $round (match $matchId)"
+      s"no race-to configured for scope $scope (match $matchId)"
   }
 
   final case class MissingRatingError(player: Player) extends Error {
@@ -172,37 +173,22 @@ object MatchLifecycle {
       )
     }
 
-  /** Bracket round encoded in match ids (`wb-2-1`, `lb-3-2`, `gf-1`). */
-  def bracketRound(matchId: String, bracketSize: Int): Option[Int] =
-    matchId match {
-      case s"wb-$round-$_" =>
-        round.toIntOption
-      case s"lb-$round-$_" =>
-        round.toIntOption
-      case "gf-1" =>
-        Some(log2(bracketSize))
-      case _ => None
-    }
-
   def resolveRaceTo(
       state: TournamentState,
       matchId: String
   ): Either[Error, Int] =
     for {
-      bracket <- state.bracket.toRight(NoBracketError(): Error)
-      round <- bracketRound(matchId, bracket.size)
+      scope <- RaceToScopes
+        .keyForMatch(matchId)
         .toRight(
           InvalidTransitionError(
             matchId,
             "ready",
-            "cannot determine bracket round"
+            "unknown match scope"
           )
         )
-      raceTo <- state.roundRaceTo
-        .get(round)
-        .toRight(MissingRaceToError(matchId, round))
+      raceTo <- state.raceToByScope
+        .get(scope)
+        .toRight(MissingRaceToError(matchId, scope))
     } yield raceTo
-
-  private def log2(n: Int): Int =
-    (math.log(n) / math.log(2)).toInt
 }

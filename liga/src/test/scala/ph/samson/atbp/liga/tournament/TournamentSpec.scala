@@ -2,6 +2,7 @@ package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.bracket.BracketGen
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.testsupport.RaceToTestSupport
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 import zio.test.*
 
@@ -17,29 +18,24 @@ object TournamentSpec extends ZIOSpecDefault {
   private val eightPlayerRatings: List[PlayerRating] =
     (1 to 8).map(i => rating(s"P$i", 1700 - i * 10)).toList
 
-  private def seededState(roundRaceTo: Map[Int, Int]): TournamentState = {
+  private def seededState(raceToByScope: Map[String, Int]): TournamentState = {
     val bracket = BracketGen.generate(eightPlayerRatings)
     TournamentState(
       name = "Spring Open",
       players = eightPlayerRatings.map(_.player),
       bracket = Some(bracket),
       frozenRatings = eightPlayerRatings.map(r => r.player -> r).toMap,
-      roundRaceTo = roundRaceTo
+      raceToByScope = raceToByScope
     )
   }
 
   private def seededState(): TournamentState =
-    seededState(Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7))
+    seededState(RaceToTestSupport.uniformRaceTo(8))
 
   private def seededEvents(state: TournamentState): List[TournamentEvent] = {
     val players = eightPlayerRatings.map(_.player)
-    val raceToEvents = (1 to 4).map { round =>
-      TournamentEvent.RoundRaceToSet(
-        seq = 3 + round,
-        at = at,
-        payload = RoundRaceToSetPayload(round = round, raceTo = 7)
-      )
-    }.toList
+    val raceToEvents =
+      RaceToTestSupport.raceToSetEvents(playerCount = 8, startSeq = 4, at = at)
     List(
       TournamentEvent.Created(
         seq = 1,
@@ -60,7 +56,7 @@ object TournamentSpec extends ZIOSpecDefault {
         payload = PlayersLockedPayload()
       )
     ) ++ raceToEvents :+ TournamentEvent.BracketSeeded(
-      seq = 8,
+      seq = 12,
       at = at,
       payload = BracketSeededPayload(
         frozenRatings = eightPlayerRatings,
@@ -225,19 +221,19 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 12,
+            seq = 16,
             at
           )
           next <- Replay.replay(
             seededEvents(base) :+
               TournamentEvent.MatchReady(
-                seq = 9,
+                seq = 13,
                 at = at,
                 payload =
                   MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
               ) :+
               TournamentEvent.HandicapApplied(
-                seq = 10,
+                seq = 14,
                 at = at,
                 payload = HandicapAppliedPayload(
                   matchId = "wb-1-1",
@@ -245,7 +241,7 @@ object TournamentSpec extends ZIOSpecDefault {
                 )
               ) :+
               TournamentEvent.MatchStarted(
-                seq = 11,
+                seq = 15,
                 at = at,
                 payload = MatchStartedPayload(matchId = "wb-1-1")
               ) :+
@@ -327,17 +323,17 @@ object TournamentSpec extends ZIOSpecDefault {
       test("ready → handicap → start → result replays cleanly") {
         val state = seededState()
         val seeded = seededEvents(state)
-        val ready = Tournament.ready(state, "wb-1-1", seq = 9, at).toOption.get
+        val ready = Tournament.ready(state, "wb-1-1", seq = 13, at).toOption.get
         val afterReady = Replay.replay(seeded :+ ready).toOption.get
         val handicap =
           Tournament
-            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 10, at)
+            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 14, at)
             .toOption
             .get
         val afterHandicap =
           Replay.replay(seeded :+ ready :+ handicap).toOption.get
         val started =
-          Tournament.start(afterHandicap, "wb-1-1", seq = 11, at).toOption.get
+          Tournament.start(afterHandicap, "wb-1-1", seq = 15, at).toOption.get
         val afterStart =
           Replay.replay(seeded :+ ready :+ handicap :+ started).toOption.get
         val result = Tournament
@@ -346,7 +342,7 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 12,
+            seq = 16,
             at
           )
           .toOption
@@ -455,43 +451,101 @@ object TournamentSpec extends ZIOSpecDefault {
         )
         assertTrue(Tournament.lockPlayers(state, seq = 2, at).isRight)
       },
-      test("setRoundRaceTo rejects race-to below 2") {
+      test("setRaceToByScope rejects incomplete scope map") {
         val state = TournamentState(
           name = "Open",
           players = (1 to 8).map(i => Player(s"P$i")).toList,
           playersLocked = true
         )
+        val incomplete = RaceToTestSupport.uniformRaceTo(8) - "gf"
         val result =
-          Tournament.setRoundRaceTo(state, Map(1 -> 1), startSeq = 3, at)
+          Tournament.setRaceToByScope(state, incomplete, startSeq = 3, at)
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message
+            .contains("every scope is configured")
+        )
+      },
+      test("setRaceToByScope rejects race-to below 2") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList,
+          playersLocked = true
+        )
+        val invalid =
+          RaceToTestSupport.uniformRaceTo(8).updated("wb-1", 1)
+        val result =
+          Tournament.setRaceToByScope(state, invalid, startSeq = 3, at)
         assertTrue(
           result.isLeft,
           result.left.toOption.get.message
             .contains("race-to must be at least 2")
         )
       },
-      test("setRoundRaceTo emits one event per round") {
+      test("setRaceToByScope emits one event per scope") {
         val state = TournamentState(
           name = "Open",
           players = (1 to 8).map(i => Player(s"P$i")).toList,
           playersLocked = true
         )
         val result =
-          Tournament.setRoundRaceTo(
+          Tournament.setRaceToByScope(
             state,
-            Map(1 -> 7, 2 -> 5),
+            RaceToTestSupport.uniformRaceTo(8).updated("wb-2", 5),
             startSeq = 3,
             at
           )
         assertTrue(
           result.isRight,
-          result.toOption.get.size == 2,
-          result.toOption.get.map(_.payload.round) == List(1, 2)
+          result.toOption.get.size == 8,
+          result.toOption.get.map(_.payload.scope).contains("wb-2"),
+          result.toOption.get
+            .find(_.payload.scope == "wb-2")
+            .exists(_.payload.raceTo == 5)
         )
       },
-      test("setRoundRaceTo rejects after bracket is seeded") {
+      test("setRaceToByScope rejects after bracket is seeded") {
         assertTrue(
           Tournament
-            .setRoundRaceTo(seededState(), Map(1 -> 7), startSeq = 3, at)
+            .setRaceToByScope(
+              seededState(),
+              RaceToTestSupport.uniformRaceTo(8),
+              startSeq = 3,
+              at
+            )
+            .isLeft
+        )
+      }
+    ),
+    suite("resolveRaceTo")(
+      test("uses per-section values from raceToByScope") {
+        val raceTo = RaceToTestSupport.differentiatedRaceTo(8)
+        val state = seededState(raceTo)
+        assertTrue(
+          MatchLifecycle.resolveRaceTo(state, "wb-1-1") == Right(7),
+          MatchLifecycle.resolveRaceTo(state, "lb-1-1") == Right(5),
+          MatchLifecycle.resolveRaceTo(state, "gf-1") == Right(9)
+        )
+      }
+    ),
+    suite("result with differentiated race-to")(
+      test("enforces losers-bracket race-to on result") {
+        val state = withMatch(
+          seededState(RaceToTestSupport.differentiatedRaceTo(8)),
+          "lb-1-1"
+        ) {
+          _.copy(
+            state = BracketMatchState.Started,
+            handicapSuggested = Some(0),
+            handicapApplied = Some(0)
+          )
+        }
+        assertTrue(
+          Tournament
+            .recordResult(state, "lb-1-1", scoreA = 5, scoreB = 3, seq = 6, at)
+            .isRight,
+          Tournament
+            .recordResult(state, "lb-1-1", scoreA = 7, scoreB = 3, seq = 6, at)
             .isLeft
         )
       }

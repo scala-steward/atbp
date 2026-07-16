@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 
@@ -30,36 +31,6 @@ object BracketLayout {
       case Section.GrandFinal => "Grand Final"
       case section            =>
         s"${section.label} — round ${roundOf(matchId, bracketSize)}"
-    }
-
-  /** Human-readable scope for a race-to round key in the setup wizard. */
-  def raceToRoundLabel(round: Int, playerCount: Int): String = {
-    val bracketSize = bracketSizeFor(playerCount)
-    val winnersRounds = log2(bracketSize)
-    val losersRounds = (winnersRounds - 1) * 2
-    val scopes = List(
-      Option.when(round >= 1 && round <= winnersRounds)(s"Winners R$round"),
-      Option.when(round >= 1 && round <= losersRounds)(s"Losers R$round"),
-      Option.when(round == winnersRounds)("Grand Final")
-    ).flatten
-    val scopeText =
-      if (scopes.isEmpty) {
-        s"Round $round"
-      } else {
-        scopes.mkString(", ")
-      }
-    s"Round $round ($scopeText)"
-  }
-
-  private def bracketSizeFor(playerCount: Int): Int =
-    if (playerCount <= 8) {
-      8
-    } else if (playerCount <= 16) {
-      16
-    } else if (playerCount <= 32) {
-      32
-    } else {
-      64
     }
 
   private def log2(n: Int): Int =
@@ -111,8 +82,7 @@ object BracketLayout {
 
   def defaultRaceTo(
       matchId: String,
-      bracketSize: Int,
-      roundRaceTo: Map[Int, Int]
+      raceToByScope: Map[String, Int]
   ): Option[Int] =
-    bracketRound(matchId, bracketSize).flatMap(roundRaceTo.get)
+    RaceToScopes.keyForMatch(matchId).flatMap(raceToByScope.get)
 }

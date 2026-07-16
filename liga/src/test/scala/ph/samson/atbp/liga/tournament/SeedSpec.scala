@@ -2,6 +2,7 @@ package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.glicko.Tuning
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.testsupport.RaceToTestSupport
 import zio.test.*
 
 import java.time.Instant
@@ -18,11 +19,11 @@ object SeedSpec extends ZIOSpecDefault {
       name = "Open",
       players = players,
       playersLocked = true,
-      roundRaceTo = Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7)
+      raceToByScope = RaceToTestSupport.uniformRaceTo(8)
     )
 
-  private val fullRoundRaceTo: Map[Int, Int] =
-    Map(1 -> 7, 2 -> 7, 3 -> 7, 4 -> 7)
+  private val fullRaceToByScope: Map[String, Int] =
+    RaceToTestSupport.uniformRaceTo(8)
 
   private val eightPlayers: List[Player] =
     (1 to 8).map(i => Player(s"P$i")).toList
@@ -39,15 +40,27 @@ object SeedSpec extends ZIOSpecDefault {
       )
       assertTrue(
         Seed
-          .buildEvents(state, periodRatings, fullRoundRaceTo, startSeq = 2, at)
+          .buildEvents(
+            state,
+            periodRatings,
+            fullRaceToByScope,
+            startSeq = 2,
+            at
+          )
           .isLeft
       )
     },
     test("seed rejected before race-to is complete") {
-      val state = lockedState(eightPlayers).copy(roundRaceTo = Map.empty)
+      val state = lockedState(eightPlayers).copy(raceToByScope = Map.empty)
       assertTrue(
         Seed
-          .buildEvents(state, periodRatings, fullRoundRaceTo, startSeq = 2, at)
+          .buildEvents(
+            state,
+            periodRatings,
+            fullRaceToByScope,
+            startSeq = 2,
+            at
+          )
           .isLeft
       )
     },
@@ -59,7 +72,7 @@ object SeedSpec extends ZIOSpecDefault {
         Seed.buildEvents(
           state,
           periodRatings,
-          fullRoundRaceTo,
+          fullRaceToByScope,
           startSeq = 2,
           at
         )
@@ -85,7 +98,7 @@ object SeedSpec extends ZIOSpecDefault {
         Seed.buildEvents(
           state,
           periodRatings,
-          fullRoundRaceTo,
+          fullRaceToByScope,
           startSeq = 2,
           at
         )
