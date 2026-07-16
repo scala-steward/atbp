@@ -126,8 +126,8 @@ object DirectorApp {
                           .flatMap(_ => client.lockPlayers())
                       )
                     },
-                    Observer[Map[Int, Int]](roundRaceTo =>
-                      runAction(client.setRaceTo(roundRaceTo))
+                    Observer[Map[String, Int]](raceToByScope =>
+                      runAction(client.setRaceTo(raceToByScope))
                     ),
                     Observer[Unit](_ => runAction(client.seed()))
                   )

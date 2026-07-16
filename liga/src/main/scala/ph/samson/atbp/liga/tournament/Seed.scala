@@ -57,22 +57,35 @@ object Seed {
   ): Either[Error, List[TournamentEvent]] =
     for {
       _ <- validateState(state)
-      _ <- validateRaceToByScope(raceToByScope, state.players.size)
+      effectiveRaceTo =
+        if (raceToByScope.isEmpty) {
+          state.raceToByScope
+        } else {
+          raceToByScope
+        }
+      _ <- validateRaceToByScope(effectiveRaceTo, state.players.size)
       ratings <- resolveRatings(state.players, periodRatings)
       _ <- validatePlayerCount(ratings.size)
       bracket = BracketGen.generate(ratings)
-      raceToEvents = RaceToScopes
-        .requiredKeys(state.players.size)
-        .zipWithIndex
-        .map { case (scope, index) =>
-          TournamentEvent.RaceToSet(
-            seq = startSeq + index,
-            at = at,
-            payload = RaceToSetPayload(
-              scope = scope,
-              raceTo = raceToByScope(scope)
-            )
-          )
+      raceToAlreadySaved =
+        raceToByScope.isEmpty && TournamentPhase.raceToComplete(state)
+      raceToEvents =
+        if (raceToAlreadySaved) {
+          Nil
+        } else {
+          RaceToScopes
+            .requiredKeys(state.players.size)
+            .zipWithIndex
+            .map { case (scope, index) =>
+              TournamentEvent.RaceToSet(
+                seq = startSeq + index,
+                at = at,
+                payload = RaceToSetPayload(
+                  scope = scope,
+                  raceTo = effectiveRaceTo(scope)
+                )
+              )
+            }
         }
       seededSeq = startSeq + raceToEvents.size
       seeded = TournamentEvent.BracketSeeded(

@@ -1,6 +1,8 @@
 package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.bracket.RaceToScopes
+import ph.samson.atbp.liga.bracket.RaceToWizard
 import ph.samson.atbp.liga.js.api.Models.*
 import ph.samson.atbp.liga.model.Player as CommonPlayer
 import ph.samson.atbp.liga.model.PlayerRating as CommonPlayerRating
@@ -16,7 +18,7 @@ object WizardView {
       busy: Signal[Boolean],
       onSetPlayers: Observer[List[Player]],
       onSaveAndLock: Observer[List[Player]],
-      onSetRaceTo: Observer[Map[Int, Int]],
+      onSetRaceTo: Observer[Map[String, Int]],
       onSeed: Observer[Unit]
   ): Div = {
     val phase = TournamentPhase.fromApi(tournament.phase)
@@ -177,46 +179,81 @@ object WizardView {
   private def raceToStep(
       tournament: TournamentResponse,
       busy: Signal[Boolean],
-      onSetRaceTo: Observer[Map[Int, Int]]
+      onSetRaceTo: Observer[Map[String, Int]]
   ): Div = {
-    val rounds = WizardRounds.requiredKeys(tournament.players.size)
-    val raceToValues = Var(rounds.map(r => r -> 7).toMap)
+    val playerCount = tournament.players.size
+    val scopes = RaceToScopes.requiredKeys(playerCount)
+    val initialWizard =
+      if (tournament.raceToByScope.nonEmpty) {
+        RaceToWizard.loadState(tournament.raceToByScope, playerCount)
+      } else {
+        RaceToWizard.initialState(playerCount)
+      }
+    val wizardState = Var(initialWizard)
+
+    def scopesFor(section: RaceToScopes.Section): List[String] =
+      scopes.filter(scope => RaceToScopes.scopeLabel(scope).section == section)
+
+    def renderSection(section: RaceToScopes.Section): Div =
+      div(
+        cls := "race-to-section",
+        h3(section.label),
+        ul(
+          cls := "race-to-inputs",
+          scopesFor(section).map { scope =>
+            val scopeLabel = RaceToScopes.scopeLabel(scope)
+            li(
+              label(
+                scopeLabel.roundLabel,
+                input(
+                  typ := "number",
+                  controlled(
+                    value <-- wizardState.signal.map(
+                      _.raceToByScope.getOrElse(scope, 7).toString
+                    ),
+                    onInput.mapToValue --> Observer[String] { raw =>
+                      raw.toIntOption.foreach { value =>
+                        wizardState.update { state =>
+                          RaceToWizard.applyEdit(
+                            state,
+                            scope,
+                            value,
+                            playerCount
+                          )
+                        }
+                      }
+                    }
+                  )
+                ),
+                if (scope == "gf") {
+                  p(
+                    cls := "hint",
+                    "usually longer than finals — set explicitly."
+                  )
+                } else {
+                  emptyNode
+                }
+              )
+            )
+          }
+        )
+      )
 
     div(
       cls := "wizard-panel",
-      h2("Race-to by round"),
+      h2("Race-to by bracket section"),
       p(
-        "Set race-to for each bracket round (pre-filled to 7). " +
-          "The same round number may apply to several bracket sections."
+        "Set race-to for winners, losers, and Grand Final. " +
+          "Editing a round cascades through later rounds in that section."
       ),
-      ul(
-        cls := "race-to-inputs",
-        rounds.map { round =>
-          li(
-            label(
-              BracketLayout.raceToRoundLabel(round, tournament.players.size),
-              input(
-                typ := "number",
-                controlled(
-                  value <-- raceToValues.signal.map(
-                    _.getOrElse(round, 7).toString
-                  ),
-                  onInput.mapToValue --> Observer[String] { raw =>
-                    raw.toIntOption.foreach { value =>
-                      raceToValues.update(_.updated(round, value))
-                    }
-                  }
-                )
-              )
-            )
-          )
-        }
-      ),
+      renderSection(RaceToScopes.Section.Winners),
+      renderSection(RaceToScopes.Section.Losers),
+      renderSection(RaceToScopes.Section.GrandFinal),
       button(
         cls := "primary",
         disabled <-- busy,
         onClick.mapTo(()) --> Observer[Unit](_ =>
-          onSetRaceTo.onNext(raceToValues.now())
+          onSetRaceTo.onNext(wizardState.now().raceToByScope)
         ),
         "Save race-to"
       )
@@ -232,7 +269,7 @@ object WizardView {
       cls := "wizard-panel",
       h2("Seed bracket"),
       p(
-        s"${tournament.players.size} players locked. Race-to configured for all rounds."
+        s"${tournament.players.size} players locked. Race-to configured for all bracket sections."
       ),
       p(cls := "guidance", DirectorGuidance.seedHint),
       ul(

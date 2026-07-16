@@ -321,7 +321,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         response <- seedTournament(ctx)
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
-        seededFileExists = (ctx.tournamentDir.get / "000008-seeded.json").exists
+        seededFileExists = (ctx.tournamentDir.get / "000012-seeded.json").exists
         _ <- cleanup(root)
       } yield assertTrue(
         response.status == Status.Ok,

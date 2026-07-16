@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 
@@ -111,8 +112,7 @@ object BracketLayout {
 
   def defaultRaceTo(
       matchId: String,
-      bracketSize: Int,
-      roundRaceTo: Map[Int, Int]
+      raceToByScope: Map[String, Int]
   ): Option[Int] =
-    bracketRound(matchId, bracketSize).flatMap(roundRaceTo.get)
+    RaceToScopes.keyForMatch(matchId).flatMap(raceToByScope.get)
 }

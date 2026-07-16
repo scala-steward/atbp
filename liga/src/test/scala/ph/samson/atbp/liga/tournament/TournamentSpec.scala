@@ -221,19 +221,19 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 12,
+            seq = 16,
             at
           )
           next <- Replay.replay(
             seededEvents(base) :+
               TournamentEvent.MatchReady(
-                seq = 9,
+                seq = 13,
                 at = at,
                 payload =
                   MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
               ) :+
               TournamentEvent.HandicapApplied(
-                seq = 10,
+                seq = 14,
                 at = at,
                 payload = HandicapAppliedPayload(
                   matchId = "wb-1-1",
@@ -241,7 +241,7 @@ object TournamentSpec extends ZIOSpecDefault {
                 )
               ) :+
               TournamentEvent.MatchStarted(
-                seq = 11,
+                seq = 15,
                 at = at,
                 payload = MatchStartedPayload(matchId = "wb-1-1")
               ) :+
@@ -323,17 +323,17 @@ object TournamentSpec extends ZIOSpecDefault {
       test("ready → handicap → start → result replays cleanly") {
         val state = seededState()
         val seeded = seededEvents(state)
-        val ready = Tournament.ready(state, "wb-1-1", seq = 9, at).toOption.get
+        val ready = Tournament.ready(state, "wb-1-1", seq = 13, at).toOption.get
         val afterReady = Replay.replay(seeded :+ ready).toOption.get
         val handicap =
           Tournament
-            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 10, at)
+            .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 14, at)
             .toOption
             .get
         val afterHandicap =
           Replay.replay(seeded :+ ready :+ handicap).toOption.get
         val started =
-          Tournament.start(afterHandicap, "wb-1-1", seq = 11, at).toOption.get
+          Tournament.start(afterHandicap, "wb-1-1", seq = 15, at).toOption.get
         val afterStart =
           Replay.replay(seeded :+ ready :+ handicap :+ started).toOption.get
         val result = Tournament
@@ -342,7 +342,7 @@ object TournamentSpec extends ZIOSpecDefault {
             "wb-1-1",
             scoreA = 7,
             scoreB = 4,
-            seq = 12,
+            seq = 16,
             at
           )
           .toOption
