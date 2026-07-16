@@ -57,9 +57,9 @@ Source: [`SPEC.md`](../SPEC.md) · Plan: [`tasks/plan.md`](plan.md)
 
 ### Checkpoint: Complete
 - [x] `sbt --client "ligaCommonJVM/test"`, `liga/test`, `liga-js/test` pass
-- [ ] `sbt --client fixup && git status` clean
-- [ ] SPEC success criteria verified
-- [ ] Ready for PR
+- [x] `sbt --client fixup && git status` clean
+- [x] SPEC success criteria verified
+- [x] Ready for PR
 
 ---
 
