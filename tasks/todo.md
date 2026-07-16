@@ -6,11 +6,11 @@ Source: [`SPEC.md`](../SPEC.md) · Plan: [`tasks/plan.md`](plan.md)
 
 ## Phase 1: Shared Foundation
 
-- [ ] **Task 1:** `RaceToScopes` in `liga-common` (keyForMatch, requiredKeys, scopeLabel)
-- [ ] **Task 2:** `RaceToWizard` in `liga-common` (initialState, loadState, applyEdit, GF pin)
+- [x] **Task 1:** `RaceToScopes` in `liga-common` (keyForMatch, requiredKeys, scopeLabel)
+- [x] **Task 2:** `RaceToWizard` in `liga-common` (initialState, loadState, applyEdit, GF pin)
 
 ### Checkpoint: Foundation
-- [ ] `sbt --client "ligaCommonJVM/test"` passes
+- [x] `sbt --client "ligaCommonJVM/test"` passes
 - [ ] Review plan before server migration
 
 ---
