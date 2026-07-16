@@ -2,17 +2,26 @@
 
 Source idea: [`docs/ideas/section-aware-race-to.md`](docs/ideas/section-aware-race-to.md)
 
-## Assumptions
+**Status:** Approved — ready for planning/implementation.
 
-Proceeding with these unless you correct them:
+## Decisions (confirmed)
+
+| Topic | Decision |
+|-------|----------|
+| Assumptions below | Accepted as stated |
+| Event type | `RaceToSet` with payload `{ "scope": String, "raceTo": Int }` |
+| Scope helpers | `RaceToScopes` + `RaceToWizard` in **`liga-common`** (cross-project JVM + JS) |
+| Event log filename | `round-race-to` → `race-to` |
+
+## Assumptions
 
 1. **Breaking change is acceptable** — no migration of existing tournament event directories; fixtures and tests are rewritten in place.
 2. **Scope keys are flat strings** (`wb-3`, `lb-4`, `gf`) end-to-end — not a nested `{ winners, losers, grandFinal }` API shape.
 3. **Cascade is wizard-only** — the server stores a full `raceToByScope` map; no anchor/sparse semantics on the backend.
 4. **No post-seed race-to edits** — misconfiguration requires a new tournament (same as today).
 5. **No per-match override** — effective race-to always resolves from scope at `MatchReady` / resolve time.
-6. **`RaceToScopes` lives on JVM** (`liga`) with a **JS mirror** (`liga-js`), matching today's `BracketRounds` / `WizardRounds` split — not moved into `liga-common` unless implementation proves shared topology access is needed.
-7. **Event rename** — `RoundRaceToSet` → `RaceToSet` with payload field `scope: String` (replacing `round: Int`). Event log filename segment may change from `round-race-to` to `race-to`.
+6. **`RaceToScopes` and `RaceToWizard` live in `liga-common`** — single cross-project source shared by `liga` (JVM) and `liga-js` (Scala.js). Replaces `BracketRounds` / `WizardRounds` and their JVM/JS mirrors.
+7. **Event rename** — `RoundRaceToSet` → `RaceToSet` with payload field `scope: String` (replacing `round: Int`).
 
 ## Objective
 
@@ -36,7 +45,7 @@ Tournament directors need to set race-to **independently per bracket section** (
 | Language | Scala 3.8.4 |
 | Server / domain | `liga` (ZIO, zio-json) |
 | Director UI | `liga-js` (Scala.js, Laminar) |
-| Shared models | `liga-common` (handicap, roster — scope logic stays in liga + mirror for now) |
+| Shared logic | `liga-common` (cross-project: `RaceToScopes`, `RaceToWizard`, handicap, roster) |
 | Tests | ZIO Test (`ZIOSpecDefault`) |
 | Build | sbt cross-project |
 
@@ -46,6 +55,9 @@ Tournament directors need to set race-to **independently per bracket section** (
 # Compile server + JS
 sbt --client compile
 
+# Run liga-common tests (scope keys, cascade)
+sbt --client "ligaCommonJVM/test"
+
 # Run all liga tests (domain, API, replay fixtures)
 sbt --client "liga/test"
 
@@ -53,7 +65,7 @@ sbt --client "liga/test"
 sbt --client "ligaJs/test"
 
 # Focused tests while developing
-sbt --client "liga/testOnly *RaceToScopes*"
+sbt --client "ligaCommonJVM/testOnly *RaceTo*"
 sbt --client "liga/testOnly *Replay*"
 sbt --client "ligaJs/testOnly *Wizard*"
 
@@ -64,12 +76,20 @@ sbt --client fixup
 ## Project Structure
 
 ```
+liga-common/src/main/scala/ph/samson/atbp/liga/bracket/
+  RaceToScopes.scala             → keyForMatch, requiredKeys, scopeLabel, section helpers
+  RaceToWizard.scala             → initialState, loadState, applyEdit (cascade + GF pin)
+
+liga-common/src/test/scala/ph/samson/atbp/liga/bracket/
+  RaceToScopesSpec.scala         → key sets for 8/16/64; match-id → scope mapping
+  RaceToWizardSpec.scala         → cascade rules; GF pin behavior
+
 liga/src/main/scala/ph/samson/atbp/liga/
   bracket/
-    BracketRounds.scala          → replace with RaceToScopes.scala (scope string keys)
+    BracketRounds.scala          → delete (replaced by liga-common RaceToScopes)
   model/Types.scala              → TournamentState.raceToByScope, RaceToSetPayload
   tournament/
-    MatchLifecycle.scala         → resolveRaceTo via keyForMatch
+    MatchLifecycle.scala         → resolveRaceTo via RaceToScopes.keyForMatch
     TournamentPhase.scala        → raceToComplete on scope keys
     Replay.scala                 → apply RaceToSet events
     Seed.scala                   → validate + emit scope events
@@ -82,8 +102,8 @@ liga-js/src/main/scala/ph/samson/atbp/liga/js/
   api/Models.scala               → mirror API types
   api/Client.scala               → setRaceTo / seed signatures
   director/
-    WizardView.scala             → section-grouped UI + cascade
-    WizardRounds.scala           → replace with RaceToScopes mirror
+    WizardView.scala             → section-grouped UI; delegates cascade to RaceToWizard
+    WizardRounds.scala           → delete (replaced by liga-common RaceToScopes)
     BracketLayout.scala          → defaultRaceTo via scope; drop raceToRoundLabel
     DirectorApp.scala            → wire new map type
 
@@ -113,7 +133,7 @@ gf-1    → gf
 
 `MatchLifecycle.resolveRaceTo` looks up `state.raceToByScope(RaceToScopes.keyForMatch(matchId))`.
 
-`RaceToScopes.requiredKeys(playerCount)` returns all `wb-*`, `lb-*`, and `gf` keys derived from bracket topology (replaces `BracketRounds.requiredKeys`).
+`RaceToScopes.requiredKeys(playerCount)` returns all `wb-*`, `lb-*`, and `gf` keys for the bracket size implied by player count (replaces `BracketRounds.requiredKeys`).
 
 **Example (8 players, bracket size 8):** `wb-1`, `wb-2`, `wb-3`, `lb-1`, `lb-2`, `lb-3`, `lb-4`, `gf` — eight scope keys.
 
@@ -165,11 +185,11 @@ Grand Final
   (helper: "usually longer than finals — set explicitly.")
 ```
 
-Labels derive from scope keys (`wb-3` → "Winners — round 3"). Remove `BracketLayout.raceToRoundLabel` multi-scope concatenation.
+Labels derive from scope keys (`wb-3` → "Round 3" under Winners Bracket). Remove `BracketLayout.raceToRoundLabel` multi-scope concatenation.
 
 ### Cascade rules (client-side only)
 
-On save, send the full `raceToByScope` map. Cascade runs only in the wizard.
+`RaceToWizard` in `liga-common` owns cascade logic. `WizardView` calls `RaceToWizard.applyEdit` on input change and sends the full map on save. The server stores one value per scope key with no anchor/sparse semantics.
 
 | Rule | Behavior |
 |------|----------|
@@ -188,18 +208,22 @@ On save, send the full `raceToByScope` map. Cascade runs only in the wizard.
 
 | Scope | Value | Source |
 |-------|-------|--------|
-| `wb-1`..`wb-N` | 7 | hardcoded default |
+| `wb-1`..`wb-N` | 7 | `RaceToWizard.initialState` |
 | `lb-1` | = `wb-1` | sync on load |
 | `lb-2`..`lb-M` | = `lb-1` | cascade on load |
 | `gf` | = `wb-N` | sync on load; unpinned |
+
+When reloading from server state, `RaceToWizard.loadState` infers `gfPinned` when `gf ≠ wb-N`.
 
 ## Code Style
 
 Follow existing Liga conventions: `object` companions for pure helpers, `Either[Error, T]` for domain validation, zio-json `@jsonHint` on events, Laminar `Var`/`Signal` in the wizard.
 
-**New scope helper (illustrative):**
+**`RaceToScopes` in `liga-common` (illustrative):**
 
 ```scala
+package ph.samson.atbp.liga.bracket
+
 object RaceToScopes {
 
   def keyForMatch(matchId: String): Option[String] =
@@ -210,20 +234,14 @@ object RaceToScopes {
       case _                => None
     }
 
-  def requiredKeys(playerCount: Int): SortedSet[String] = {
-    val bracketSize = Seeding.bracketSize(playerCount)
-    BracketTopology(bracketSize).matches.keys
-      .flatMap(keyForMatch)
-      .to(SortedSet)
+  def requiredKeys(playerCount: Int): List[String] = {
+    val size = bracketSize(playerCount)
+    val wb = (1 to winnersRounds(size)).map(n => s"wb-$n")
+    val lb = (1 to losersRounds(size)).map(n => s"lb-$n")
+    wb.toList ++ lb.toList :+ "gf"
   }
 
-  def scopeLabel(scope: String): String =
-    scope match {
-      case s"wb-$n" => s"Winners — round $n"
-      case s"lb-$n" => s"Losers — round $n"
-      case "gf"     => "Grand Final"
-      case other    => other
-    }
+  def scopeLabel(scope: String): String = /* section-aware label */
 }
 ```
 
@@ -244,18 +262,18 @@ Rename `MissingRaceToError` round field to `scope: String` where applicable.
 
 ## Testing Strategy
 
-**Framework:** ZIO Test in `liga/src/test` and `liga-js/src/test`.
+**Framework:** ZIO Test — `liga-common` (JVM) for pure logic; `liga` and `liga-js` for integration.
 
 | Concern | Where | Approach |
 |---------|-------|----------|
-| `keyForMatch` / `requiredKeys` | `RaceToScopesSpec` | Unit: 8/16/64 player key sets; match-id → scope mapping |
-| `resolveRaceTo` | `MatchLifecycle` tests or dedicated spec | Winners, losers, GF resolve independently |
+| `keyForMatch` / `requiredKeys` | `liga-common` `RaceToScopesSpec` | Unit: 8/16/64 player key sets; match-id → scope mapping |
+| Cascade + GF pin | `liga-common` `RaceToWizardSpec` | `wb-1`, `lb-1`, `gf` edit scenarios |
+| `resolveRaceTo` | `liga` tests | Winners, losers, GF resolve independently |
 | Event codec | `EventCodecSpec` | `RaceToSet` JSON round-trip |
 | Replay | `ReplaySpec` + fixture JSON | Rewritten `*-race-to.json` files replay to correct state |
 | Phase gating | `TournamentPhase` / `SeedSpec` | `raceToComplete` requires every scope key |
 | API contract | `ApiClientContractSpec`, `WriteApiSpec`, `ReadApiSpec` | `raceToByScope` in responses and POST bodies |
 | E2E seed flow | `EndToEndSpec` | Seed with differentiated wb/lb/gf values |
-| Wizard cascade | `liga-js` (optional) | Pure extraction of cascade into testable object if `WizardView` logic grows |
 
 **Fixture rewrite pattern:**
 
@@ -267,26 +285,24 @@ Rename `MissingRaceToError` round field to `scope: String` where applicable.
 {"type":"RaceToSet","payload":{"scope":"wb-3","raceTo":7}}
 ```
 
-Add separate `lb-*` and `gf` events where fixtures previously relied on shared integer round keys.
-
-**Coverage expectation:** all existing race-to / seed / replay tests pass after rewrite; new spec covers scope-key edge cases (GF pinned behavior is UI-only — no server test unless cascade helper is extracted).
+Add separate `lb-*` and `gf` events where fixtures previously relied on shared integer round keys. Seq numbers for post-race-to events shift accordingly (8 scope events for 8-player brackets, not 4).
 
 ## Boundaries
 
 ### Always
 
-- Keep JVM `RaceToScopes` and JS mirror in sync (same keys for a given `playerCount`).
+- Import `RaceToScopes` / `RaceToWizard` from `liga-common` — no JVM/JS duplicate implementations.
 - Validate all `requiredKeys(playerCount)` are present before seed.
 - Emit one `RaceToSet` event per scope on save/seed (full map, no sparse storage).
-- Run `sbt --client fixup` and `liga/test` before committing Scala changes.
+- Run `sbt --client fixup` and relevant tests before committing Scala changes.
 - Rewrite replay fixtures when event shape changes.
 
 ### Ask first
 
-- Moving `RaceToScopes` into `liga-common` cross-project (would touch build deps).
 - Changing event log filename conventions beyond `round-race-to` → `race-to`.
 - Adding server-side cascade or partial-map merge semantics.
 - Supporting old `roundRaceTo` / `RoundRaceToSet` alongside the new shape.
+- Moving bracket topology (`BracketTopology`) into `liga-common` — not required for this feature.
 
 ### Never
 
@@ -299,13 +315,13 @@ Add separate `lb-*` and `gf` events where fixtures previously relied on shared i
 ## Success Criteria
 
 - [ ] `TournamentState`, API models, `SeedRequest`, and `RaceToRequest` expose `raceToByScope: Map[String, Int]` (no `roundRaceTo`).
-- [ ] `RaceToScopes.keyForMatch` and `requiredKeys` exist on JVM; JS mirror returns identical key sets for 8, 16, 32, 64 players.
+- [ ] `RaceToScopes` and `RaceToWizard` in `liga-common`; consumed by both `liga` and `liga-js`.
 - [ ] `resolveRaceTo("lb-2-1", …)` and `resolveRaceTo("wb-2-1", …)` can return different values for the same numeric round.
 - [ ] `resolveRaceTo("gf-1", …)` uses `gf` scope, independent of `wb-N`.
 - [ ] `TournamentPhase.raceToComplete` passes only when every required scope key is set.
 - [ ] `RaceToSet` events replay correctly; all tournament fixture directories updated.
 - [ ] Director wizard shows Winners / Losers / Grand Final sections with cascade + GF pin behavior per tables above.
-- [ ] `sbt --client "liga/test"` and `sbt --client "ligaJs/test"` pass.
+- [ ] `sbt --client "ligaCommonJVM/test"`, `sbt --client "liga/test"`, and `sbt --client "ligaJs/test"` pass.
 - [ ] Typical 8-player flow works: set `lb-1` → 5 (losers all 5), `wb-2` → 5 (winners 7,5,5; GF → 5 if unpinned), `gf` → 9 (pinned).
 
 ## MVP Scope
@@ -324,9 +340,11 @@ Add separate `lb-*` and `gf` events where fixtures previously relied on shared i
 
 ## Open Questions
 
-All items from the idea doc are resolved:
+None — all resolved.
 
-- **Single POST with full map?** Yes.
-- **`wb-1` cascades to losers via `lb-1`?** Yes.
-
-No blocking open questions remain. If you want a different event rename (`RaceToByScopeSet`) or to hoist `RaceToScopes` into `liga-common`, say so before implementation.
+| Question | Resolution |
+|----------|------------|
+| Single POST with full map? | Yes |
+| `wb-1` cascades to losers via `lb-1`? | Yes |
+| Event name? | `RaceToSet` |
+| Where does scope logic live? | `liga-common` (`RaceToScopes` + `RaceToWizard`) |
