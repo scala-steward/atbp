@@ -27,7 +27,8 @@ Source idea: [`docs/ideas/liga-batch-period-ratings.md`](docs/ideas/liga-batch-p
 - [ ] `Leaderboard.compute` uses only `updateAfterPeriod` (no inner match fold).
 - [ ] `updateAfterMatch` and `updateAfterGame` are removed from `Glicko2`.
 - [ ] All tests pass, including new cases listed under Testing Strategy.
-- [ ] Golden fixture expected values are updated deliberately with commented expected ratings (not silent drift).
+- [ ] Golden fixture expected values are updated deliberately with commented expected ratings in `LeaderboardSpec` (not silent drift).
+- [ ] Period files with zero matches are rejected at load time.
 
 ## Tech Stack
 
@@ -68,6 +69,8 @@ liga/src/main/scala/ph/samson/atbp/liga/
   glicko/
     Glicko2.scala       ← add updateAfterPeriod; remove updateAfterMatch/Game
     Leaderboard.scala   ← single updateAfterPeriod call per period
+  io/
+    PeriodLoader.scala  ← reject period files with zero matches
   model/
     ScoreExpansion.scala  ← reuse for per-game outcome expansion
     Types.scala           ← Period, PeriodMatch (unchanged)
@@ -77,7 +80,7 @@ liga/src/test/scala/ph/samson/atbp/liga/
     Glicko2Spec.scala       ← rewrite tests for updateAfterPeriod
     LeaderboardSpec.scala   ← new: batch semantics + golden values
   io/
-    PeriodLoaderSpec.scala  ← may add hard-coded golden rating assertions
+    PeriodLoaderSpec.scala  ← add empty-period rejection test; keep self-consistency golden test
 
 liga/src/test/resources/
   period-loader/golden/     ← 2026-01-10.liga, 2026-03-15.liga (unchanged files)
@@ -108,8 +111,8 @@ def updateAfterPeriod(priorSnapshot: Snapshot, period: Period): Snapshot
 1. Freeze `priorSnapshot` — all opponent references for this period come from here.
 2. For each match, expand scores via `ScoreExpansion.expandGames`; build `Seq[Result]` per player using **period-start** opponent `GlickoPlayer` values.
 3. Update every player in `priorSnapshot`:
-   - Played → `afterPeriod(results, tuning)`; W–L from match scores.
-   - Did not play → `afterPeriod(Nil, tuning)` (inactive period).
+   - Played → `afterPeriod(results, tuning)`; W–L incremented from match scores.
+   - Did not play → `afterPeriod(Nil, tuning)` — rating unchanged, RD/volatility advance; W–L unchanged.
 4. Debut players (in matches but not in `priorSnapshot`) → new entry, then one `afterPeriod` with their results.
 5. Return map of all players (prior + debuts).
 
@@ -140,9 +143,9 @@ def compute(periods: List[Period]): List[PlayerRating] = {
 | Match-order independence | Shuffle `period.matches` → identical snapshot (property test) |
 | Multi-match, multi-opponent | Alice beats Bob 7–4 and loses to Carol 4–7 in one period → one batch update |
 | Rematch within period | Two matches vs same opponent both use period-start opponent μ/φ |
-| Inactive player RD increase | Bob in period 1, absent period 2 → Bob's RD increases in period 2 |
-| Empty period | No matches → all `priorSnapshot` players get inactive update |
-| Golden fixture | Hard-coded expected ratings for `period-loader/golden` after batch recompute |
+| Inactive player RD increase | Bob in period 1, absent period 2 → Bob's RD increases in period 2; W–L unchanged |
+| Empty period rejection | `.liga` file with zero matches fails at load time with a clear error |
+| Golden fixture | Hard-coded expected ratings in `LeaderboardSpec` for `period-loader/golden` after batch recompute |
 | Existing golden vectors | Library `afterPeriod` tests in `Glicko2Spec` remain (direct library calls) |
 
 ### Coverage expectations
@@ -166,8 +169,9 @@ sbt --client "liga/test"
 - Run `sbt --client fixup` and confirm a clean `git status` before committing Scala changes.
 - Use period-start opponent ratings for all games within a period.
 - Update inactive players (`priorSnapshot` keys who didn't play) with `afterPeriod(Nil)`.
-- Document the order-independence invariant on `updateAfterPeriod` scaladoc.
-- Update golden expected values deliberately with comments explaining batch semantics.
+- Document the order-independence invariant on `updateAfterPeriod` scaladoc and in `LeaderboardSpec` comments.
+- Update golden expected values deliberately with comments explaining batch semantics in `LeaderboardSpec`.
+- Reject period files with zero matches at load time.
 
 ### Ask first
 
@@ -193,18 +197,19 @@ Specific, testable conditions for "done":
 1. `Glicko2.updateAfterPeriod` is the sole rating-update entry point; `updateAfterMatch` and `updateAfterGame` are deleted.
 2. `Leaderboard.compute` has no inner `matches.foldLeft`.
 3. Property test: shuffling `period.matches` yields bit-for-bit identical `Snapshot` (within `approx` tolerance for doubles).
-4. Golden fixture test asserts Bob's RD increases in period 2 despite not playing (concrete numeric expected values in test).
-5. `sbt --client "liga/test"` passes.
-6. `sbt --client fixup` passes with clean working tree.
+4. `LeaderboardSpec` asserts Bob's RD increases in period 2 despite not playing (commented numeric expected values).
+5. Period files with zero matches are rejected at load time.
+6. `sbt --client "liga/test"` passes.
+7. `sbt --client fixup` passes with clean working tree.
 
-## Open Questions
+## Resolved Decisions
 
-| Question | Default assumption (confirm or correct) |
-|----------|----------------------------------------|
-| Can a `.liga` file have zero matches in production? | Yes — treat as inactive-update-all; test anyway. |
-| Golden fixture documentation | Add comments in `LeaderboardSpec` (or test README) that within-file ratings are match-order independent. |
-| `PeriodLoaderSpec` golden test | Currently self-consistency only (`ratings == Leaderboard.compute(...)`). Add hard-coded expected values in new `LeaderboardSpec`? **Assumed yes.** |
-| W–L accounting for inactive players | W–L unchanged for `afterPeriod(Nil)`; only RD/volatility advance. **Assumed per Glicko2.** |
+| Question | Decision |
+|----------|----------|
+| Golden fixture assertions | New `LeaderboardSpec` with commented numeric expected values; `PeriodLoaderSpec` keeps self-consistency only |
+| Empty period files | Reject at load time — a `.liga` file must have at least one match |
+| W–L for inactive players | W–L unchanged; only RD and volatility advance via `afterPeriod(Nil)` |
+| Match-order documentation | Scaladoc on `updateAfterPeriod` plus comments in `LeaderboardSpec` |
 
 ## Assumptions
 
