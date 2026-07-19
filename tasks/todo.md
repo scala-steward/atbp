@@ -29,8 +29,8 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 ## Phase 2: Integration
 
 ### Task 3: Wire `Leaderboard.compute`
-- [ ] Replace inner `matches.foldLeft` with `updateAfterPeriod` per period
-- [ ] Verify: `sbt --client "liga/testOnly *PeriodLoader*"`
+- [x] Replace inner `matches.foldLeft` with `updateAfterPeriod` per period
+- [x] Verify: `sbt --client "liga/testOnly *PeriodLoader*"`
 
 ### Task 4: Batch semantics and order-independence tests
 - [ ] Multi-opponent period test (Alice beats Bob 7-4, loses to Carol 4-7)
