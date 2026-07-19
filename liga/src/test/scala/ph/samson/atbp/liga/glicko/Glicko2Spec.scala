@@ -6,6 +6,7 @@ import ph.samson.atbp.liga.model.*
 import zio.test.*
 
 import java.time.LocalDate
+import scala.util.Random
 
 object Glicko2Spec extends ZIOSpecDefault {
 
@@ -17,11 +18,27 @@ object Glicko2Spec extends ZIOSpecDefault {
     Math.abs(expected - actual) <= 0.001
 
   private def singleMatchPeriod(periodMatch: PeriodMatch): Period =
+    periodWithMatches(List(periodMatch))
+
+  private def periodWithMatches(matches: List[PeriodMatch]): Period =
     Period(
       name = "test period",
       completed = LocalDate.parse("2026-01-01"),
-      matches = List(periodMatch)
+      matches = matches
     )
+
+  private def snapshotsEquivalent(
+      left: Glicko2.Snapshot,
+      right: Glicko2.Snapshot
+  ): Boolean =
+    left.keySet == right.keySet &&
+      left.forall { case (player, rating) =>
+        val other = Glicko2.ratingOf(right, player)
+        approx(rating.rating, other.rating) &&
+        approx(rating.rd, other.rd) &&
+        rating.wins == other.wins &&
+        rating.losses == other.losses
+      }
 
   def spec = suite("Glicko2")(
     suite("Tuning")(
@@ -145,6 +162,129 @@ object Glicko2Spec extends ZIOSpecDefault {
           bobAfterTwo.wins == bobAfterOne.wins,
           bobAfterTwo.losses == bobAfterOne.losses
         )
+      },
+      test("multi-opponent period batches all matches into one update") {
+        val period = periodWithMatches(
+          List(
+            PeriodMatch(
+              playerA = alice,
+              playerB = bob,
+              scoreA = 7,
+              scoreB = 4,
+              raceTo = 7,
+              handicapSuggested = 0,
+              handicapApplied = 0
+            ),
+            PeriodMatch(
+              playerA = alice,
+              playerB = carol,
+              scoreA = 4,
+              scoreB = 7,
+              raceTo = 7,
+              handicapSuggested = 0,
+              handicapApplied = 0
+            )
+          )
+        )
+        val after = Glicko2.updateAfterPeriod(Glicko2.empty, period)
+        val a = Glicko2.ratingOf(after, alice)
+        val b = Glicko2.ratingOf(after, bob)
+        val c = Glicko2.ratingOf(after, carol)
+        assertTrue(
+          a.wins == 11,
+          a.losses == 11,
+          b.wins == 4,
+          b.losses == 7,
+          c.wins == 7,
+          c.losses == 4
+        )
+      },
+      test("rematch within period uses period-start opponent ratings") {
+        val frozenBob = GlickoPlayer(1500, 350, 0.06)
+        val frozenAlice = GlickoPlayer(1500, 350, 0.06)
+        val period = periodWithMatches(
+          List(
+            PeriodMatch(
+              playerA = alice,
+              playerB = bob,
+              scoreA = 7,
+              scoreB = 4,
+              raceTo = 7,
+              handicapSuggested = 0,
+              handicapApplied = 0
+            ),
+            PeriodMatch(
+              playerA = alice,
+              playerB = bob,
+              scoreA = 4,
+              scoreB = 7,
+              raceTo = 7,
+              handicapSuggested = 0,
+              handicapApplied = 0
+            )
+          )
+        )
+        val games =
+          ScoreExpansion.expandGames(7, 4) ++ ScoreExpansion.expandGames(4, 7)
+        val aliceResults = games.map {
+          case GameWinner.PlayerA => Result.WonAgainst(frozenBob)
+          case GameWinner.PlayerB => Result.DefeatedBy(frozenBob)
+        }
+        val bobResults = games.map {
+          case GameWinner.PlayerA => Result.DefeatedBy(frozenAlice)
+          case GameWinner.PlayerB => Result.WonAgainst(frozenAlice)
+        }
+        val expectedAlice =
+          frozenAlice.afterPeriod(aliceResults, Tuning.Default)
+        val expectedBob = frozenBob.afterPeriod(bobResults, Tuning.Default)
+        val after = Glicko2.updateAfterPeriod(Glicko2.empty, period)
+        val actualAlice = Glicko2.ratingOf(after, alice)
+        val actualBob = Glicko2.ratingOf(after, bob)
+        assertTrue(
+          approx(expectedAlice.rating, actualAlice.rating),
+          approx(expectedAlice.deviation, actualAlice.rd),
+          approx(expectedBob.rating, actualBob.rating),
+          approx(expectedBob.deviation, actualBob.rd)
+        )
+      },
+      test("shuffling period.matches yields identical snapshot") {
+        val matches = List(
+          PeriodMatch(
+            playerA = alice,
+            playerB = bob,
+            scoreA = 7,
+            scoreB = 4,
+            raceTo = 7,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          ),
+          PeriodMatch(
+            playerA = alice,
+            playerB = carol,
+            scoreA = 4,
+            scoreB = 7,
+            raceTo = 7,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          ),
+          PeriodMatch(
+            playerA = bob,
+            playerB = carol,
+            scoreA = 5,
+            scoreB = 3,
+            raceTo = 5,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          )
+        )
+        val baseline =
+          Glicko2.updateAfterPeriod(Glicko2.empty, periodWithMatches(matches))
+        val shuffled =
+          Glicko2.updateAfterPeriod(
+            Glicko2.empty,
+            periodWithMatches(Random.shuffle(matches))
+          )
+        assertTrue(snapshotsEquivalent(baseline, shuffled))
       }
     ),
     suite("match updates")(

@@ -33,15 +33,15 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 - [x] Verify: `sbt --client "liga/testOnly *PeriodLoader*"`
 
 ### Task 4: Batch semantics and order-independence tests
-- [ ] Multi-opponent period test (Alice beats Bob 7-4, loses to Carol 4-7)
-- [ ] Rematch within period uses period-start opponent ratings
-- [ ] Property test: shuffled `period.matches` → identical snapshot
-- [ ] Verify: `sbt --client "liga/testOnly *Glicko2*"`
+- [x] Multi-opponent period test (Alice beats Bob 7-4, loses to Carol 4-7)
+- [x] Rematch within period uses period-start opponent ratings
+- [x] Property test: shuffled `period.matches` → identical snapshot
+- [x] Verify: `sbt --client "liga/testOnly *Glicko2*"`
 
 ### Checkpoint: Core batch semantics
-- [ ] Order-independence property test passes
-- [ ] Multi-match scenarios pass
-- [ ] `Leaderboard.compute` integration works end-to-end
+- [x] Order-independence property test passes
+- [x] Multi-match scenarios pass
+- [x] `Leaderboard.compute` integration works end-to-end
 
 ## Phase 3: Edge Cases and Golden Fixtures
 
