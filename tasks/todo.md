@@ -52,18 +52,18 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 - [x] Verify: `sbt --client "liga/testOnly *PeriodLoader*"`
 
 ### Task 6: `LeaderboardSpec` golden values and inactive RD regression
-- [ ] Create `LeaderboardSpec.scala`
-- [ ] Load golden fixture via `PeriodLoader`
-- [ ] Assert commented numeric expected rating/RD/W-L values
-- [ ] Assert Bob's RD increases in period 2 (did not play)
-- [ ] Assert Bob's W-L unchanged in period 2
-- [ ] Reduce `PeriodLoaderSpec` golden test to self-consistency only
-- [ ] Verify: `sbt --client "liga/testOnly *Leaderboard*"` and `sbt --client "liga/testOnly *PeriodLoader*"`
+- [x] Create `LeaderboardSpec.scala`
+- [x] Load golden fixture via `PeriodLoader`
+- [x] Assert commented numeric expected rating/RD/W-L values
+- [x] Assert Bob's RD increases in period 2 (did not play)
+- [x] Assert Bob's W-L unchanged in period 2
+- [x] Reduce `PeriodLoaderSpec` golden test to self-consistency only
+- [x] Verify: `sbt --client "liga/testOnly *Leaderboard*"` and `sbt --client "liga/testOnly *PeriodLoader*"`
 
 ### Checkpoint: Fixtures and edge cases
-- [ ] Golden expected values documented and passing
-- [ ] Empty period rejection works
-- [ ] Bob inactive RD inflation verified
+- [x] Golden expected values documented and passing
+- [x] Empty period rejection works
+- [x] Bob inactive RD inflation verified
 
 ## Phase 4: Cleanup
 
