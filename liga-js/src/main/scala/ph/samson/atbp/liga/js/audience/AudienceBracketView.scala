@@ -14,7 +14,7 @@ object AudienceBracketView {
       groups.map { group =>
         div(
           cls := "bracket-section",
-          h2(s"${group.section.label} — round ${group.round}"),
+          h2(BracketLayout.groupLabel(group.section, group.round)),
           div(
             cls := "round-matches",
             group.matches.map(matchRow)

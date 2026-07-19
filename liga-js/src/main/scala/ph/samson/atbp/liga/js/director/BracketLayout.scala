@@ -26,12 +26,14 @@ object BracketLayout {
       case _                        => Section.GrandFinal
     }
 
-  def matchLabel(matchId: String, bracketSize: Int): String =
-    sectionOf(matchId) match {
-      case Section.GrandFinal => "Grand Final"
-      case section            =>
-        s"${section.label} — round ${roundOf(matchId, bracketSize)}"
+  def groupLabel(section: Section, round: Int): String =
+    section match {
+      case Section.GrandFinal => section.label
+      case _                  => s"${section.label} — round $round"
     }
+
+  def matchLabel(matchId: String, bracketSize: Int): String =
+    groupLabel(sectionOf(matchId), roundOf(matchId, bracketSize))
 
   private def log2(n: Int): Int =
     (math.log(n) / math.log(2)).toInt

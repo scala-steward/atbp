@@ -20,6 +20,23 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         BracketLayout.roundOf("wb-1-1", bracketSize = 8) == 1
       )
     },
+    test("groupLabel omits round number for grand final") {
+      assertTrue(
+        BracketLayout.groupLabel(BracketLayout.Section.GrandFinal, 3) ==
+          "Grand Final",
+        BracketLayout.groupLabel(BracketLayout.Section.Winners, 2) ==
+          "Winners — round 2",
+        BracketLayout.groupLabel(BracketLayout.Section.Losers, 4) ==
+          "Losers — round 4"
+      )
+    },
+    test("matchLabel delegates to groupLabel") {
+      assertTrue(
+        BracketLayout.matchLabel("gf-1", bracketSize = 8) == "Grand Final",
+        BracketLayout.matchLabel("wb-2-1", bracketSize = 8) ==
+          "Winners — round 2"
+      )
+    },
     test("groupMatches uses bracket size for grand final round grouping") {
       val gf = BracketMatch(
         id = "gf-1",

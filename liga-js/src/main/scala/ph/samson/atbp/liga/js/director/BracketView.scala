@@ -17,7 +17,7 @@ object BracketView {
       groups.map { group =>
         div(
           cls := "bracket-section",
-          h3(s"${group.section.label} — round ${group.round}"),
+          h3(BracketLayout.groupLabel(group.section, group.round)),
           div(
             cls := "round-matches",
             group.matches.map { matchDef =>
