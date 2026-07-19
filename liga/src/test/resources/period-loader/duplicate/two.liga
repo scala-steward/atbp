@@ -1,4 +1,14 @@
 name = "Duplicate B"
 completed = "2026-05-01"
 
-matches = []
+matches = [
+  {
+    player-a = "Carol"
+    player-b = "Dave"
+    score-a = 5
+    score-b = 3
+    race-to = 5
+    handicap-suggested = 0
+    handicap-applied = 0
+  }
+]

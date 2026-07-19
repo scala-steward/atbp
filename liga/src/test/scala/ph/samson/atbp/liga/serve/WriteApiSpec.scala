@@ -557,7 +557,17 @@ object WriteApiSpec extends ZIOSpecDefault {
               Period(
                 name = "Other Tournament",
                 completed = completed,
-                matches = Nil
+                matches = List(
+                  PeriodMatch(
+                    playerA = Player("Alice"),
+                    playerB = Player("Bob"),
+                    scoreA = 1,
+                    scoreB = 0,
+                    raceTo = 1,
+                    handicapSuggested = 0,
+                    handicapApplied = 0
+                  )
+                )
               )
             )
           )

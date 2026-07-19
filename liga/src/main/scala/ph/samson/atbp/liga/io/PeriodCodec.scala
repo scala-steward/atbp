@@ -47,22 +47,30 @@ object PeriodCodec {
     } yield period
 
   private def toPeriod(config: PeriodConfig): Task[Period] =
-    ZIO
-      .attempt(LocalDate.parse(config.completed))
-      .mapBoth(
-        _ =>
-          new IllegalArgumentException(
-            s"Invalid completed date: expected ISO-8601 YYYY-MM-DD, got '${config.completed}'"
-          ),
-        completed =>
-          Period(
-            name = config.name,
-            completed = completed,
-            format = config.format,
-            raceTo = config.raceTo,
-            matches = config.matches.map(toMatch)
-          )
+    if (config.matches.isEmpty) {
+      ZIO.fail(
+        new IllegalArgumentException(
+          s"Period '${config.name}' has zero matches; a .liga file must contain at least one match"
+        )
       )
+    } else {
+      ZIO
+        .attempt(LocalDate.parse(config.completed))
+        .mapBoth(
+          _ =>
+            new IllegalArgumentException(
+              s"Invalid completed date: expected ISO-8601 YYYY-MM-DD, got '${config.completed}'"
+            ),
+          completed =>
+            Period(
+              name = config.name,
+              completed = completed,
+              format = config.format,
+              raceTo = config.raceTo,
+              matches = config.matches.map(toMatch)
+            )
+        )
+    }
 
   private def toMatch(config: PeriodMatchConfig): PeriodMatch =
     PeriodMatch(

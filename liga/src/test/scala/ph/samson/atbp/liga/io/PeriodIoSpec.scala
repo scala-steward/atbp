@@ -63,7 +63,17 @@ object PeriodIoSpec extends ZIOSpecDefault {
     test("invalid HOCON surfaces a clear error") {
       val invalid = """name = "Broken"
                       |completed = "not-a-date"
-                      |matches = []
+                      |matches = [
+                      |  {
+                      |    player-a = "Alice"
+                      |    player-b = "Bob"
+                      |    score-a = 1
+                      |    score-b = 0
+                      |    race-to = 1
+                      |    handicap-suggested = 0
+                      |    handicap-applied = 0
+                      |  }
+                      |]
                       |""".stripMargin
       for {
         result <- PeriodCodec.parseString(invalid).either

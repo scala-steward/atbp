@@ -45,6 +45,14 @@ object PeriodLoaderSpec extends ZIOSpecDefault {
         }
       )
     },
+    test("empty period files fail with a clear error") {
+      for {
+        result <- PeriodCodec.parseFile(fixture("empty/empty.liga")).either
+      } yield assertTrue(
+        result.isLeft,
+        result.left.exists(_.getMessage.contains("zero matches"))
+      )
+    },
     test("golden fixture folds two periods through Glicko2") {
       val root = fixture("golden")
       for {

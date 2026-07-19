@@ -53,109 +53,131 @@ object Glicko2 {
       )
     )
 
-  def updateAfterGame(
-      state: Snapshot,
-      playerA: Player,
-      playerB: Player,
-      winner: GameWinner
-  ): Snapshot = {
-    val a = getOrNew(state, playerA)
-    val b = getOrNew(state, playerB)
-    val aGlicko = a.toGlickoPlayer
-    val bGlicko = b.toGlickoPlayer
-
-    val (aUpdated, bUpdated, aWins, aLosses, bWins, bLosses) = winner match {
-      case GameWinner.PlayerA =>
-        (
-          aGlicko.afterPeriod(Seq(Result.WonAgainst(bGlicko)), tuning),
-          bGlicko.afterPeriod(Seq(Result.DefeatedBy(aGlicko)), tuning),
-          a.wins + 1,
-          a.losses,
-          b.wins,
-          b.losses + 1
-        )
-      case GameWinner.PlayerB =>
-        (
-          aGlicko.afterPeriod(Seq(Result.DefeatedBy(bGlicko)), tuning),
-          bGlicko.afterPeriod(Seq(Result.WonAgainst(aGlicko)), tuning),
-          a.wins,
-          a.losses + 1,
-          b.wins + 1,
-          b.losses
-        )
-    }
-
-    state
-      .updated(
-        playerA,
-        InternalRating(
-          playerA,
-          aUpdated.rating,
-          aUpdated.deviation,
-          aUpdated.volatility,
-          aWins,
-          aLosses
-        )
-      )
-      .updated(
-        playerB,
-        InternalRating(
-          playerB,
-          bUpdated.rating,
-          bUpdated.deviation,
-          bUpdated.volatility,
-          bWins,
-          bLosses
-        )
-      )
-  }
-
-  /** Apply all expanded games in one rating period (order-independent within
-    * the match).
+  /** Apply one Glicko2 rating period from a period-start snapshot.
+    *
+    * Within a period, the order of `period.matches` is presentation-only.
+    * Shuffling match rows must produce identical ratings, RD, volatility, and
+    * W–L for every player.
+    *
+    * @param priorSnapshot
+    *   cumulative state after all earlier period files
+    * @param period
+    *   one `.liga` file's matches and metadata
     */
-  def updateAfterMatch(state: Snapshot, periodMatch: PeriodMatch): Snapshot = {
-    val a = getOrNew(state, periodMatch.playerA)
-    val b = getOrNew(state, periodMatch.playerB)
-    val aGlicko = a.toGlickoPlayer
-    val bGlicko = b.toGlickoPlayer
+  def updateAfterPeriod(priorSnapshot: Snapshot, period: Period): Snapshot = {
+    require(
+      period.matches.nonEmpty,
+      s"Period '${period.name}' has zero matches; a period must contain at least one match"
+    )
 
-    val games =
-      ScoreExpansion.expandGames(periodMatch.scoreA, periodMatch.scoreB)
-    val aResults = games.map {
-      case GameWinner.PlayerA => Result.WonAgainst(bGlicko)
-      case GameWinner.PlayerB => Result.DefeatedBy(bGlicko)
-    }
-    val bResults = games.map {
-      case GameWinner.PlayerA => Result.DefeatedBy(aGlicko)
-      case GameWinner.PlayerB => Result.WonAgainst(aGlicko)
-    }
+    val frozen = priorSnapshot
+    val participants =
+      period.matches.flatMap(m => List(m.playerA, m.playerB)).toSet
 
-    val aUpdated = aGlicko.afterPeriod(aResults, tuning)
-    val bUpdated = bGlicko.afterPeriod(bResults, tuning)
-
-    state
-      .updated(
-        periodMatch.playerA,
-        InternalRating(
-          periodMatch.playerA,
-          aUpdated.rating,
-          aUpdated.deviation,
-          aUpdated.volatility,
-          a.wins + periodMatch.scoreA,
-          a.losses + periodMatch.scoreB
+    val (resultsByPlayer, winsByPlayer, lossesByPlayer) =
+      period.matches.foldLeft(
+        (
+          Map.empty[Player, List[Result]],
+          Map.empty[Player, Int],
+          Map.empty[Player, Int]
         )
-      )
-      .updated(
-        periodMatch.playerB,
-        InternalRating(
-          periodMatch.playerB,
-          bUpdated.rating,
-          bUpdated.deviation,
-          bUpdated.volatility,
-          b.wins + periodMatch.scoreB,
-          b.losses + periodMatch.scoreA
+      ) { case ((results, wins, losses), periodMatch) =>
+        val aFrozen = getOrNew(frozen, periodMatch.playerA)
+        val bFrozen = getOrNew(frozen, periodMatch.playerB)
+        val aGlicko = aFrozen.toGlickoPlayer
+        val bGlicko = bFrozen.toGlickoPlayer
+
+        val games =
+          ScoreExpansion.expandGames(periodMatch.scoreA, periodMatch.scoreB)
+        val aResults = games.map {
+          case GameWinner.PlayerA => Result.WonAgainst(bGlicko)
+          case GameWinner.PlayerB => Result.DefeatedBy(bGlicko)
+        }
+        val bResults = games.map {
+          case GameWinner.PlayerA => Result.DefeatedBy(aGlicko)
+          case GameWinner.PlayerB => Result.WonAgainst(aGlicko)
+        }
+
+        def appendResults(
+            current: Map[Player, List[Result]],
+            player: Player,
+            newResults: List[Result]
+        ): Map[Player, List[Result]] =
+          current.updatedWith(player) {
+            case Some(existing) => Some(existing ++ newResults)
+            case None           => Some(newResults)
+          }
+
+        val updatedResults =
+          appendResults(
+            appendResults(results, periodMatch.playerA, aResults),
+            periodMatch.playerB,
+            bResults
+          )
+
+        (
+          updatedResults,
+          wins
+            .updated(
+              periodMatch.playerA,
+              wins.getOrElse(periodMatch.playerA, 0) + periodMatch.scoreA
+            )
+            .updated(
+              periodMatch.playerB,
+              wins.getOrElse(periodMatch.playerB, 0) + periodMatch.scoreB
+            ),
+          losses
+            .updated(
+              periodMatch.playerA,
+              losses.getOrElse(periodMatch.playerA, 0) + periodMatch.scoreB
+            )
+            .updated(
+              periodMatch.playerB,
+              losses.getOrElse(periodMatch.playerB, 0) + periodMatch.scoreA
+            )
         )
+      }
+
+    val priorUpdated = priorSnapshot.map { case (player, internal) =>
+      if (participants.contains(player)) {
+        val results = resultsByPlayer.getOrElse(player, Nil)
+        val updated = internal.toGlickoPlayer.afterPeriod(results, tuning)
+        player -> InternalRating(
+          player,
+          updated.rating,
+          updated.deviation,
+          updated.volatility,
+          internal.wins + winsByPlayer.getOrElse(player, 0),
+          internal.losses + lossesByPlayer.getOrElse(player, 0)
+        )
+      } else {
+        val updated = internal.toGlickoPlayer.afterPeriod(Nil, tuning)
+        player -> InternalRating(
+          player,
+          updated.rating,
+          updated.deviation,
+          updated.volatility,
+          internal.wins,
+          internal.losses
+        )
+      }
+    }
+
+    val debuts = participants.diff(priorSnapshot.keySet).map { player =>
+      val results = resultsByPlayer.getOrElse(player, Nil)
+      val internal = newInternal(player)
+      val updated = internal.toGlickoPlayer.afterPeriod(results, tuning)
+      player -> InternalRating(
+        player,
+        updated.rating,
+        updated.deviation,
+        updated.volatility,
+        winsByPlayer.getOrElse(player, 0),
+        lossesByPlayer.getOrElse(player, 0)
       )
+    }
+
+    priorUpdated ++ debuts
   }
 
   /** Deterministic player ordering (alphabetical by display name). */
