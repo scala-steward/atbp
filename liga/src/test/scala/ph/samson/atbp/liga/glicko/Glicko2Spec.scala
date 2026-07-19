@@ -86,12 +86,24 @@ object Glicko2Spec extends ZIOSpecDefault {
           approx(192.020, updated.deviation)
         )
       },
-      test("wrapper updateAfterGame matches library for single game") {
+      test("wrapper updateAfterPeriod matches library for single game") {
         val state =
           Glicko2.snapshot(alice, rating = 1500, rd = 350) ++
             Glicko2.snapshot(bob, rating = 1400, rd = 30)
-        val after =
-          Glicko2.updateAfterGame(state, alice, bob, GameWinner.PlayerA)
+        val after = Glicko2.updateAfterPeriod(
+          state,
+          singleMatchPeriod(
+            PeriodMatch(
+              playerA = alice,
+              playerB = bob,
+              scoreA = 1,
+              scoreB = 0,
+              raceTo = 1,
+              handicapSuggested = 0,
+              handicapApplied = 0
+            )
+          )
+        )
         val a = Glicko2.ratingOf(after, alice)
         assertTrue(
           approx(1631.369, a.rating),
@@ -287,48 +299,6 @@ object Glicko2Spec extends ZIOSpecDefault {
         assertTrue(snapshotsEquivalent(baseline, shuffled))
       }
     ),
-    suite("match updates")(
-      test("7-4 expands to 11 games with correct W-L and winner rated higher") {
-        val periodMatch = PeriodMatch(
-          playerA = alice,
-          playerB = bob,
-          scoreA = 7,
-          scoreB = 4,
-          raceTo = 7,
-          handicapSuggested = 0,
-          handicapApplied = 0
-        )
-        val after = Glicko2.updateAfterMatch(Glicko2.empty, periodMatch)
-        val a = Glicko2.ratingOf(after, alice)
-        val b = Glicko2.ratingOf(after, bob)
-        assertTrue(
-          a.wins == 7,
-          a.losses == 4,
-          b.wins == 4,
-          b.losses == 7,
-          a.rating > b.rating
-        )
-      },
-      test("game order within match does not change ratings") {
-        val periodMatch = PeriodMatch(
-          playerA = alice,
-          playerB = bob,
-          scoreA = 7,
-          scoreB = 4,
-          raceTo = 7,
-          handicapSuggested = 0,
-          handicapApplied = 0
-        )
-        val once = Glicko2.updateAfterMatch(Glicko2.empty, periodMatch)
-        val twice = Glicko2.updateAfterMatch(Glicko2.empty, periodMatch)
-        val aOnce = Glicko2.ratingOf(once, alice)
-        val aTwice = Glicko2.ratingOf(twice, alice)
-        assertTrue(
-          approx(aOnce.rating, aTwice.rating),
-          approx(aOnce.rd, aTwice.rd)
-        )
-      }
-    ),
     suite("leaderboard")(
       test("returns players sorted by name for deterministic output") {
         val state = Map(
@@ -354,7 +324,10 @@ object Glicko2Spec extends ZIOSpecDefault {
         )
         val before = Glicko2.newPlayerRating(alice)
         val after = Glicko2.ratingOf(
-          Glicko2.updateAfterMatch(Glicko2.empty, periodMatch),
+          Glicko2.updateAfterPeriod(
+            Glicko2.empty,
+            singleMatchPeriod(periodMatch)
+          ),
           alice
         )
         assertTrue(after.rd <= before.rd)
@@ -363,8 +336,20 @@ object Glicko2Spec extends ZIOSpecDefault {
         val state =
           Glicko2.snapshot(alice, rating = 1500, rd = 350) ++
             Glicko2.snapshot(bob, rating = 5000, rd = 50)
-        val after =
-          Glicko2.updateAfterGame(state, alice, bob, GameWinner.PlayerA)
+        val after = Glicko2.updateAfterPeriod(
+          state,
+          singleMatchPeriod(
+            PeriodMatch(
+              playerA = alice,
+              playerB = bob,
+              scoreA = 1,
+              scoreB = 0,
+              raceTo = 1,
+              handicapSuggested = 0,
+              handicapApplied = 0
+            )
+          )
+        )
         val a = Glicko2.ratingOf(after, alice)
         val b = Glicko2.ratingOf(after, bob)
         assertTrue(

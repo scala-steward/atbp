@@ -68,15 +68,15 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 ## Phase 4: Cleanup
 
 ### Task 7: Remove deprecated APIs and finalize tests
-- [ ] Delete `updateAfterMatch` from `Glicko2`
-- [ ] Delete `updateAfterGame` from `Glicko2`
-- [ ] Migrate remaining `Glicko2Spec` tests to `Period` + `updateAfterPeriod`
-- [ ] Preserve direct library golden vector tests
-- [ ] Verify: `sbt --client "liga/test"`
-- [ ] Verify: `git add -A && sbt --client fixup && git status` clean
+- [x] Delete `updateAfterMatch` from `Glicko2`
+- [x] Delete `updateAfterGame` from `Glicko2`
+- [x] Migrate remaining `Glicko2Spec` tests to `Period` + `updateAfterPeriod`
+- [x] Preserve direct library golden vector tests
+- [x] Verify: `sbt --client "liga/test"`
+- [x] Verify: `git add -A && sbt --client fixup && git status` clean
 
 ### Checkpoint: Complete
-- [ ] All SPEC acceptance criteria met
-- [ ] Full test suite green
-- [ ] Working tree clean after fixup
-- [ ] Ready for human review / commit
+- [x] All SPEC acceptance criteria met
+- [x] Full test suite green
+- [x] Working tree clean after fixup
+- [x] Ready for human review / commit
