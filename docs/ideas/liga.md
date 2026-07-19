@@ -10,7 +10,7 @@
 
 The CLI (`atbp liga`) is the source-of-truth engine: read ordered period files, recompute Glicko2 ratings, print leaderboards, and calculate handicap suggestions for arbitrary matchups. Period files store match results as final scores only (e.g. `7–4`); game order within a match does not matter — the score expands to the correct win/loss counts for Glicko2. Presentation metadata (format name, race-to-N label) rides along for display but does not affect rating or ranking math.
 
-**Rating periods.** A tournament is one Glicko2 rating period. Ratings are frozen at period start (carried forward from prior completed periods) and do not update as match results come in. Glicko2 runs only when a period completes and its period file is finalized. Bracket seeding and all handicap suggestions within a tournament use this same frozen snapshot.
+**Rating periods.** A tournament is one Glicko2 rating period. Ratings are frozen at period start (carried forward from prior completed periods) and do not update as match results come in. Glicko2 runs only when a period completes and its period file is finalized. Bracket seeding and all handicap suggestions within a tournament use this same frozen snapshot. Within a period file, all matches batch into one update per player from period-start ratings; match order in the file is presentation-only; inactive players' RD/volatility advance too (see `docs/ideas/liga-batch-period-ratings.md`).
 
 **Race-to-N.** The director sets race-to-N per bracket scope (Winners round,
 Losers round, Grand Final — see `docs/ideas/section-aware-race-to.md`). Handicap
@@ -94,3 +94,4 @@ _(None — ready for spec.)_
 | Serve runtime | Single JVM on director's laptop |
 | Race-to-N | Per bracket scope (Winners / Losers / GF); no per-match override |
 | Tournament persistence | Append-only directory of JSON files, one dir per tournament; no in-place updates; replay on resume |
+| Period rating batching | One `.liga` file = one Glicko2 period; `updateAfterPeriod` only; order-independent matches; inactive players updated — see `docs/ideas/liga-batch-period-ratings.md` |
