@@ -65,6 +65,11 @@ object Glicko2 {
     *   one `.liga` file's matches and metadata
     */
   def updateAfterPeriod(priorSnapshot: Snapshot, period: Period): Snapshot = {
+    require(
+      period.matches.nonEmpty,
+      s"Period '${period.name}' has zero matches; a period must contain at least one match"
+    )
+
     val frozen = priorSnapshot
     val participants =
       period.matches.flatMap(m => List(m.playerA, m.playerB)).toSet

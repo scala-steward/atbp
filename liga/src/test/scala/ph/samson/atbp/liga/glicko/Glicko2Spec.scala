@@ -259,6 +259,23 @@ object Glicko2Spec extends ZIOSpecDefault {
           approx(expectedBob.deviation, actualBob.rd)
         )
       },
+      test("rejects periods with zero matches") {
+        val emptyPeriod = Period(
+          name = "empty period",
+          completed = LocalDate.parse("2026-01-01"),
+          matches = Nil
+        )
+        val result =
+          try {
+            Right(Glicko2.updateAfterPeriod(Glicko2.empty, emptyPeriod))
+          } catch {
+            case error: IllegalArgumentException => Left(error)
+          }
+        assertTrue(
+          result.isLeft,
+          result.left.exists(_.getMessage.contains("zero matches"))
+        )
+      },
       test("reversed period.matches yields identical snapshot") {
         val matches = List(
           PeriodMatch(
