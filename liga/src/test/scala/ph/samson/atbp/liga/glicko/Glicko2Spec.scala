@@ -176,6 +176,9 @@ object Glicko2Spec extends ZIOSpecDefault {
         )
       },
       test("multi-opponent period batches all matches into one update") {
+        val frozenAlice = GlickoPlayer(1500, 350, 0.06)
+        val frozenBob = GlickoPlayer(1500, 350, 0.06)
+        val frozenCarol = GlickoPlayer(1500, 350, 0.06)
         val period = periodWithMatches(
           List(
             PeriodMatch(
@@ -198,11 +201,40 @@ object Glicko2Spec extends ZIOSpecDefault {
             )
           )
         )
+        val aliceVsBob = ScoreExpansion.expandGames(7, 4)
+        val aliceVsCarol = ScoreExpansion.expandGames(4, 7)
+        val aliceResults =
+          aliceVsBob.map {
+            case GameWinner.PlayerA => Result.WonAgainst(frozenBob)
+            case GameWinner.PlayerB => Result.DefeatedBy(frozenBob)
+          } ++ aliceVsCarol.map {
+            case GameWinner.PlayerA => Result.WonAgainst(frozenCarol)
+            case GameWinner.PlayerB => Result.DefeatedBy(frozenCarol)
+          }
+        val bobResults = aliceVsBob.map {
+          case GameWinner.PlayerA => Result.DefeatedBy(frozenAlice)
+          case GameWinner.PlayerB => Result.WonAgainst(frozenAlice)
+        }
+        val carolResults = aliceVsCarol.map {
+          case GameWinner.PlayerA => Result.DefeatedBy(frozenAlice)
+          case GameWinner.PlayerB => Result.WonAgainst(frozenAlice)
+        }
+        val expectedAlice =
+          frozenAlice.afterPeriod(aliceResults, Tuning.Default)
+        val expectedBob = frozenBob.afterPeriod(bobResults, Tuning.Default)
+        val expectedCarol =
+          frozenCarol.afterPeriod(carolResults, Tuning.Default)
         val after = Glicko2.updateAfterPeriod(Glicko2.empty, period)
         val a = Glicko2.ratingOf(after, alice)
         val b = Glicko2.ratingOf(after, bob)
         val c = Glicko2.ratingOf(after, carol)
         assertTrue(
+          approx(expectedAlice.rating, a.rating),
+          approx(expectedAlice.deviation, a.rd),
+          approx(expectedBob.rating, b.rating),
+          approx(expectedBob.deviation, b.rd),
+          approx(expectedCarol.rating, c.rating),
+          approx(expectedCarol.deviation, c.rd),
           a.wins == 11,
           a.losses == 11,
           b.wins == 4,
