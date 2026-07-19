@@ -46,10 +46,10 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 ## Phase 3: Edge Cases and Golden Fixtures
 
 ### Task 5: Reject empty period files at load time
-- [ ] Fail `PeriodCodec.toPeriod` when `matches.isEmpty`
-- [ ] Add `period-loader/empty/empty.liga` fixture
-- [ ] Add `PeriodLoaderSpec` test with clear error message
-- [ ] Verify: `sbt --client "liga/testOnly *PeriodLoader*"`
+- [x] Fail `PeriodCodec.toPeriod` when `matches.isEmpty`
+- [x] Add `period-loader/empty/empty.liga` fixture
+- [x] Add `PeriodLoaderSpec` test with clear error message
+- [x] Verify: `sbt --client "liga/testOnly *PeriodLoader*"`
 
 ### Task 6: `LeaderboardSpec` golden values and inactive RD regression
 - [ ] Create `LeaderboardSpec.scala`
