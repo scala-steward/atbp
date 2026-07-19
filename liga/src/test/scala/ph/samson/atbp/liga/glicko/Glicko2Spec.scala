@@ -259,6 +259,45 @@ object Glicko2Spec extends ZIOSpecDefault {
           approx(expectedBob.deviation, actualBob.rd)
         )
       },
+      test("reversed period.matches yields identical snapshot") {
+        val matches = List(
+          PeriodMatch(
+            playerA = alice,
+            playerB = bob,
+            scoreA = 7,
+            scoreB = 4,
+            raceTo = 7,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          ),
+          PeriodMatch(
+            playerA = alice,
+            playerB = carol,
+            scoreA = 4,
+            scoreB = 7,
+            raceTo = 7,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          ),
+          PeriodMatch(
+            playerA = bob,
+            playerB = carol,
+            scoreA = 5,
+            scoreB = 3,
+            raceTo = 5,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          )
+        )
+        val baseline =
+          Glicko2.updateAfterPeriod(Glicko2.empty, periodWithMatches(matches))
+        val reversed =
+          Glicko2.updateAfterPeriod(
+            Glicko2.empty,
+            periodWithMatches(matches.reverse)
+          )
+        assertTrue(snapshotsEquivalent(baseline, reversed))
+      },
       test("shuffling period.matches yields identical snapshot") {
         val matches = List(
           PeriodMatch(
