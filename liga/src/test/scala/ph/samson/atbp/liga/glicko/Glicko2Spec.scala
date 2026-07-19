@@ -5,13 +5,23 @@ import dimos.glicko2.Result
 import ph.samson.atbp.liga.model.*
 import zio.test.*
 
+import java.time.LocalDate
+
 object Glicko2Spec extends ZIOSpecDefault {
 
   private val alice = Player("Alice")
   private val bob = Player("Bob")
+  private val carol = Player("Carol")
 
   private def approx(expected: Double, actual: Double): Boolean =
     Math.abs(expected - actual) <= 0.001
+
+  private def singleMatchPeriod(periodMatch: PeriodMatch): Period =
+    Period(
+      name = "test period",
+      completed = LocalDate.parse("2026-01-01"),
+      matches = List(periodMatch)
+    )
 
   def spec = suite("Glicko2")(
     suite("Tuning")(
@@ -69,6 +79,71 @@ object Glicko2Spec extends ZIOSpecDefault {
         assertTrue(
           approx(1631.369, a.rating),
           approx(252.160, a.rd)
+        )
+      }
+    ),
+    suite("updateAfterPeriod")(
+      test(
+        "7-4 single-match period expands to correct W-L and winner rated higher"
+      ) {
+        val periodMatch = PeriodMatch(
+          playerA = alice,
+          playerB = bob,
+          scoreA = 7,
+          scoreB = 4,
+          raceTo = 7,
+          handicapSuggested = 0,
+          handicapApplied = 0
+        )
+        val after =
+          Glicko2.updateAfterPeriod(
+            Glicko2.empty,
+            singleMatchPeriod(periodMatch)
+          )
+        val a = Glicko2.ratingOf(after, alice)
+        val b = Glicko2.ratingOf(after, bob)
+        assertTrue(
+          a.wins == 7,
+          a.losses == 4,
+          b.wins == 4,
+          b.losses == 7,
+          a.rating > b.rating
+        )
+      },
+      test("inactive prior players get afterPeriod(Nil) with unchanged W-L") {
+        val periodOne = singleMatchPeriod(
+          PeriodMatch(
+            playerA = alice,
+            playerB = bob,
+            scoreA = 7,
+            scoreB = 4,
+            raceTo = 7,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          )
+        )
+        val afterPeriodOne = Glicko2.updateAfterPeriod(Glicko2.empty, periodOne)
+        val bobAfterOne = Glicko2.ratingOf(afterPeriodOne, bob)
+
+        val periodTwo = singleMatchPeriod(
+          PeriodMatch(
+            playerA = alice,
+            playerB = carol,
+            scoreA = 4,
+            scoreB = 7,
+            raceTo = 7,
+            handicapSuggested = 0,
+            handicapApplied = 0
+          )
+        )
+        val afterPeriodTwo =
+          Glicko2.updateAfterPeriod(afterPeriodOne, periodTwo)
+        val bobAfterTwo = Glicko2.ratingOf(afterPeriodTwo, bob)
+
+        assertTrue(
+          bobAfterTwo.rd > bobAfterOne.rd,
+          bobAfterTwo.wins == bobAfterOne.wins,
+          bobAfterTwo.losses == bobAfterOne.losses
         )
       }
     ),

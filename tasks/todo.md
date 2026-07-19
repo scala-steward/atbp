@@ -12,19 +12,19 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 - [x] Verify: `sbt --client "liga/testOnly *Glicko2*"`
 
 ### Task 2: Implement `Glicko2.updateAfterPeriod`
-- [ ] Add `updateAfterPeriod(priorSnapshot, period)` with order-independence scaladoc
-- [ ] Freeze period-start snapshot for opponent references
-- [ ] Collect `Seq[Result]` per player via `ScoreExpansion`
-- [ ] Update played players with `afterPeriod(results)` and correct W-L
-- [ ] Update inactive prior players with `afterPeriod(Nil)` and unchanged W-L
-- [ ] Handle debut players (new entry + one `afterPeriod`)
-- [ ] Migrate single-match 7-4 test to `updateAfterPeriod`
-- [ ] Verify: `sbt --client "liga/testOnly *Glicko2*"` and `sbt --client compile`
+- [x] Add `updateAfterPeriod(priorSnapshot, period)` with order-independence scaladoc
+- [x] Freeze period-start snapshot for opponent references
+- [x] Collect `Seq[Result]` per player via `ScoreExpansion`
+- [x] Update played players with `afterPeriod(results)` and correct W-L
+- [x] Update inactive prior players with `afterPeriod(Nil)` and unchanged W-L
+- [x] Handle debut players (new entry + one `afterPeriod`)
+- [x] Migrate single-match 7-4 test to `updateAfterPeriod`
+- [x] Verify: `sbt --client "liga/testOnly *Glicko2*"` and `sbt --client compile`
 
 ### Checkpoint: Foundation
-- [ ] `updateAfterPeriod` compiles and single-match tests pass
-- [ ] `afterPeriod(Nil)` library test passes
-- [ ] Review algorithm against SPEC steps 1-5
+- [x] `updateAfterPeriod` compiles and single-match tests pass
+- [x] `afterPeriod(Nil)` library test passes
+- [x] Review algorithm against SPEC steps 1-5
 
 ## Phase 2: Integration
 
