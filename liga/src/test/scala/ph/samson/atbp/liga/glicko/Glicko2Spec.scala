@@ -25,6 +25,17 @@ object Glicko2Spec extends ZIOSpecDefault {
         )
       }
     ),
+    suite("library afterPeriod")(
+      test("afterPeriod(Nil) keeps rating stable and increases RD") {
+        val before = GlickoPlayer(1500, 200, 0.06)
+        val after = before.afterPeriod(Nil, Tuning.Default)
+        assertTrue(
+          approx(1500, after.rating),
+          after.deviation > before.deviation,
+          after.volatility.isFinite
+        )
+      }
+    ),
     suite("golden vectors")(
       test("Example 1 — win vs lower-rated established opponent") {
         val a = GlickoPlayer(1500, 350, 0.06)

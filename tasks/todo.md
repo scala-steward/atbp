@@ -5,11 +5,11 @@ Source: [`tasks/plan.md`](plan.md) · [`SPEC.md`](../SPEC.md)
 ## Phase 1: Foundation
 
 ### Task 1: Validate `afterPeriod(Nil)` library semantics
-- [ ] Add direct `GlickoPlayer.afterPeriod(Nil, Tuning.Default)` test in `Glicko2Spec`
-- [ ] Assert rating unchanged (within `approx`)
-- [ ] Assert RD increased
-- [ ] Assert volatility finite
-- [ ] Verify: `sbt --client "liga/testOnly *Glicko2*"`
+- [x] Add direct `GlickoPlayer.afterPeriod(Nil, Tuning.Default)` test in `Glicko2Spec`
+- [x] Assert rating unchanged (within `approx`)
+- [x] Assert RD increased
+- [x] Assert volatility finite
+- [x] Verify: `sbt --client "liga/testOnly *Glicko2*"`
 
 ### Task 2: Implement `Glicko2.updateAfterPeriod`
 - [ ] Add `updateAfterPeriod(priorSnapshot, period)` with order-independence scaladoc
