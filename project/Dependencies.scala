@@ -49,7 +49,7 @@ object Dependencies {
 
     val laminar = Def.setting("com.raquo" %%% "laminar" % "17.2.1")
 
-    val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.7"
+    val pdfbox = "org.apache.pdfbox" % "pdfbox" % "3.0.8"
 
     val plantuml = "net.sourceforge.plantuml" % "plantuml" % "1.2026.6"
 
