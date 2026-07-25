@@ -19,6 +19,9 @@ final class ApiClient private (baseUrl: String)(using ExecutionContext) {
   def getLeaderboard: Future[LeaderboardResponse] =
     get("/api/leaderboard")
 
+  def getLatestRatings: Future[LatestRatingsResponse] =
+    get("/api/latest-ratings")
+
   def getConfig: Future[ConfigResponse] =
     get("/api/config")
 

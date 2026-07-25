@@ -15,13 +15,22 @@ object StaticAssets {
 
   val directorScriptName: String = "director.js"
   val audienceScriptName: String = "audience.js"
+  val sharedCssName: String = "shared.css"
   val directorCssName: String = "director.css"
   val audienceCssName: String = "audience.css"
 
   val directorHtml: String =
-    htmlShell("Liga Director", directorScriptName, Some(directorCssName))
+    htmlShell(
+      "Liga Director",
+      directorScriptName,
+      List(sharedCssName, directorCssName)
+    )
   val audienceHtml: String =
-    htmlShell("Liga Audience", audienceScriptName, Some(audienceCssName))
+    htmlShell(
+      "Liga Audience",
+      audienceScriptName,
+      List(sharedCssName, audienceCssName)
+    )
 
   def jsAssetPath(fileName: String): String = s"/assets/js/$fileName"
   def cssAssetPath(fileName: String): String = s"/assets/css/$fileName"
@@ -60,17 +69,17 @@ object StaticAssets {
   private def htmlShell(
       title: String,
       scriptFile: String,
-      cssFile: Option[String]
+      cssFiles: List[String]
   ): String = {
-    val cssLink = cssFile
+    val cssLinks = cssFiles
       .map(file => s"""  <link rel="stylesheet" href="/assets/css/$file">""")
-      .getOrElse("")
+      .mkString("\n")
     s"""<!DOCTYPE html>
        |<html lang="en">
        |<head>
        |  <meta charset="utf-8">
        |  <title>$title</title>
-       |$cssLink
+       |$cssLinks
        |</head>
        |<body>
        |  <div id="app"></div>

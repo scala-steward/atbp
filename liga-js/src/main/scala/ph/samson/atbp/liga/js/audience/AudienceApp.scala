@@ -1,10 +1,12 @@
 package ph.samson.atbp.liga.js.audience
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.js.LatestRatingsView
 import ph.samson.atbp.liga.js.api.ApiClient
 import ph.samson.atbp.liga.js.api.Models.*
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.scalajs.js
 import scala.util.Failure
 import scala.util.Success
@@ -16,16 +18,31 @@ object AudienceApp {
 
   def apply(client: ApiClient): Div = {
     val tournament = Var[Option[TournamentResponse]](None)
+    val latestRatings = Var[Option[LatestRatingsResponse]](None)
     val pollSeconds = Var(DefaultPollSeconds)
     val lastUpdated = Var[Option[String]](None)
     val statusMessage = Var("")
 
     def refresh(): Unit = {
-      client.getTournament.onComplete {
-        case Success(value) =>
-          tournament.set(Some(value))
+      val loaded = client.getTournament.flatMap { t =>
+        val phase = TournamentPhase.fromApi(t.phase)
+        if (AudienceIdlePolicy.needsLatestRatings(phase)) {
+          client.getLatestRatings
+            .map(lr => AudienceIdlePolicy.idleLatestRatingsFeed(Right(lr)))
+            .recover { case err =>
+              AudienceIdlePolicy.idleLatestRatingsFeed(Left(err.getMessage))
+            }
+            .map { case (feed, msg) => (t, Some(feed), msg) }
+        } else {
+          Future.successful((t, None, Option.empty[String]))
+        }
+      }
+      loaded.onComplete {
+        case Success((t, lr, errMsg)) =>
+          tournament.set(Some(t))
+          latestRatings.set(lr)
           lastUpdated.set(Some(new js.Date().toLocaleTimeString()))
-          statusMessage.set("")
+          statusMessage.set(errMsg.getOrElse(""))
         case Failure(err) =>
           statusMessage.set(err.getMessage)
       }
@@ -55,24 +72,23 @@ object AudienceApp {
       child <-- statusMessage.signal.map { msg =>
         if (msg.nonEmpty) div(cls := "error", msg) else emptyNode
       },
-      child <-- tournament.signal.map {
-        case None =>
-          div(cls := "loading", p("Loading tournament…"))
-        case Some(t) =>
-          TournamentPhase.fromApi(t.phase) match {
-            case TournamentPhase.None =>
-              div(
-                cls := "empty",
-                p("No active tournament yet.")
-              )
-            case TournamentPhase.Defining | TournamentPhase.Locked |
-                TournamentPhase.RaceTo =>
+      child <-- tournament.signal
+        .combineWith(latestRatings.signal)
+        .map { case (maybeTournament, maybeLatestRatings) =>
+          AudienceIdlePolicy.view(maybeTournament, maybeLatestRatings) match {
+            case AudienceIdlePolicy.View.LoadingTournament =>
+              div(cls := "loading", p("Loading tournament…"))
+            case AudienceIdlePolicy.View.LoadingLatestRatings =>
+              div(cls := "loading", p("Loading latest ratings…"))
+            case AudienceIdlePolicy.View.Idle(latest) =>
+              LatestRatingsView(latest)
+            case AudienceIdlePolicy.View.Setup(t) =>
               div(
                 cls := "setup",
                 h2(t.name),
                 p("Tournament setup in progress…")
               )
-            case TournamentPhase.Active | TournamentPhase.Completed =>
+            case AudienceIdlePolicy.View.Bracket(t) =>
               t.bracket match {
                 case Some(bracket) =>
                   div(
@@ -88,7 +104,7 @@ object AudienceApp {
                   div(p("Bracket not seeded yet."))
               }
           }
-      },
+        },
       styleTag(audienceStyles)
     )
   }

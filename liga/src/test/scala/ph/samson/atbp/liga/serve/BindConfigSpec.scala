@@ -56,6 +56,9 @@ object BindConfigSpec extends ZIOSpecDefault {
         leaderboard <- LigaRoutes
           .routes(ctx, bind)
           .runZIO(get("/api/leaderboard", remote))
+        latestRatings <- LigaRoutes
+          .routes(ctx, bind)
+          .runZIO(get("/api/latest-ratings", remote))
         config <- LigaRoutes
           .routes(ctx, bind)
           .runZIO(get("/api/config", remote))
@@ -63,6 +66,7 @@ object BindConfigSpec extends ZIOSpecDefault {
         tournament.status == Status.Ok,
         audience.status == Status.Ok,
         leaderboard.status == Status.Ok,
+        latestRatings.status == Status.Ok,
         config.status == Status.Ok
       )
     },

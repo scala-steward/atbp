@@ -72,6 +72,16 @@ object Models {
       ratings: List[PlayerRating]
   )
 
+  final case class LatestRating(
+      player: Player,
+      rating: Double,
+      delta: Double
+  )
+
+  final case class LatestRatingsResponse(
+      ratings: List[LatestRating]
+  )
+
   final case class ConfigResponse(
       audiencePollIntervalSeconds: Int
   )
@@ -104,6 +114,8 @@ object Models {
   given JsonCodec[Bracket] = DeriveJsonCodec.gen
   given JsonCodec[TournamentResponse] = DeriveJsonCodec.gen
   given JsonCodec[LeaderboardResponse] = DeriveJsonCodec.gen
+  given JsonCodec[LatestRating] = DeriveJsonCodec.gen
+  given JsonCodec[LatestRatingsResponse] = DeriveJsonCodec.gen
   given JsonCodec[ConfigResponse] = DeriveJsonCodec.gen
   given JsonEncoder[SeedRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[CreateRequest] = DeriveJsonEncoder.gen

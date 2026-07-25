@@ -72,6 +72,19 @@ object Routes {
                 .status(Status.InternalServerError)
             )
           )
+      },
+      Method.GET / "api" / "latest-ratings" -> handler {
+        ctx.loadLatestRatings
+          .map(ratings =>
+            Response.json(ApiJson.LatestRatingsResponse(ratings).toJson)
+          )
+          .catchAll(_ =>
+            ZIO.succeed(
+              Response
+                .text(internalServerErrorBody)
+                .status(Status.InternalServerError)
+            )
+          )
       }
     )
 }

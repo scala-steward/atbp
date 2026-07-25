@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.serve
 
+import ph.samson.atbp.liga.glicko.LatestRating
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.EventCodec
 import ph.samson.atbp.liga.tournament.TournamentPhase
@@ -24,12 +25,18 @@ object ApiJson {
       ratings: List[PlayerRating]
   )
 
+  final case class LatestRatingsResponse(
+      ratings: List[LatestRating]
+  )
+
   final case class ConfigResponse(
       audiencePollIntervalSeconds: Int
   )
 
   given JsonCodec[TournamentResponse] = DeriveJsonCodec.gen
   given JsonCodec[LeaderboardResponse] = DeriveJsonCodec.gen
+  given JsonCodec[LatestRating] = DeriveJsonCodec.gen
+  given JsonCodec[LatestRatingsResponse] = DeriveJsonCodec.gen
   given JsonCodec[ConfigResponse] = DeriveJsonCodec.gen
 
   def sortRatings(ratings: List[PlayerRating]): List[PlayerRating] =

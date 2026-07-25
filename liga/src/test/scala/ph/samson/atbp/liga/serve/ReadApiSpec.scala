@@ -1,6 +1,8 @@
 package ph.samson.atbp.liga.serve
 
 import better.files.File
+import ph.samson.atbp.liga.glicko.LatestRating
+import ph.samson.atbp.liga.glicko.LatestRatings
 import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.serve.ApiJson.*
@@ -17,6 +19,9 @@ object ReadApiSpec extends ZIOSpecDefault {
 
   private def fixturePeriods: File =
     File(getClass.getResource("/periods"))
+
+  private def goldenPeriods: File =
+    File(getClass.getResource("/period-loader/golden"))
 
   private def context(
       dataDir: File,
@@ -153,6 +158,56 @@ object ReadApiSpec extends ZIOSpecDefault {
         parsed.ratings.nonEmpty,
         parsed.ratings.exists(_.player.name == "Alice")
       )
+    },
+    test("GET /api/latest-ratings returns last-period participants") {
+      val ctx = ServeContext(dataDir = goldenPeriods, tournamentDir = None)
+      for {
+        expected <- PeriodLoader.discover(goldenPeriods).map { loaded =>
+          LatestRatings.fromPeriods(loaded.map(_.period))
+        }
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/latest-ratings"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[LatestRatingsResponse])
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.ratings == expected,
+        parsed.ratings.map(_.player.name).sorted == List("Alice", "Carol"),
+        !parsed.ratings.exists(_.player.name == "Bob")
+      )
+    },
+    test("GET /api/latest-ratings returns empty list without period files") {
+      for {
+        dataDir <- ZIO.attemptBlocking {
+          File.newTemporaryDirectory("liga-latest-ratings-empty")
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/latest-ratings"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[LatestRatingsResponse])
+        _ <- ZIO.attemptBlocking(dataDir.delete(swallowIOExceptions = true))
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.ratings.isEmpty
+      )
+    },
+    test("latest-ratings cache hits until invalidated") {
+      val ctx = ServeContext(dataDir = goldenPeriods, tournamentDir = None)
+      val seeded = List(
+        LatestRating(Player("Seeded"), rating = 999.0, delta = 1.0)
+      )
+      ctx.seedLatestRatingsCache(seeded)
+      for {
+        cached <- ctx.loadLatestRatings
+        _ <- ctx.invalidateLatestRatingsCache
+        fromDisk <- ctx.loadLatestRatings
+        expected <- PeriodLoader.discover(goldenPeriods).map { loaded =>
+          LatestRatings.fromPeriods(loaded.map(_.period))
+        }
+      } yield assertTrue(cached == seeded, fromDisk == expected)
     },
     test("GET /api/config returns audience poll interval") {
       val bind = BindConfig(audiencePollIntervalSeconds = 10)

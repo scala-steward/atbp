@@ -15,6 +15,7 @@ object DirectorApp {
   def apply(client: ApiClient): Div = {
     val tournament = Var[Option[TournamentResponse]](None)
     val leaderboard = Var[Option[LeaderboardResponse]](None)
+    val latestRatings = Var[Option[LatestRatingsResponse]](None)
     val selectedMatchId = Var[Option[String]](None)
     val statusMessage = Var("")
     val busy = Var(false)
@@ -28,14 +29,30 @@ object DirectorApp {
 
     def refresh(): Unit = {
       busy.set(true)
-      val loaded = for {
-        t <- client.getTournament
-        lb <- client.getLeaderboard
-      } yield (t, lb)
+      val loaded = client.getTournament.flatMap { t =>
+        val phase = TournamentPhase.fromApi(t.phase)
+        val leaderboardF =
+          if (DirectorIdlePolicy.needsLeaderboard(phase)) {
+            client.getLeaderboard.map(Some(_))
+          } else {
+            Future.successful(None)
+          }
+        val latestRatingsF =
+          if (DirectorIdlePolicy.needsLatestRatings(phase)) {
+            client.getLatestRatings.map(Some(_))
+          } else {
+            Future.successful(None)
+          }
+        for {
+          lb <- leaderboardF
+          lr <- latestRatingsF
+        } yield (t, lb, lr)
+      }
       loaded.onComplete {
-        case Success((t, lb)) =>
+        case Success((t, lb, lr)) =>
           tournament.set(Some(t))
-          leaderboard.set(Some(lb))
+          leaderboard.set(lb)
+          latestRatings.set(lr)
           selectFirstActionable(t)
           busy.set(false)
           statusMessage.set("")
@@ -111,57 +128,59 @@ object DirectorApp {
           }
         },
       child <-- tournament.signal
-        .combineWith(leaderboard.signal)
-        .map { case (maybeTournament, maybeLeaderboard) =>
-          (maybeTournament, maybeLeaderboard) match {
-            case (None, _) =>
+        .combineWith(leaderboard.signal, latestRatings.signal)
+        .map { case (maybeTournament, maybeLeaderboard, maybeLatestRatings) =>
+          DirectorIdlePolicy.view(
+            maybeTournament,
+            maybeLeaderboard,
+            maybeLatestRatings
+          ) match {
+            case DirectorIdlePolicy.View.LoadingTournament =>
               div(p("Loading…"))
-            case (Some(_), None) =>
+            case DirectorIdlePolicy.View.LoadingLeaderboard =>
               div(p("Loading leaderboard…"))
-            case (Some(t), Some(lb)) =>
-              TournamentPhase.fromApi(t.phase) match {
-                case TournamentPhase.None =>
-                  LeaderboardView(
-                    lb,
-                    busy.signal,
-                    Observer[String](name =>
-                      runAction(client.createTournament(name))
-                    )
+            case DirectorIdlePolicy.View.LoadingLatestRatings =>
+              div(p("Loading latest ratings…"))
+            case DirectorIdlePolicy.View.Idle(latest) =>
+              IdleDirectorView(
+                latest,
+                busy.signal,
+                Observer[String](name =>
+                  runAction(client.createTournament(name))
+                )
+              )
+            case DirectorIdlePolicy.View.Wizard(t, lb) =>
+              WizardView(
+                t,
+                lb,
+                busy.signal,
+                Observer[List[Player]](players =>
+                  runAction(client.setPlayers(players))
+                ),
+                Observer[List[Player]] { players =>
+                  runAction(
+                    client
+                      .setPlayers(players)
+                      .flatMap(_ => client.lockPlayers())
                   )
-                case TournamentPhase.Defining | TournamentPhase.Locked |
-                    TournamentPhase.RaceTo =>
-                  WizardView(
-                    t,
-                    lb,
-                    busy.signal,
-                    Observer[List[Player]](players =>
-                      runAction(client.setPlayers(players))
-                    ),
-                    Observer[List[Player]] { players =>
-                      runAction(
-                        client
-                          .setPlayers(players)
-                          .flatMap(_ => client.lockPlayers())
-                      )
-                    },
-                    Observer[Map[String, Int]](raceToByScope =>
-                      runAction(client.setRaceTo(raceToByScope))
-                    ),
-                    Observer[Unit](_ => runAction(client.seed()))
-                  )
-                case TournamentPhase.Active | TournamentPhase.Completed =>
-                  div(
-                    completionBar(t, busy.signal, runAction, client),
-                    mainLayout(
-                      t,
-                      selectedMatch,
-                      busy.signal,
-                      selectedMatchId,
-                      client,
-                      runAction
-                    )
-                  )
-              }
+                },
+                Observer[Map[String, Int]](raceToByScope =>
+                  runAction(client.setRaceTo(raceToByScope))
+                ),
+                Observer[Unit](_ => runAction(client.seed()))
+              )
+            case DirectorIdlePolicy.View.Live(t) =>
+              div(
+                completionBar(t, busy.signal, runAction, client),
+                mainLayout(
+                  t,
+                  selectedMatch,
+                  busy.signal,
+                  selectedMatchId,
+                  client,
+                  runAction
+                )
+              )
           }
         },
       p(cls := "footer-note", DirectorGuidance.localhostNote)

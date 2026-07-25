@@ -1,13 +1,14 @@
 package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.js.LatestRatingsView
 import ph.samson.atbp.liga.js.api.Models.*
 
-/** Period leaderboard panel shown before a tournament exists. */
-object LeaderboardView {
+/** Idle director panel: latest ratings plus create-tournament controls. */
+object IdleDirectorView {
 
   def apply(
-      leaderboard: LeaderboardResponse,
+      latestRatings: LatestRatingsResponse,
       busy: Signal[Boolean],
       onCreate: Observer[String]
   ): Div = {
@@ -15,26 +16,7 @@ object LeaderboardView {
 
     div(
       cls := "leaderboard-panel",
-      h2("Period leaderboard"),
-      table(
-        cls := "leaderboard-table",
-        thead(
-          tr(
-            th("Player"),
-            th("Rating"),
-            th("W–L")
-          )
-        ),
-        tbody(
-          leaderboard.ratings.map { rating =>
-            tr(
-              td(rating.player.name),
-              td(f"${rating.rating}%.0f"),
-              td(s"${rating.wins}–${rating.losses}")
-            )
-          }
-        )
-      ),
+      LatestRatingsView(latestRatings),
       div(
         cls := "start-tournament",
         h3("Start today's tournament"),

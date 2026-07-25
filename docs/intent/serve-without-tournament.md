@@ -6,8 +6,8 @@ Confirmed statement of intent (output of an interview-me session). This captures
 ## Outcome
 
 `liga serve` always starts, even when no tournament is in progress. With no active
-tournament, both the director (`/`) and audience (`/audience`) show the period
-leaderboard. Tournaments are created and run entirely from the Director UI via a
+tournament, both the director (`/`) and audience (`/audience`) show the **Latest
+Ratings** table. Tournaments are created and run entirely from the Director UI via a
 staged wizard. The `--new` CLI flag is removed.
 
 ## User
@@ -24,12 +24,12 @@ immediately; tournament creation belongs in the Director UI, not the CLI.
 
 ## Success
 
-- `liga serve` starts with no tournament: period leaderboard on both surfaces;
-  director sees leaderboard plus controls to begin defining a tournament.
+- `liga serve` starts with no tournament: Latest Ratings on both surfaces;
+  director sees Latest Ratings plus controls to begin defining a tournament.
 - Director wizard (staged):
   1. **Define** — tournament name; select players from period data or add new
      names.
-  2. **Lock players** — audience switches from period leaderboard to a
+  2. **Lock players** — audience switches from Latest Ratings to a
      tournament-only leaderboard (entrants and their ratings).
   3. **Race-to** — director sets race-to per round (round count derived from
      locked player count).
@@ -58,6 +58,6 @@ serve stack (ZIO HTTP, Laminar, event-sourced tournament state).
 
 | Phase | `/audience` shows |
 | --- | --- |
-| No tournament | Period leaderboard |
+| No tournament | Latest Ratings |
 | Defined, players locked, not seeded | Tournament-only leaderboard |
 | Seeded | Live tournament view |

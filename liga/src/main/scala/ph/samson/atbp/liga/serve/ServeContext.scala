@@ -1,6 +1,8 @@
 package ph.samson.atbp.liga.serve
 
 import better.files.File
+import ph.samson.atbp.liga.glicko.LatestRating
+import ph.samson.atbp.liga.glicko.LatestRatings
 import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.EventLog
@@ -11,10 +13,12 @@ import ph.samson.atbp.liga.tournament.Seed
 import ph.samson.atbp.liga.tournament.Tournament
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 import zio.Task
+import zio.UIO
 import zio.ZIO
 
 import java.time.Instant
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicReference
 
 /** Runtime data roots for serve mode (period files + active tournament). */
 object ServeContext {
@@ -30,6 +34,9 @@ final case class ServeContext(
     dataDir: File,
     tournamentDir: Option[File]
 ) {
+  private val latestRatingsCache =
+    new AtomicReference[Option[List[LatestRating]]](None)
+
   def loadTournament: Task[TournamentState] =
     activeDirOption.flatMap {
       case Some(dir) => Replay.replayDir(dir)
@@ -45,6 +52,34 @@ final case class ServeContext(
     } else {
       ZIO.succeed(ApiJson.sortRatings(state.frozenRatings.values.toList))
     }
+
+  /** Last-period match participants with post-period rating and delta.
+    *
+    * Cached between idle polls; invalidated when a period is written
+    * (tournament complete). External `.liga` drops require a process restart to
+    * refresh.
+    */
+  def loadLatestRatings: Task[List[LatestRating]] =
+    latestRatingsCache.get() match {
+      case Some(cached) => ZIO.succeed(cached)
+      case None         =>
+        PeriodLoader.discover(dataDir).map { loaded =>
+          val ratings = LatestRatings.fromPeriods(loaded.map(_.period))
+          latestRatingsCache.set(Some(ratings))
+          ratings
+        }
+    }
+
+  private[serve] def invalidateLatestRatingsCache: UIO[Unit] =
+    ZIO.succeed {
+      latestRatingsCache.set(None)
+    }
+
+  /** Test hook: seed the idle-ratings cache without reading period files. */
+  private[serve] def seedLatestRatingsCache(
+      ratings: List[LatestRating]
+  ): Unit =
+    latestRatingsCache.set(Some(ratings))
 
   def createTournament(name: String): Task[TournamentState] =
     for {
@@ -148,6 +183,7 @@ final case class ServeContext(
           .map(err => ServeContext.CommandError(err.message))
       )
       _ <- PeriodEmission.writeOrVerify(dataDir, state, completed)
+      _ <- invalidateLatestRatingsCache
       _ <- EventLog.append(dir, event)
       updated <- Replay.replayDir(dir)
     } yield updated

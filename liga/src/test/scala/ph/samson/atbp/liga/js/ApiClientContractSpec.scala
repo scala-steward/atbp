@@ -56,6 +56,15 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       |  }]
       |}""".stripMargin
 
+  private val latestRatingsFixture =
+    """{
+      |  "ratings": [{
+      |    "player": {"name": "Alice"},
+      |    "rating": 1497.8,
+      |    "delta": -120.2
+      |  }]
+      |}""".stripMargin
+
   private def decodeResponse[T: JsonDecoder](
       status: Int,
       body: String
@@ -89,6 +98,14 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         parsed.exists(_.ratings.head.wins == 12)
       )
     },
+    test("latest-ratings fixture matches JS client JSON schema") {
+      val parsed = latestRatingsFixture.fromJson[LatestRatingsResponse]
+      assertTrue(
+        parsed.isRight,
+        parsed.exists(_.ratings.head.player.name == "Alice"),
+        parsed.exists(_.ratings.head.delta == -120.2)
+      )
+    },
     test("config fixture matches JS client JSON schema") {
       val parsed =
         """{"audiencePollIntervalSeconds":10}""".fromJson[ConfigResponse]
@@ -115,6 +132,24 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         response.status == Status.Ok,
         parsed.name == "Spring Open",
         parsed.bracket.exists(_.matches.nonEmpty)
+      )
+    },
+    test("live GET /api/latest-ratings JSON parses for JS client") {
+      val ctx = ServeContext(
+        dataDir = File(getClass.getResource("/period-loader/golden")),
+        tournamentDir = None
+      )
+      for {
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/latest-ratings"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(
+          decodeResponse[LatestRatingsResponse](response.status.code, body)
+        )
+      } yield assertTrue(
+        response.status == Status.Ok,
+        parsed.ratings.map(_.player.name).sorted == List("Alice", "Carol")
       )
     },
     test("decodeResponse surfaces HTTP and JSON failures") {

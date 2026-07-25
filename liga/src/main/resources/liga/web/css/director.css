@@ -14,8 +14,6 @@
 }
 .complete-panel { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .main-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
-.leaderboard-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-.leaderboard-table th, .leaderboard-table td { border-bottom: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; }
 .start-tournament, .wizard-panel { border: 1px solid #ccc; border-radius: 6px; padding: 1rem; background: #fff; }
 .roster-paste { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; max-width: 28rem; }
 .roster-paste label { display: flex; flex-direction: column; gap: 0.35rem; }

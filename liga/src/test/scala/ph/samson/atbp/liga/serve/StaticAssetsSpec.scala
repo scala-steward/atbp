@@ -12,6 +12,7 @@ object StaticAssetsSpec extends ZIOSpecDefault {
         html.contains("id=\"app\""),
         html.contains("Liga Director"),
         html.contains("/assets/js/"),
+        html.contains("/assets/css/shared.css"),
         html.contains("/assets/css/director.css")
       )
     },
@@ -21,6 +22,7 @@ object StaticAssetsSpec extends ZIOSpecDefault {
         html.contains("id=\"app\""),
         html.contains("Liga Audience"),
         html.contains("/assets/js/"),
+        html.contains("/assets/css/shared.css"),
         html.contains("/assets/css/audience.css")
       )
     },
@@ -50,6 +52,21 @@ object StaticAssetsSpec extends ZIOSpecDefault {
       } yield assertTrue(
         response.status == Status.Ok,
         body.contains(".director-app"),
+        response
+          .header(Header.ContentType)
+          .exists(_.mediaType == MediaType.text.`css`)
+      )
+    },
+    test("asset routes serve shared CSS from classpath") {
+      val path = StaticAssets.cssAssetPath(StaticAssets.sharedCssName)
+      for {
+        response <- StaticAssets
+          .assetRoutes(BindConfig())
+          .runZIO(Request.get(path))
+        body <- response.body.asString
+      } yield assertTrue(
+        response.status == Status.Ok,
+        body.contains(".leaderboard-table"),
         response
           .header(Header.ContentType)
           .exists(_.mediaType == MediaType.text.`css`)
