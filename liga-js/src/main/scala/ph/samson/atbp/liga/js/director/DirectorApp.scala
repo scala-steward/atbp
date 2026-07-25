@@ -94,13 +94,22 @@ object DirectorApp {
           "Refresh"
         )
       ),
-      child <-- statusMessage.signal.map { msg =>
-        if (msg.nonEmpty) {
-          div(cls := "error", DirectorGuidance.friendlyApiError(msg))
-        } else {
-          emptyNode
-        }
-      },
+      child <-- statusMessage.signal
+        .combineWith(tournament.signal, selectedMatchId.signal)
+        .map { case (msg, maybeTournament, maybeMatchId) =>
+          if (msg.nonEmpty) {
+            div(
+              cls := "error",
+              DirectorGuidance.friendlyApiErrorForSelectedMatch(
+                msg,
+                maybeTournament,
+                maybeMatchId
+              )
+            )
+          } else {
+            emptyNode
+          }
+        },
       child <-- tournament.signal
         .combineWith(leaderboard.signal)
         .map { case (maybeTournament, maybeLeaderboard) =>
@@ -204,6 +213,7 @@ object DirectorApp {
         cls := "bracket-column",
         BracketView(
           tournament.bracket.get,
+          tournament.raceToByScope,
           selectedMatchId.signal,
           Observer[String](id => selectedMatchId.set(Some(id)))
         )

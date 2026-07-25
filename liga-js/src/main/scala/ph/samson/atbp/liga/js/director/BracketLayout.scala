@@ -144,11 +144,56 @@ object BracketLayout {
       case BracketMatchState.Completed => "done"
     }
 
-  def defaultRaceTo(
+  def scopeRaceTo(
       matchId: String,
       raceToByScope: Map[String, Int]
   ): Option[Int] =
     RaceToScopes.keyForMatch(matchId).flatMap(raceToByScope.get)
+
+  def scopeKey(section: Section, round: Int): String =
+    section match {
+      case Section.Winners    => RaceToScopes.keyForWinnersRound(round)
+      case Section.Losers     => RaceToScopes.keyForLosersRound(round)
+      case Section.GrandFinal => RaceToScopes.grandFinalScopeKey
+    }
+
+  def raceToLabel(raceTo: Int): String =
+    s"Race to $raceTo"
+
+  def resolveRoundRaceTo(
+      section: Section,
+      round: Int,
+      raceToByScope: Map[String, Int]
+  ): Option[Int] =
+    raceToByScope.get(scopeKey(section, round))
+
+  def roundRaceToScope(
+      section: Section,
+      round: Int,
+      raceToByScope: Map[String, Int]
+  ): Either[String, Int] =
+    resolveRoundRaceTo(section, round, raceToByScope) match {
+      case Some(n) => Right(n)
+      case None    => Left(scopeKey(section, round))
+    }
+
+  def resolveMatchRaceTo(
+      matchDef: BracketMatch,
+      raceToByScope: Map[String, Int]
+  ): Option[Int] =
+    matchDef.raceTo.orElse(scopeRaceTo(matchDef.id, raceToByScope))
+
+  def matchRaceToScope(
+      matchDef: BracketMatch,
+      raceToByScope: Map[String, Int]
+  ): Either[String, Int] =
+    resolveMatchRaceTo(matchDef, raceToByScope) match {
+      case Some(n) => Right(n)
+      case None    =>
+        val scope =
+          RaceToScopes.keyForMatch(matchDef.id).getOrElse(matchDef.id)
+        Left(scope)
+    }
 
   def resultLabel(matchDef: BracketMatch): Option[String] =
     if (matchDef.isBye && matchDef.state == BracketMatchState.Completed) {

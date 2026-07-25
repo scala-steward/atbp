@@ -2,6 +2,7 @@
 .header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
 .tournament-name { color: #555; }
 .error { color: #b00020; margin-bottom: 1rem; }
+.race-to-error { color: #b00020; font-weight: 600; margin: 0.35rem 0; }
 .validation-error { color: #b00020; font-size: 0.9rem; margin: 0.5rem 0; }
 .guidance { color: #444; font-size: 0.9rem; margin: 0.5rem 0; }
 .hint { color: #666; font-size: 0.85rem; margin: 0.35rem 0; }

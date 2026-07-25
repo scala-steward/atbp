@@ -16,10 +16,12 @@ object StaticAssets {
   val directorScriptName: String = "director.js"
   val audienceScriptName: String = "audience.js"
   val directorCssName: String = "director.css"
+  val audienceCssName: String = "audience.css"
 
   val directorHtml: String =
     htmlShell("Liga Director", directorScriptName, Some(directorCssName))
-  val audienceHtml: String = htmlShell("Liga Audience", audienceScriptName)
+  val audienceHtml: String =
+    htmlShell("Liga Audience", audienceScriptName, Some(audienceCssName))
 
   def jsAssetPath(fileName: String): String = s"/assets/js/$fileName"
   def cssAssetPath(fileName: String): String = s"/assets/css/$fileName"
@@ -54,9 +56,6 @@ object StaticAssets {
           }
       }
     )
-
-  private def htmlShell(title: String, scriptFile: String): String =
-    htmlShell(title, scriptFile, None)
 
   private def htmlShell(
       title: String,

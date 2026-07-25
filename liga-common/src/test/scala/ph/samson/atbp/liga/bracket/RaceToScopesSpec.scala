@@ -54,14 +54,14 @@ object RaceToScopesSpec extends ZIOSpecDefault {
       test("requiredKeys(8) returns eight scope keys") {
         assertTrue(
           RaceToScopes.requiredKeys(8) == List(
-            "wb-1",
-            "wb-2",
-            "wb-3",
-            "lb-1",
-            "lb-2",
-            "lb-3",
-            "lb-4",
-            "gf"
+            RaceToScopes.keyForWinnersRound(1),
+            RaceToScopes.keyForWinnersRound(2),
+            RaceToScopes.keyForWinnersRound(3),
+            RaceToScopes.keyForLosersRound(1),
+            RaceToScopes.keyForLosersRound(2),
+            RaceToScopes.keyForLosersRound(3),
+            RaceToScopes.keyForLosersRound(4),
+            RaceToScopes.grandFinalScopeKey
           )
         )
       },
@@ -97,6 +97,23 @@ object RaceToScopesSpec extends ZIOSpecDefault {
             (1 to 10).map(n => s"lb-$n").toList :+
             "gf"
         )
+      }
+    ),
+    suite("scope keys for rounds")(
+      test("keyForWinnersRound encodes wb scope") {
+        assertTrue(
+          RaceToScopes.keyForWinnersRound(1) == "wb-1",
+          RaceToScopes.keyForWinnersRound(3) == "wb-3"
+        )
+      },
+      test("keyForLosersRound encodes lb scope") {
+        assertTrue(
+          RaceToScopes.keyForLosersRound(2) == "lb-2",
+          RaceToScopes.keyForLosersRound(4) == "lb-4"
+        )
+      },
+      test("grandFinalScopeKey is gf regardless of bracket round number") {
+        assertTrue(RaceToScopes.grandFinalScopeKey == "gf")
       }
     ),
     suite("scopeLabel")(

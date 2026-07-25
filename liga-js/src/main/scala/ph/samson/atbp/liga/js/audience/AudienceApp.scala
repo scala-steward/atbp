@@ -82,7 +82,7 @@ object AudienceApp {
                     } else {
                       emptyNode
                     },
-                    AudienceBracketView(bracket)
+                    AudienceBracketView(bracket, t.raceToByScope)
                   )
                 case None =>
                   div(p("Bracket not seeded yet."))

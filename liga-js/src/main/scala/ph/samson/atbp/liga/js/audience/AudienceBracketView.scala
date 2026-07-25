@@ -3,18 +3,32 @@ package ph.samson.atbp.liga.js.audience
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.api.Models.*
 import ph.samson.atbp.liga.js.director.BracketLayout
+import ph.samson.atbp.liga.js.director.RaceToLabels
 
 /** Read-only bracket display for the audience screen. */
 object AudienceBracketView {
 
-  def apply(bracket: Bracket): Div = {
+  def apply(bracket: Bracket, raceToByScope: Map[String, Int]): Div = {
     val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
     div(
       cls := "audience-bracket",
       groups.map { group =>
         div(
           cls := "bracket-section",
-          h2(BracketLayout.groupLabel(group.section, group.round)),
+          h2(
+            cls := {
+              if (
+                RaceToLabels.roundHeaderIsError(
+                  group.section,
+                  group.round,
+                  raceToByScope
+                )
+              ) "race-to-error"
+              else ""
+            },
+            RaceToLabels
+              .roundHeaderLabel(group.section, group.round, raceToByScope)
+          ),
           div(
             cls := "round-matches",
             group.matches.map(matchRow)

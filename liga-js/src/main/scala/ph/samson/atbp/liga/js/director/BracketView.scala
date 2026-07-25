@@ -8,6 +8,7 @@ object BracketView {
 
   def apply(
       bracket: Bracket,
+      raceToByScope: Map[String, Int],
       selectedMatchId: Signal[Option[String]],
       onSelect: Observer[String]
   ): Div = {
@@ -17,7 +18,20 @@ object BracketView {
       groups.map { group =>
         div(
           cls := "bracket-section",
-          h3(BracketLayout.groupLabel(group.section, group.round)),
+          h3(
+            cls := {
+              if (
+                RaceToLabels.roundHeaderIsError(
+                  group.section,
+                  group.round,
+                  raceToByScope
+                )
+              ) "race-to-error"
+              else ""
+            },
+            RaceToLabels
+              .roundHeaderLabel(group.section, group.round, raceToByScope)
+          ),
           div(
             cls := "round-matches",
             group.matches.map { matchDef =>

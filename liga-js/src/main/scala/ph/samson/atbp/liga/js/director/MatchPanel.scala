@@ -17,11 +17,18 @@ object MatchPanel {
       onStart: Observer[Unit],
       onResult: Observer[(Int, Int)]
   ): Div = {
+    val resolvedRaceTo =
+      BracketLayout.resolveMatchRaceTo(matchDef, tournament.raceToByScope)
     val handicapInput = Var(
       matchDef.handicapApplied
         .orElse(matchDef.handicapSuggested)
         .map(_.toString)
-        .getOrElse(previewHandicap(tournament, matchDef).handicap.toString)
+        .orElse {
+          resolvedRaceTo.flatMap(rt =>
+            previewHandicap(tournament, matchDef, rt).map(_.handicap.toString)
+          )
+        }
+        .getOrElse("0")
     )
     val scoreAInput = Var(
       matchDef.result.map(_.scoreA.toString).getOrElse("0")
@@ -47,11 +54,15 @@ object MatchPanel {
         cls := "match-state",
         s"State: ${BracketLayout.stateLabel(matchDef.state)}"
       ),
-      matchDef.raceTo.map(rt => p(s"Race to $rt")),
-      p(cls := "guidance", DirectorGuidance.matchStepHint(matchDef)),
+      raceToDisplay(matchDef, tournament.raceToByScope),
+      p(
+        cls := "guidance",
+        DirectorGuidance.matchStepHint(matchDef, resolvedRaceTo)
+      ),
       matchControls(
         matchDef,
         tournament,
+        resolvedRaceTo,
         handicapInput,
         scoreAInput,
         scoreBInput,
@@ -65,9 +76,27 @@ object MatchPanel {
     )
   }
 
+  private def raceToDisplay(
+      matchDef: BracketMatch,
+      raceToByScope: Map[String, Int]
+  ): Node =
+    RaceToLabels.matchRaceToLabel(matchDef, raceToByScope) match {
+      case Right(label) => p(cls := "race-to", label)
+      case Left(hint)   => p(cls := "race-to-error", hint)
+    }
+
+  private def missingRaceToControls(matchDef: BracketMatch): Div =
+    div(
+      p(
+        cls := "hint race-to-error",
+        DirectorGuidance.missingRaceToHint(matchDef.id)
+      )
+    )
+
   private def matchControls(
       matchDef: BracketMatch,
       tournament: TournamentResponse,
+      resolvedRaceTo: Option[Int],
       handicapInput: Var[String],
       scoreAInput: Var[String],
       scoreBInput: Var[String],
@@ -78,33 +107,40 @@ object MatchPanel {
       onStart: Observer[Unit],
       onResult: Observer[(Int, Int)]
   ): Div =
-    matchDef.state match {
-      case BracketMatchState.Pending =>
+    (matchDef.state, resolvedRaceTo) match {
+      case (BracketMatchState.Pending, _) =>
         div(p("Waiting for players."))
 
-      case BracketMatchState.Ready if matchDef.handicapSuggested.isEmpty =>
-        val preview = previewHandicap(tournament, matchDef)
-        div(
-          p(
-            DirectorGuidance.handicapSpotLabel(
-              preview.weakerPlayer.name,
-              preview.raceTo,
-              DirectorGuidance.handicapCap(preview.raceTo)
-            )
-          ),
-          p(s"Preview spot: ${preview.handicap}"),
-          button(
-            cls := "primary",
-            disabled <-- busy,
-            onClick.mapTo(()) --> onReady,
-            "Ready match"
-          )
-        )
+      case (BracketMatchState.Ready | BracketMatchState.Started, None) =>
+        missingRaceToControls(matchDef)
 
-      case BracketMatchState.Ready =>
-        val raceTo = matchDef.raceTo.getOrElse(7)
+      case (BracketMatchState.Ready, Some(raceTo))
+          if matchDef.handicapSuggested.isEmpty =>
+        previewHandicap(tournament, matchDef, raceTo) match {
+          case Some(preview) =>
+            div(
+              p(
+                DirectorGuidance.handicapSpotLabel(
+                  preview.weakerPlayer.name,
+                  raceTo,
+                  DirectorGuidance.handicapCap(raceTo)
+                )
+              ),
+              p(s"Preview spot: ${preview.handicap}"),
+              button(
+                cls := "primary",
+                disabled <-- busy,
+                onClick.mapTo(()) --> onReady,
+                "Ready match"
+              )
+            )
+          case None =>
+            div(p("Waiting for player ratings to compute a preview."))
+        }
+
+      case (BracketMatchState.Ready, Some(raceTo)) =>
         val cap = DirectorGuidance.handicapCap(raceTo)
-        val weakerName = weakerPlayerName(tournament, matchDef)
+        val weakerName = weakerPlayerName(tournament, matchDef, raceTo)
         div(
           weakerName
             .map(name =>
@@ -146,16 +182,19 @@ object MatchPanel {
           )
         )
 
-      case BracketMatchState.Started =>
+      case (BracketMatchState.Started, Some(raceTo)) =>
         div(
           matchDef.handicapApplied
             .flatMap { h =>
-              weakerPlayerName(tournament, matchDef).map { name =>
+              weakerPlayerName(tournament, matchDef, raceTo).map { name =>
                 p(s"Handicap applied: $h spot to $name")
               }
             }
             .getOrElse(emptyNode),
-          p(cls := "guidance", DirectorGuidance.scoreboardScoreHint),
+          p(
+            cls := "guidance",
+            DirectorGuidance.scoreboardScoreHint(raceTo)
+          ),
           div(
             cls := "score-entry",
             label(
@@ -176,7 +215,8 @@ object MatchPanel {
             )
           ),
           child <-- validationError.signal.map { msg =>
-            if (msg.nonEmpty) div(cls := "validation-error", msg) else emptyNode
+            if (msg.nonEmpty) div(cls := "validation-error", msg)
+            else emptyNode
           },
           button(
             cls := "primary",
@@ -195,14 +235,16 @@ object MatchPanel {
                   validationError.set("")
                   onResult.onNext((a, b))
                 case _ =>
-                  validationError.set("Enter valid scores for both players.")
+                  validationError.set(
+                    "Enter valid scores for both players."
+                  )
               }
             },
             "Record result"
           )
         )
 
-      case BracketMatchState.Completed =>
+      case (BracketMatchState.Completed, _) =>
         if (matchDef.isBye) {
           div(
             p("Bye — auto-advance"),
@@ -223,34 +265,30 @@ object MatchPanel {
 
   private def weakerPlayerName(
       tournament: TournamentResponse,
-      matchDef: BracketMatch
+      matchDef: BracketMatch,
+      raceTo: Int
   ): Option[String] =
-    previewHandicap(tournament, matchDef).weakerPlayer.name match {
-      case name if name.nonEmpty => Some(name)
-      case _                     => None
-    }
+    previewHandicap(tournament, matchDef, raceTo)
+      .map(_.weakerPlayer.name)
+      .filter(_.nonEmpty)
 
   private def previewHandicap(
       tournament: TournamentResponse,
-      matchDef: BracketMatch
-  ): HandicapSuggestion = {
-    val raceTo = matchDef.raceTo.orElse(
-      BracketLayout.defaultRaceTo(matchDef.id, tournament.raceToByScope)
-    )
+      matchDef: BracketMatch,
+      raceTo: Int
+  ): Option[HandicapSuggestion] = {
     val ratingA = matchDef.playerA.flatMap(p =>
       tournament.frozenRatings.find(_.player.name == p.name)
     )
     val ratingB = matchDef.playerB.flatMap(p =>
       tournament.frozenRatings.find(_.player.name == p.name)
     )
-    (for {
+    for {
       a <- ratingA
       b <- ratingB
-      rt <- raceTo
     } yield toJsSuggestion(
-      Handicap.suggest(toSharedRating(a), toSharedRating(b), rt)
-    ))
-      .getOrElse(HandicapSuggestion(Player("—"), handicap = 0, raceTo = 7))
+      Handicap.suggest(toSharedRating(a), toSharedRating(b), raceTo)
+    )
   }
 
   private def toSharedRating(rating: PlayerRating): shared.PlayerRating =

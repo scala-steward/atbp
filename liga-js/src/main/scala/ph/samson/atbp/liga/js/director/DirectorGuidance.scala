@@ -1,9 +1,11 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.bracket.TournamentBounds
 import ph.samson.atbp.liga.handicap.HandicapCap
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
+import ph.samson.atbp.liga.js.api.Models.TournamentResponse
 
 /** Director-facing copy for match setup and API error translation. */
 object DirectorGuidance {
@@ -11,12 +13,22 @@ object DirectorGuidance {
   val matchWorkflowOverview: String =
     "Each match: Ready (compute spot) → Apply handicap → Start → Record result."
 
-  val scoreboardScoreHint: String =
+  def scoreboardScoreHint(raceTo: Int): String = {
+    val exampleLoser = math.max(0, raceTo - 2)
     "Enter the numbers on the scoreboard (include spotted games). " +
-      "Example: Bob spotted 2, board reads 7–5 → enter 7 and 5."
+      s"Example: Bob spotted 2, board reads $raceTo–$exampleLoser → enter $raceTo and $exampleLoser."
+  }
 
   val localhostNote: String =
     "Director controls are localhost-only. Open /audience on the club TV."
+
+  def missingRaceToBugHint(scopeKey: String): String =
+    s"Race-to missing for $scopeKey — please file a bug."
+
+  def missingRaceToHint(matchId: String): String =
+    missingRaceToBugHint(
+      RaceToScopes.keyForMatch(matchId).getOrElse(matchId)
+    )
 
   def lockRosterHint(playerCount: Int): String =
     if (playerCount < TournamentBounds.MinPlayers) {
@@ -37,7 +49,21 @@ object DirectorGuidance {
     "Seeding freezes each player's rating from the period leaderboard. " +
       "Guests receive default ratings."
 
-  def matchStepHint(matchDef: BracketMatch): String =
+  def matchStepHint(
+      matchDef: BracketMatch,
+      resolvedRaceTo: Option[Int]
+  ): String = {
+    val needsRaceTo =
+      matchDef.state == BracketMatchState.Ready ||
+        matchDef.state == BracketMatchState.Started
+    if (needsRaceTo && resolvedRaceTo.isEmpty) {
+      missingRaceToHint(matchDef.id)
+    } else {
+      matchStepHintByState(matchDef)
+    }
+  }
+
+  private def matchStepHintByState(matchDef: BracketMatch): String =
     matchDef.state match {
       case BracketMatchState.Pending =>
         "Waiting for both players to be assigned from earlier results."
@@ -57,9 +83,29 @@ object DirectorGuidance {
     HandicapCap.capFor(raceTo)
 
   def handicapSpotLabel(weakerName: String, raceTo: Int, cap: Int): String =
-    s"Spot for $weakerName in race-to-$raceTo (max $cap)."
+    s"Spot for $weakerName (max $cap for Race to $raceTo)."
 
-  def friendlyApiError(raw: String): String = {
+  def friendlyApiError(raw: String): String =
+    friendlyApiError(raw, None)
+
+  def friendlyApiErrorForSelectedMatch(
+      raw: String,
+      tournament: Option[TournamentResponse],
+      selectedMatchId: Option[String]
+  ): String = {
+    val raceTo = tournament.flatMap { t =>
+      selectedMatchId.flatMap { id =>
+        t.bracket
+          .flatMap(_.matches.find(_.id == id))
+          .flatMap(matchDef =>
+            BracketLayout.resolveMatchRaceTo(matchDef, t.raceToByScope)
+          )
+      }
+    }
+    friendlyApiError(raw, raceTo)
+  }
+
+  def friendlyApiError(raw: String, raceTo: Option[Int]): String = {
     val lower = raw.toLowerCase
     if (lower.contains("handicap must be applied first")) {
       "Apply a handicap before starting play."
@@ -76,17 +122,55 @@ object DirectorGuidance {
     } else if (lower.contains("duplicate player names")) {
       "Each player name must be unique on the roster."
     } else if (lower.contains("handicap must be at most")) {
-      "Handicap exceeds the maximum allowed for this race-to."
+      handicapCapError(raw, raceTo)
     } else if (lower.contains("handicap must be non-negative")) {
       "Handicap cannot be negative."
     } else if (lower.contains("winner score must be")) {
-      "Winner's scoreboard total must match the race-to for this round."
+      winnerScoreError(raw, raceTo)
     } else if (lower.contains("loser score must be less than")) {
-      "Loser's scoreboard total must be below the race-to."
+      loserScoreError(raw, raceTo)
     } else if (lower.startsWith("player count must be")) {
       s"Roster must have ${TournamentBounds.MinPlayers}–${TournamentBounds.MaxPlayers} players"
     } else {
       raw
     }
   }
+
+  private def handicapCapError(raw: String, raceTo: Option[Int]): String = {
+    val parsed = for {
+      cap <- """at most (\d+)""".r.findFirstMatchIn(raw).map(_.group(1).toInt)
+      rt <- raceToFromRaw(raw).orElse(raceTo)
+    } yield (cap, rt)
+    parsed match {
+      case Some((cap, rt)) =>
+        s"Handicap exceeds the maximum ($cap) for Race to $rt."
+      case None =>
+        "Handicap exceeds the maximum allowed for this race-to."
+    }
+  }
+
+  private def winnerScoreError(raw: String, raceTo: Option[Int]): String =
+    raceToFromRaw(raw).orElse(raceTo) match {
+      case Some(rt) =>
+        s"Winner's scoreboard total must be $rt (Race to $rt)."
+      case None =>
+        "Winner's scoreboard total must match the race-to for this round."
+    }
+
+  private def loserScoreError(raw: String, raceTo: Option[Int]): String =
+    raceToFromRaw(raw).orElse(raceTo) match {
+      case Some(rt) =>
+        s"Loser's scoreboard total must be below $rt (Race to $rt)."
+      case None =>
+        "Loser's scoreboard total must be below the race-to."
+    }
+
+  private def raceToFromRaw(raw: String): Option[Int] =
+    """race-to (\d+)""".r
+      .findFirstMatchIn(raw)
+      .map(_.group(1).toInt)
+      .orElse(trailingInt(raw))
+
+  private def trailingInt(raw: String): Option[Int] =
+    """(\d+)\s*$""".r.findFirstMatchIn(raw).map(_.group(1).toInt)
 }

@@ -20,7 +20,8 @@ object StaticAssetsSpec extends ZIOSpecDefault {
       assertTrue(
         html.contains("id=\"app\""),
         html.contains("Liga Audience"),
-        html.contains("/assets/js/")
+        html.contains("/assets/js/"),
+        html.contains("/assets/css/audience.css")
       )
     },
     test("asset routes serve director bundle from classpath") {
@@ -49,6 +50,21 @@ object StaticAssetsSpec extends ZIOSpecDefault {
       } yield assertTrue(
         response.status == Status.Ok,
         body.contains(".director-app"),
+        response
+          .header(Header.ContentType)
+          .exists(_.mediaType == MediaType.text.`css`)
+      )
+    },
+    test("asset routes serve audience CSS from classpath") {
+      val path = StaticAssets.cssAssetPath(StaticAssets.audienceCssName)
+      for {
+        response <- StaticAssets
+          .assetRoutes(BindConfig())
+          .runZIO(Request.get(path))
+        body <- response.body.asString
+      } yield assertTrue(
+        response.status == Status.Ok,
+        body.contains(".race-to-error"),
         response
           .header(Header.ContentType)
           .exists(_.mediaType == MediaType.text.`css`)

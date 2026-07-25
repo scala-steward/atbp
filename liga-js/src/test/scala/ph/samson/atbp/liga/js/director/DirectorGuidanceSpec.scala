@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.director
 
 import ph.samson.atbp.liga.bracket.TournamentBounds
+import ph.samson.atbp.liga.js.api.Models.*
 import zio.test.*
 
 object DirectorGuidanceSpec extends ZIOSpecDefault {
@@ -32,6 +33,142 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
           TournamentBounds.invalidPlayerCountMessage(2)
         ) ==
           s"Roster must have ${TournamentBounds.MinPlayers}–${TournamentBounds.MaxPlayers} players"
+      )
+    },
+    test("matchStepHint omits workflow steps when race-to is unresolved") {
+      val matchDef = BracketMatch(
+        id = "wb-2-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      val hint = DirectorGuidance.matchStepHint(matchDef, resolvedRaceTo = None)
+      assertTrue(
+        !hint.contains("click Ready"),
+        !hint.contains("Step 1"),
+        hint.contains("file a bug"),
+        hint.contains("wb-2")
+      )
+    },
+    test("missingRaceToHint for match id uses bug-filing copy") {
+      val hint = DirectorGuidance.missingRaceToHint("wb-2-1")
+      assertTrue(
+        hint.contains("file a bug"),
+        hint.contains("wb-2")
+      )
+    },
+    test("matchStepHint keeps workflow steps when race-to resolves") {
+      val matchDef = BracketMatch(
+        id = "wb-2-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      assertTrue(
+        DirectorGuidance
+          .matchStepHint(matchDef, resolvedRaceTo = Some(7))
+          .contains("Step 1")
+      )
+    },
+    test("missingRaceToBugHint tells user to file a bug") {
+      val hint = DirectorGuidance.missingRaceToBugHint("wb-2")
+      assertTrue(
+        hint.contains("file a bug"),
+        hint.contains("wb-2")
+      )
+    },
+    test("scoreboardScoreHint uses the given race-to in its example") {
+      val hint = DirectorGuidance.scoreboardScoreHint(raceTo = 9)
+      assertTrue(
+        hint.contains("9"),
+        !hint.contains("7–5")
+      )
+    },
+    test("friendlyApiError includes cap and race-to for handicap errors") {
+      val friendly = DirectorGuidance.friendlyApiError(
+        "handicap must be at most 5 for race-to 7"
+      )
+      assertTrue(
+        friendly.contains("5"),
+        friendly.contains("Race to 7")
+      )
+    },
+    test("friendlyApiError includes race-to for winner score errors") {
+      val friendly = DirectorGuidance.friendlyApiError(
+        "winner score must be 9"
+      )
+      assertTrue(
+        friendly.contains("9"),
+        friendly.contains("Race to 9")
+      )
+    },
+    test("friendlyApiError includes race-to for loser score errors") {
+      val friendly = DirectorGuidance.friendlyApiError(
+        "loser score must be less than 9"
+      )
+      assertTrue(
+        friendly.contains("9"),
+        friendly.contains("Race to 9")
+      )
+    },
+    test("friendlyApiErrorForSelectedMatch uses selected match race-to") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Started
+      )
+      val tournament = TournamentResponse(
+        name = "T",
+        players = Nil,
+        completed = false,
+        phase = "active",
+        raceToByScope = Map("wb-1" -> 9),
+        bracket = Some(Bracket(size = 8, matches = List(matchDef))),
+        frozenRatings = Nil
+      )
+      val friendly = DirectorGuidance.friendlyApiErrorForSelectedMatch(
+        "winner score must be",
+        Some(tournament),
+        Some("wb-1-1")
+      )
+      assertTrue(
+        friendly.contains("9"),
+        friendly.contains("Race to 9")
+      )
+    },
+    test("friendlyApiError uses optional raceTo when raw omits numbers") {
+      val friendly = DirectorGuidance.friendlyApiError(
+        "winner score must be",
+        raceTo = Some(11)
+      )
+      assertTrue(
+        friendly.contains("11"),
+        friendly.contains("Race to 11")
+      )
+    },
+    test(
+      "friendlyApiError prefers race-to parsed from raw over client context"
+    ) {
+      val winner = DirectorGuidance.friendlyApiError(
+        "winner score must be 9",
+        raceTo = Some(5)
+      )
+      val loser = DirectorGuidance.friendlyApiError(
+        "loser score must be less than 9",
+        raceTo = Some(5)
+      )
+      val handicap = DirectorGuidance.friendlyApiError(
+        "handicap must be at most 3 for race-to 9",
+        raceTo = Some(5)
+      )
+      assertTrue(
+        winner.contains("9"),
+        !winner.contains("Race to 5"),
+        loser.contains("9"),
+        !loser.contains("Race to 5"),
+        handicap.contains("Race to 9"),
+        !handicap.contains("Race to 5")
       )
     }
   )

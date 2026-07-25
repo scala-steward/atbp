@@ -375,6 +375,117 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         isBye = true
       )
       assertTrue(BracketLayout.resultLabel(ghostBye) == Some("bye"))
+    },
+    test("raceToLabel formats Race to N") {
+      assertTrue(
+        BracketLayout.raceToLabel(7) == "Race to 7",
+        BracketLayout.raceToLabel(9) == "Race to 9"
+      )
+    },
+    test("resolveRoundRaceTo resolves mixed WB/LB/GF scopes") {
+      val raceToByScope = Map(
+        "wb-1" -> 7,
+        "lb-2" -> 5,
+        "gf" -> 9
+      )
+      assertTrue(
+        BracketLayout.resolveRoundRaceTo(
+          BracketLayout.Section.Winners,
+          1,
+          raceToByScope
+        ) == Some(7),
+        BracketLayout.resolveRoundRaceTo(
+          BracketLayout.Section.Losers,
+          2,
+          raceToByScope
+        ) == Some(5),
+        BracketLayout.resolveRoundRaceTo(
+          BracketLayout.Section.GrandFinal,
+          3,
+          raceToByScope
+        ) == Some(9)
+      )
+    },
+    test("resolveRoundRaceTo uses gf key for grand final not wb round number") {
+      val raceToByScope = Map("gf" -> 9, "wb-3" -> 7)
+      assertTrue(
+        BracketLayout.resolveRoundRaceTo(
+          BracketLayout.Section.GrandFinal,
+          3,
+          raceToByScope
+        ) == Some(9)
+      )
+    },
+    test("resolveRoundRaceTo returns None when scope is missing") {
+      assertTrue(
+        BracketLayout.resolveRoundRaceTo(
+          BracketLayout.Section.Winners,
+          2,
+          Map("wb-1" -> 7)
+        ) == None
+      )
+    },
+    test("roundRaceToScope returns Right when scope resolves") {
+      val raceToByScope = Map("wb-2" -> 7)
+      assertTrue(
+        BracketLayout.roundRaceToScope(
+          BracketLayout.Section.Winners,
+          2,
+          raceToByScope
+        ) == Right(7)
+      )
+    },
+    test("roundRaceToScope returns Left scope key when unresolved") {
+      val result = BracketLayout.roundRaceToScope(
+        BracketLayout.Section.Losers,
+        3,
+        Map.empty
+      )
+      assertTrue(result == Left("lb-3"))
+    },
+    test(
+      "matchRaceToScope returns Left scope key when race-to cannot resolve"
+    ) {
+      val matchDef = BracketMatch(
+        id = "wb-2-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      assertTrue(
+        BracketLayout.matchRaceToScope(matchDef, Map.empty) == Left("wb-2")
+      )
+    },
+    test("resolveMatchRaceTo prefers matchDef.raceTo over scope default") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready,
+        raceTo = Some(11)
+      )
+      assertTrue(
+        BracketLayout.resolveMatchRaceTo(matchDef, Map("wb-1" -> 7)) ==
+          Some(11)
+      )
+    },
+    test("resolveMatchRaceTo falls back to raceToByScope") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      assertTrue(
+        BracketLayout.resolveMatchRaceTo(matchDef, Map("wb-1" -> 7)) ==
+          Some(7)
+      )
+    },
+    test("scopeRaceTo looks up race-to from scope map without defaults") {
+      assertTrue(
+        BracketLayout.scopeRaceTo("wb-2-1", Map("wb-2" -> 9)) == Some(9),
+        BracketLayout.scopeRaceTo("wb-2-1", Map.empty).isEmpty
+      )
     }
   )
 }

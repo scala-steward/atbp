@@ -14,17 +14,26 @@ object RaceToScopes {
 
   def keyForMatch(matchId: String): Option[String] =
     matchId match {
-      case s"wb-$round-$_" => Some(s"wb-$round")
-      case s"lb-$round-$_" => Some(s"lb-$round")
-      case "gf-1"          => Some("gf")
+      case s"wb-$round-$_" => round.toIntOption.map(keyForWinnersRound)
+      case s"lb-$round-$_" => round.toIntOption.map(keyForLosersRound)
+      case "gf-1"          => Some(grandFinalScopeKey)
       case _               => None
     }
 
+  def keyForWinnersRound(round: Int): String =
+    s"wb-$round"
+
+  def keyForLosersRound(round: Int): String =
+    s"lb-$round"
+
+  def grandFinalScopeKey: String =
+    "gf"
+
   def requiredKeys(playerCount: Int): List[String] = {
     val size = TournamentBounds.bracketSize(playerCount)
-    val wb = (1 to winnersRounds(size)).map(n => s"wb-$n")
-    val lb = (1 to losersRounds(size)).map(n => s"lb-$n")
-    wb.toList ++ lb.toList :+ "gf"
+    val wb = (1 to winnersRounds(size)).map(keyForWinnersRound)
+    val lb = (1 to losersRounds(size)).map(keyForLosersRound)
+    wb.toList ++ lb.toList :+ grandFinalScopeKey
   }
 
   def scopeLabel(scope: String): ScopeLabel =
