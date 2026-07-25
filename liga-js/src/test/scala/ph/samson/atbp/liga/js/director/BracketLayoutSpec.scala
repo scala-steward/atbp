@@ -82,6 +82,16 @@ object BracketLayoutSpec extends ZIOSpecDefault {
       )
       assertTrue(BracketLayout.resultLabel(matchDef) == None)
     },
+    test("resultLabel ignores isBye on non-completed matches") {
+      val flaggedPending = BracketMatch(
+        id = "wb-2-1",
+        playerA = Some(Player("P1")),
+        playerB = None,
+        state = BracketMatchState.Pending,
+        isBye = true
+      )
+      assertTrue(BracketLayout.resultLabel(flaggedPending) == None)
+    },
     test("resultLabel shows bye for ghost structural byes without a result") {
       val ghostBye = BracketMatch(
         id = "lb-1-2",
