@@ -79,7 +79,7 @@ object BracketGen {
     BracketMatch(id, playerA, playerB, state)
   }
 
-  /** Promote half-filled pending slots that already have both players. */
+  /** Promote pending slots that already have both players. */
   private def reconcileReadyStates(bracket: Bracket): Bracket =
     bracket.copy(matches = bracket.matches.map {
       case matchDef
