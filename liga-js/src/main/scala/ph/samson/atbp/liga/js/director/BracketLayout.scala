@@ -7,10 +7,10 @@ import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 /** Pure bracket layout helpers for the director UI. */
 object BracketLayout {
 
-  enum Section(val label: String, val order: Int) {
-    case Winners extends Section("Winners", 0)
-    case Losers extends Section("Losers", 1)
-    case GrandFinal extends Section("Grand Final", 2)
+  enum Section(val label: String) {
+    case Winners extends Section("Winners")
+    case Losers extends Section("Losers")
+    case GrandFinal extends Section("Grand Final")
   }
 
   final case class RoundGroup(
@@ -50,6 +50,57 @@ object BracketLayout {
   def roundOf(matchId: String, bracketSize: Int): Int =
     bracketRound(matchId, bracketSize).getOrElse(0)
 
+  private def showInList(m: BracketMatch): Boolean =
+    m.state != BracketMatchState.Pending ||
+      m.playerA.isDefined || m.playerB.isDefined
+
+  private def statusSortKey(m: BracketMatch): Int =
+    m.state match {
+      case BracketMatchState.Ready     => 0
+      case BracketMatchState.Pending   => 1
+      case BracketMatchState.Started   => 2
+      case BracketMatchState.Completed => 3
+    }
+
+  private def matchSeedIndex(matchId: String): Int =
+    matchId match {
+      case s"wb-$_-$index" => index.toIntOption.getOrElse(0)
+      case s"lb-$_-$index" => index.toIntOption.getOrElse(0)
+      case "gf-1"          => 1
+      case _               => 0
+    }
+
+  private def matchSortKey(m: BracketMatch): (Int, Int) =
+    (statusSortKey(m), matchSeedIndex(m.id))
+
+  private def listSectionOrder(section: Section): Int =
+    section match {
+      case Section.GrandFinal => 0
+      case Section.Losers     => 1
+      case Section.Winners    => 2
+    }
+
+  private def roundFullyCompleted(matches: List[BracketMatch]): Boolean =
+    matches.forall(_.state == BracketMatchState.Completed)
+
+  private def groupStackKey(
+      section: Section,
+      round: Int,
+      allMatches: List[BracketMatch]
+  ): (Int, Int, Int) =
+    (
+      if (roundFullyCompleted(allMatches)) 1 else 0,
+      listSectionOrder(section),
+      -round
+    )
+
+  private final case class PreparedGroup(
+      section: Section,
+      round: Int,
+      allMatches: List[BracketMatch],
+      shownMatches: List[BracketMatch]
+  )
+
   def groupMatches(
       matches: List[BracketMatch],
       bracketSize: Int
@@ -57,10 +108,21 @@ object BracketLayout {
     matches
       .groupBy(m => (sectionOf(m.id), roundOf(m.id, bracketSize)))
       .toList
-      .sortBy { case ((section, round), _) => (section.order, round) }
       .map { case ((section, round), grouped) =>
-        RoundGroup(section, round, grouped.sortBy(_.id))
+        PreparedGroup(
+          section = section,
+          round = round,
+          allMatches = grouped,
+          shownMatches = grouped.filter(showInList).sortBy(matchSortKey)
+        )
       }
+      .filter(_.shownMatches.nonEmpty)
+      .sortBy(prepared =>
+        groupStackKey(prepared.section, prepared.round, prepared.allMatches)
+      )
+      .map(prepared =>
+        RoundGroup(prepared.section, prepared.round, prepared.shownMatches)
+      )
 
   def isActionable(matchDef: BracketMatch): Boolean =
     matchDef.state == BracketMatchState.Ready ||

@@ -70,6 +70,9 @@ object Dependencies {
 
     val zioJson = Def.setting("dev.zio" %%% "zio-json" % "0.9.2")
 
+    val zioTestJs = Def.setting("dev.zio" %%% "zio-test" % Zio % Test)
+    val zioTestSbtJs = Def.setting("dev.zio" %%% "zio-test-sbt" % Zio % Test)
+
     val zioLogging = "dev.zio" %% "zio-logging" % ZioLogging
     val zioLoggingSlf4j2 = "dev.zio" %% "zio-logging-slf4j2" % ZioLogging
 
@@ -252,7 +255,7 @@ object Dependencies {
     glicko2.value,
     laminar.value,
     zioJson.value,
-    TestLibs.zioTest,
-    TestLibs.zioTestSbt
+    zioTestJs.value,
+    zioTestSbtJs.value
   )
 }

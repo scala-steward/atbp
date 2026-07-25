@@ -181,6 +181,7 @@ lazy val ligaJs = atbpModule("liga-js")
   .settings(
     Compile / packageDoc / mappings := Nil,
     scalaJSUseMainModuleInitializer := false,
+    Test / scalaJSUseTestModuleInitializer := true,
     scalaJSLinkerConfig :=
       scalaJSLinkerConfig.value
         .withESFeatures(_.withESVersion(ESVersion.ES2017))

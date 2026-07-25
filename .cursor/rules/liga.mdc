@@ -1,0 +1,44 @@
+---
+description: Liga subproject map, stack, commands, and boundaries
+globs: liga/**/*,liga-js/**/*,liga-common/**/*,docs/intent/liga.md,docs/ideas/liga*.md,docs/ideas/section-aware-race-to.md,docs/ideas/bye-bracket-display.md,docs/ideas/grand-final-labels.md,docs/ideas/serve-without-tournament.md,docs/intent/paste-roster.md,docs/intent/serve-without-tournament.md
+alwaysApply: false
+---
+
+# Liga
+
+Billiards club ratings + handicapped double-elim tournaments. Intent:
+`docs/intent/liga.md`. Direction: `docs/ideas/liga.md`. Map: `docs/liga/map.md`.
+
+## Stack
+
+- JVM: ZIO HTTP (`liga`), Glicko2, append-only tournament JSON replay
+- Shared: `liga-common` (cross JVM/JS) — handicap, race-to scopes, types
+- UI: Laminar Scala.js (`liga-js`) — director + audience SPAs
+- CLI: `atbp liga` (leaderboard / handicap / serve)
+
+## Commands
+
+```bash
+sbt --client "liga/compile"
+sbt --client "liga/test"
+sbt --client "liga-js/test"
+sbt --client "liga/testOnly *Handicap*"
+sbt --client fixup
+sbt run   # no --client — verify serve starts
+```
+
+## Conventions
+
+- Period files (`.liga`) are source of truth; never mutate completed periods
+- Tournament state = append-only event dir; resume via replay
+- Ratings freeze at period start; Glicko2 only on period complete
+- Handicaps are suggestions until match start, then locked
+- Race-to is per scope (WB/LB/GF rounds), not per match
+- Director and audience are separate URLs/SPAs
+
+## Boundaries
+
+- No auth, multi-tournament concurrency, cloud hosting, or mobile apps (v1)
+- No in-period rating drift; no WebSockets (audience polls)
+- Shared domain math lives in `liga-common`, not duplicated in `liga-js`
+- Follow existing Laminar patterns in `liga-js/.../director/`

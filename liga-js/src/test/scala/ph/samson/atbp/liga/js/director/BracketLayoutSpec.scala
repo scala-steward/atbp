@@ -40,9 +40,9 @@ object BracketLayoutSpec extends ZIOSpecDefault {
     test("groupMatches uses bracket size for grand final round grouping") {
       val gf = BracketMatch(
         id = "gf-1",
-        playerA = None,
-        playerB = None,
-        state = BracketMatchState.Pending
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
       )
       val groups =
         BracketLayout.groupMatches(matches = List(gf), bracketSize = 8)
@@ -50,6 +50,280 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         groups.length == 1,
         groups.head.section == BracketLayout.Section.GrandFinal,
         groups.head.round == 3
+      )
+    },
+    test("groupMatches omits empty Pending matches with neither player") {
+      val hidden = BracketMatch(
+        id = "wb-1-1",
+        playerA = None,
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val shown = BracketMatch(
+        id = "wb-1-2",
+        playerA = Some(Player("P1")),
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val groups =
+        BracketLayout.groupMatches(
+          matches = List(hidden, shown),
+          bracketSize = 8
+        )
+      assertTrue(
+        groups.length == 1,
+        groups.head.matches.map(_.id) == List("wb-1-2")
+      )
+    },
+    test(
+      "groupMatches sorts matches Ready then Pending then Started then Completed"
+    ) {
+      val player = Some(Player("P1"))
+      val ready = BracketMatch(
+        id = "wb-2-4",
+        playerA = player,
+        playerB = None,
+        state = BracketMatchState.Ready
+      )
+      val pending = BracketMatch(
+        id = "wb-2-1",
+        playerA = player,
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val started =
+        pending.copy(id = "wb-2-3", state = BracketMatchState.Started)
+      val completed =
+        pending.copy(id = "wb-2-2", state = BracketMatchState.Completed)
+      val groups = BracketLayout.groupMatches(
+        matches = List(completed, started, pending, ready),
+        bracketSize = 8
+      )
+      assertTrue(
+        groups.length == 1,
+        groups.head.matches
+          .map(_.id) == List("wb-2-4", "wb-2-1", "wb-2-3", "wb-2-2")
+      )
+    },
+    test(
+      "groupMatches keeps ascending id order within the same status bucket"
+    ) {
+      val player = Some(Player("P1"))
+      val first = BracketMatch(
+        id = "wb-2-1",
+        playerA = player,
+        playerB = None,
+        state = BracketMatchState.Ready
+      )
+      val second = first.copy(id = "wb-2-2")
+      val groups =
+        BracketLayout.groupMatches(
+          matches = List(second, first),
+          bracketSize = 8
+        )
+      assertTrue(groups.head.matches.map(_.id) == List("wb-2-1", "wb-2-2"))
+    },
+    test(
+      "groupMatches sorts by numeric match index within the same status bucket"
+    ) {
+      val player = Some(Player("P1"))
+      val second = BracketMatch(
+        id = "wb-1-2",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      val tenth = second.copy(id = "wb-1-10")
+      val groups =
+        BracketLayout.groupMatches(
+          matches = List(tenth, second),
+          bracketSize = 64
+        )
+      assertTrue(groups.head.matches.map(_.id) == List("wb-1-2", "wb-1-10"))
+    },
+    test("groupMatches places unfinished rounds above fully completed rounds") {
+      val player = Some(Player("P1"))
+      val unfinished = BracketMatch(
+        id = "wb-2-1",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Started
+      )
+      val finished = BracketMatch(
+        id = "wb-3-1",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Completed
+      )
+      val groups = BracketLayout.groupMatches(
+        matches = List(finished, unfinished),
+        bracketSize = 8
+      )
+      assertTrue(
+        groups.map(g => (g.section, g.round)) ==
+          List(
+            (BracketLayout.Section.Winners, 2),
+            (BracketLayout.Section.Winners, 3)
+          )
+      )
+    },
+    test(
+      "groupMatches places unfinished band above section stack order"
+    ) {
+      val player = Some(Player("P1"))
+      val opponent = Some(Player("P2"))
+      val unfinishedWinners = BracketMatch(
+        id = "wb-1-1",
+        playerA = player,
+        playerB = opponent,
+        state = BracketMatchState.Ready
+      )
+      val finishedGrandFinal = BracketMatch(
+        id = "gf-1",
+        playerA = player,
+        playerB = opponent,
+        state = BracketMatchState.Completed
+      )
+      val groups = BracketLayout.groupMatches(
+        matches = List(finishedGrandFinal, unfinishedWinners),
+        bracketSize = 8
+      )
+      assertTrue(
+        groups.map(g => (g.section, g.round)) ==
+          List(
+            (BracketLayout.Section.Winners, 1),
+            (BracketLayout.Section.GrandFinal, 3)
+          )
+      )
+    },
+    test(
+      "groupMatches stacks Grand Final above Losers above Winners in a band"
+    ) {
+      val player = Some(Player("P1"))
+      val wb = BracketMatch(
+        id = "wb-1-1",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      val lb = BracketMatch(
+        id = "lb-1-1",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      val gf = BracketMatch(
+        id = "gf-1",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      val groups =
+        BracketLayout.groupMatches(matches = List(wb, lb, gf), bracketSize = 8)
+      assertTrue(
+        groups.map(_.section) == List(
+          BracketLayout.Section.GrandFinal,
+          BracketLayout.Section.Losers,
+          BracketLayout.Section.Winners
+        )
+      )
+    },
+    test("groupMatches places later rounds above earlier rounds in a section") {
+      val player = Some(Player("P1"))
+      val round1 = BracketMatch(
+        id = "wb-1-1",
+        playerA = player,
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Ready
+      )
+      val round2 = round1.copy(id = "wb-2-1")
+      val groups =
+        BracketLayout.groupMatches(
+          matches = List(round1, round2),
+          bracketSize = 8
+        )
+      assertTrue(groups.map(_.round) == List(2, 1))
+    },
+    test("groupMatches omits groups where every match is hidden") {
+      val hiddenOnly = BracketMatch(
+        id = "wb-1-1",
+        playerA = None,
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val groups =
+        BracketLayout.groupMatches(matches = List(hiddenOnly), bracketSize = 8)
+      assertTrue(groups.isEmpty)
+    },
+    test(
+      "groupMatches keeps round unfinished when visible Completed plus hidden empty Pending"
+    ) {
+      val player = Some(Player("P1"))
+      val opponent = Some(Player("P2"))
+      val completedVisible = BracketMatch(
+        id = "wb-2-1",
+        playerA = player,
+        playerB = opponent,
+        state = BracketMatchState.Completed
+      )
+      val hiddenEmptyPending = BracketMatch(
+        id = "wb-2-2",
+        playerA = None,
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val finishedLater = BracketMatch(
+        id = "wb-3-1",
+        playerA = player,
+        playerB = opponent,
+        state = BracketMatchState.Completed
+      )
+      val groups = BracketLayout.groupMatches(
+        matches = List(finishedLater, hiddenEmptyPending, completedVisible),
+        bracketSize = 8
+      )
+      assertTrue(
+        groups.length == 2,
+        groups.map(g => (g.section, g.round)) ==
+          List(
+            (BracketLayout.Section.Winners, 2),
+            (BracketLayout.Section.Winners, 3)
+          ),
+        groups.head.matches.map(_.id) == List("wb-2-1")
+      )
+    },
+    test(
+      "groupMatches treats rounds with only hidden empty Pendings as unfinished but omits them"
+    ) {
+      val hiddenOnly = BracketMatch(
+        id = "wb-1-1",
+        playerA = None,
+        playerB = None,
+        state = BracketMatchState.Pending
+      )
+      val visibleUnfinished = BracketMatch(
+        id = "wb-2-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Started
+      )
+      val finishedLater = BracketMatch(
+        id = "wb-3-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Completed
+      )
+      val groups = BracketLayout.groupMatches(
+        matches = List(finishedLater, hiddenOnly, visibleUnfinished),
+        bracketSize = 8
+      )
+      assertTrue(
+        groups.length == 2,
+        groups.map(g => (g.section, g.round)) ==
+          List(
+            (BracketLayout.Section.Winners, 2),
+            (BracketLayout.Section.Winners, 3)
+          )
       )
     },
     test("resultLabel shows bye for completed bye matches") {
