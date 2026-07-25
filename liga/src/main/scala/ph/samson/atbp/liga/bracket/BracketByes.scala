@@ -12,12 +12,6 @@ object BracketByes {
     case Winner, Loser
   }
 
-  def propagateStructuralByes(
-      bracket: Bracket,
-      topology: BracketTopology.Topology
-  ): Bracket =
-    propagateStructuralByesE(bracket, topology).fold(_ => bracket, identity)
-
   def propagateStructuralByesE(
       bracket: Bracket,
       topology: BracketTopology.Topology

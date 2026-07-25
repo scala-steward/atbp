@@ -16,9 +16,13 @@ object BracketGen {
         emptyMatch(id, playerA, playerB)
       }
     val bracket = Bracket(size, matches)
-    reconcileReadyStates(
-      BracketByes.propagateStructuralByes(bracket, topology)
-    )
+    val propagated =
+      BracketByes.propagateStructuralByesE(bracket, topology) match {
+        case Right(value) => value
+        case Left(err)    =>
+          sys.error(s"structural bye propagation failed: $err")
+      }
+    reconcileReadyStates(propagated)
   }
 
   private def seedSlotsFor(
