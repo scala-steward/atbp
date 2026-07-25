@@ -210,9 +210,7 @@ object BracketSpec extends ZIOSpecDefault {
           findMatch(afterWb22, "lb-1-2").isBye,
           lb22.state == BracketMatchState.Completed,
           lb22.isBye,
-          // loser of wb-2-2 (P3) advanced through lb-2-2 past the ghost
-          playerInMatch(findMatch(afterWb22, "lb-3-1"), "P3") ||
-            playerInMatch(findMatch(afterWb22, "lb-4-1"), "P3")
+          findMatch(afterWb22, "lb-3-1").playerB.contains(Player("P3"))
         )
       },
       test("partial fills 3..64: play-out reaches ready grand final") {
