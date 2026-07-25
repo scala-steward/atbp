@@ -4,41 +4,30 @@
 
 **How might we show bye-advanced players only in their immediate next match, matching the UX of a normal round-1 win, on both director and audience views?**
 
-## Recommended Direction
+## What shipped
 
-Limit `BracketGen.propagateByes` to first-round winners bracket matches (`wb-1-*`) where one seed slot is empty. Complete those as 1–0 and place the winner in `wb-2-*` pending — then stop. Do not treat later half-filled matches (waiting for a feeder winner) as byes.
+Root cause: the old `isByeMatch` treated any half-filled incomplete match as a bye. After a round-1 bye, the winner lands in `wb-2-X` alone — still half-filled — so bye propagation recursively auto-completed through every later winners round.
 
-The UI needs no changes; both surfaces already render bracket state faithfully.
+**Domain (`BracketByes`):**
 
-Root cause: `isByeMatch` treats any half-filled incomplete match as a bye. After a round-1 bye, the winner lands in `wb-2-X` alone — still half-filled — so `propagateByes` recursively auto-completes through every later winners round, writing 1–0 results at each hop.
+- Winners R1 byes (`wb-1-*` with one seed slot): complete as 1–0, place winner in `wb-2-*` pending, stop cascade.
+- Ghost losers matches (empty, all feeders permanently dead): mark completed with `isBye`.
+- Cascading losers byes (sole player when the empty slot can never fill): auto-advance via `advanceCore(..., isBye = true)`.
 
-## Key Assumptions to Validate
+**UI:**
 
-- [ ] R1 winners byes are the only structural empty slots in partial-fill brackets
-- [ ] `wb-2-*` with one player should stay Pending until the feeder completes
-- [ ] Existing R1 bye tests still pass with stricter downstream assertions
+- `BracketMatch.isBye` on domain and JS models.
+- Director and audience surfaces show italic **bye** label (not a score) via `BracketLayout.resultLabel`.
 
-## MVP Scope
+## Validated assumptions
 
-**In:**
+- [x] R1 winners byes are not the only structural empty slots — losers ghost/cascade cases also need handling.
+- [x] `wb-2-*` with one player stays Pending until the feeder completes.
+- [x] R1 bye tests pass with stricter downstream assertions (wb-2 pending, no GF pre-fill).
 
-- Narrow bye detection in `BracketGen` (first-round winners only)
-- Tests: 3-in-4 and 12-in-16 — player in exactly one future match, not cascaded
-- Assert wb-2 is Pending (not Completed) after bye propagation
+## Test coverage
 
-**Out:**
-
-- Display-layer filtering or deduplication
-- Losers-bracket bye rules (unless a case surfaces)
-- Changing how completed R1 byes render (keep 1–0, done)
-
-## Not Doing (and Why)
-
-- **UI-only fix** — root cause is data; display patch would leave API wrong
-- **Full cascade then scrub** — fights Advancement, leaves garbage state
-- **Deferred/lazy bye resolution** — same outcome, more complexity
-- **Hiding R1 bye matches** — director wants them visible as completed
-
-## Open Questions
-
-- None blocking — ready to implement
+- 3-in-4 and 12-in-16: player appears in exactly one wb-2 slot, no cascade.
+- Losers structural bye (3-player) and ghost bye (5-player).
+- `partial fills 3..64`: play-out reaches ready grand final.
+- HTTP seed API: 3-player bracket leaves `wb-1-2` as sole ready match.
