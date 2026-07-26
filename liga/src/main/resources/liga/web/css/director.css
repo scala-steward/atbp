@@ -47,6 +47,45 @@
 .match-state { text-transform: uppercase; font-size: 0.75rem; color: #666; }
 .match-panel { border: 1px solid #ccc; border-radius: 6px; padding: 1rem; background: #fff; }
 .match-panel.empty { color: #666; }
+.handicap-probability { margin: 0.75rem 0; }
+.handicap-probability-header { margin: 0 0 0.35rem; font-size: 0.95rem; color: #333; }
+.handicap-probability-rows {
+  display: inline-grid;
+  grid-template-columns: 2.75rem 3rem;
+  column-gap: 1.5rem;
+  row-gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0.25rem 0 0.5rem;
+}
+.handicap-probability-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+}
+.handicap-probability-row.suggested {
+  font-weight: 600;
+  background: #f0f4f8;
+  border-radius: 3px;
+}
+.handicap-probability-row.suggested .handicap-spot,
+.handicap-probability-row.suggested .handicap-percent {
+  font-weight: inherit;
+}
+.handicap-probability-row.over-cap .handicap-spot,
+.handicap-probability-row.over-cap .handicap-percent {
+  color: #999;
+  font-style: italic;
+}
+.handicap-spot {
+  text-align: right;
+  color: #555;
+  padding: 0.1rem 0.25rem;
+}
+.handicap-percent {
+  text-align: right;
+  color: #222;
+  padding: 0.1rem 0.25rem;
+}
 .actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .score-entry { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0; }
 button { padding: 0.4rem 0.8rem; cursor: pointer; }

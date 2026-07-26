@@ -26,6 +26,20 @@ object HandicapRendererSpec extends ZIOSpecDefault {
             #""".stripMargin('#')
       )
     },
+    test("render uses distinct neighborhood columns when suggested is zero") {
+      val weaker = rating(bob, 1450, 90)
+      val stronger = rating(alice, 1700, 80)
+      val suggestion = HandicapSuggestion(bob, handicap = 0, raceTo = 7)
+      val result = HandicapResult(weaker, stronger, suggestion)
+      val rendered = HandicapRenderer.render(result)
+      assertTrue(
+        rendered ==
+          """| Weaker player | Race-to |  + 0 |  + 1 |
+            #| ------------- | ------: | ---: | ---: |
+            #| Bob           |       7 | 0.7% | 1.9% |
+            #""".stripMargin('#')
+      )
+    },
     test("unknown player name returns clear error") {
       val ratings = List(rating(alice, 1700, 100))
       val result = HandicapRenderer.suggest(ratings, "Alice", "Eve", raceTo = 7)

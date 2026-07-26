@@ -33,8 +33,7 @@ object HandicapRenderer {
   def render(result: HandicapResult): String = {
     val suggestion = result.suggestion
     val suggested = suggestion.handicap
-    val handicaps =
-      List(0, math.max(0, suggested - 1), suggested, suggested + 1)
+    val handicaps = Handicap.probabilityNeighborhoodSpots(suggested)
     val probabilities = handicaps.map(winProbability(result, _))
     val spotColumns = handicaps.map { handicap =>
       MarkdownTable.Column(formatSpotHeader(handicap), Alignment.Right)

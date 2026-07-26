@@ -1,7 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
-import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.js.api.Models.*
 import ph.samson.atbp.liga.model as shared
 
@@ -25,7 +24,9 @@ object MatchPanel {
         .map(_.toString)
         .orElse {
           resolvedRaceTo.flatMap(rt =>
-            previewHandicap(tournament, matchDef, rt).map(_.handicap.toString)
+            MatchHandicapPreview
+              .fromMatch(tournament, matchDef, rt)
+              .map(_.suggestedHandicap.toString)
           )
         }
         .getOrElse("0")
@@ -114,19 +115,18 @@ object MatchPanel {
       case (BracketMatchState.Ready | BracketMatchState.Started, None) =>
         missingRaceToControls(matchDef)
 
-      case (BracketMatchState.Ready, Some(raceTo))
-          if matchDef.handicapSuggested.isEmpty =>
-        previewHandicap(tournament, matchDef, raceTo) match {
-          case Some(preview) =>
+      case (BracketMatchState.Ready, Some(raceTo)) =>
+        val preview =
+          MatchHandicapPreview.fromMatch(tournament, matchDef, raceTo)
+        ReadyHandicapPolicy.surface(matchDef, preview) match {
+          case ReadyHandicapPolicy.Surface.Preview(handicapPreview) =>
             div(
-              p(
-                DirectorGuidance.handicapSpotLabel(
-                  preview.weakerPlayer.name,
-                  raceTo,
-                  DirectorGuidance.handicapCap(raceTo)
-                )
+              probabilityNeighborhood(
+                handicapPreview.weaker,
+                handicapPreview.stronger,
+                raceTo,
+                handicapPreview.suggestedHandicap
               ),
-              p(s"Preview spot: ${preview.handicap}"),
               button(
                 cls := "primary",
                 disabled <-- busy,
@@ -134,53 +134,72 @@ object MatchPanel {
                 "Ready match"
               )
             )
-          case None =>
-            div(p("Waiting for player ratings to compute a preview."))
+          case ReadyHandicapPolicy.Surface.PreviewWaiting =>
+            div(p(ReadyHandicapPolicy.previewWaitingMessage))
+          case ReadyHandicapPolicy.Surface.Adjust(suggested, maybePreview) =>
+            div(
+              maybePreview match {
+                case Some(handicapPreview) =>
+                  probabilityNeighborhood(
+                    handicapPreview.weaker,
+                    handicapPreview.stronger,
+                    raceTo,
+                    suggested
+                  )
+                case None =>
+                  p(ReadyHandicapPolicy.previewWaitingMessage)
+              },
+              div(
+                label(
+                  "Handicap (games spotted to weaker player): ",
+                  input(
+                    typ := "number",
+                    value <-- handicapInput,
+                    onInput.mapToValue --> handicapInput
+                  )
+                ),
+                maybePreview match {
+                  case Some(handicapPreview) =>
+                    child <-- handicapInput.signal.map { input =>
+                      HandicapProbabilityHints.typedSpotHint(
+                        handicapPreview.weaker,
+                        handicapPreview.stronger,
+                        raceTo,
+                        suggested,
+                        input
+                      ) match {
+                        case Some(hint) =>
+                          p(cls := "hint typed-spot-hint", hint)
+                        case None => emptyNode
+                      }
+                    }
+                  case None => emptyNode
+                },
+                div(
+                  cls := "actions",
+                  button(
+                    disabled <-- busy,
+                    onClick --> onApplyHandicap.contramap { _ =>
+                      handicapInput.now().toIntOption.getOrElse(0)
+                    },
+                    "Apply handicap"
+                  ),
+                  button(
+                    cls := "primary",
+                    disabled <-- busy.combineWith(handicapInput.signal).map {
+                      case (isBusy, _) =>
+                        isBusy || matchDef.handicapApplied.isEmpty
+                    },
+                    onClick.mapTo(()) --> onStart,
+                    "Start match"
+                  )
+                ),
+                Option.when(matchDef.handicapApplied.isEmpty)(
+                  p(cls := "hint", "Apply handicap before starting.")
+                )
+              )
+            )
         }
-
-      case (BracketMatchState.Ready, Some(raceTo)) =>
-        val cap = DirectorGuidance.handicapCap(raceTo)
-        val weakerName = weakerPlayerName(tournament, matchDef, raceTo)
-        div(
-          weakerName
-            .map(name =>
-              p(DirectorGuidance.handicapSpotLabel(name, raceTo, cap))
-            )
-            .getOrElse(emptyNode),
-          label(
-            "Handicap (games spotted to weaker player): ",
-            input(
-              typ := "number",
-              value <-- handicapInput,
-              onInput.mapToValue --> handicapInput
-            )
-          ),
-          matchDef.handicapSuggested.map { suggested =>
-            p(s"Server suggested: $suggested")
-          },
-          div(
-            cls := "actions",
-            button(
-              disabled <-- busy,
-              onClick --> onApplyHandicap.contramap { _ =>
-                handicapInput.now().toIntOption.getOrElse(0)
-              },
-              "Apply handicap"
-            ),
-            button(
-              cls := "primary",
-              disabled <-- busy.combineWith(handicapInput.signal).map {
-                case (isBusy, _) =>
-                  isBusy || matchDef.handicapApplied.isEmpty
-              },
-              onClick.mapTo(()) --> onStart,
-              "Start match"
-            )
-          ),
-          Option.when(matchDef.handicapApplied.isEmpty)(
-            p(cls := "hint", "Apply handicap before starting.")
-          )
-        )
 
       case (BracketMatchState.Started, Some(raceTo)) =>
         div(
@@ -268,44 +287,51 @@ object MatchPanel {
       matchDef: BracketMatch,
       raceTo: Int
   ): Option[String] =
-    previewHandicap(tournament, matchDef, raceTo)
-      .map(_.weakerPlayer.name)
+    MatchHandicapPreview
+      .fromMatch(tournament, matchDef, raceTo)
+      .map(_.weakerName)
       .filter(_.nonEmpty)
 
-  private def previewHandicap(
-      tournament: TournamentResponse,
-      matchDef: BracketMatch,
-      raceTo: Int
-  ): Option[HandicapSuggestion] = {
-    val ratingA = matchDef.playerA.flatMap(p =>
-      tournament.frozenRatings.find(_.player.name == p.name)
-    )
-    val ratingB = matchDef.playerB.flatMap(p =>
-      tournament.frozenRatings.find(_.player.name == p.name)
-    )
-    for {
-      a <- ratingA
-      b <- ratingB
-    } yield toJsSuggestion(
-      Handicap.suggest(toSharedRating(a), toSharedRating(b), raceTo)
+  private def probabilityNeighborhood(
+      weaker: shared.PlayerRating,
+      stronger: shared.PlayerRating,
+      raceTo: Int,
+      suggested: Int
+  ): Div = {
+    val rows =
+      HandicapProbabilityHints.neighborhoodRows(
+        weaker,
+        stronger,
+        raceTo,
+        suggested
+      )
+    div(
+      cls := "handicap-probability",
+      p(
+        cls := "handicap-probability-header",
+        HandicapProbabilityHints.headerLabel(weaker.player.name, raceTo)
+      ),
+      div(
+        cls := "handicap-probability-rows",
+        rows.map { row =>
+          val rowClass = List(
+            Some("handicap-probability-row"),
+            Option.when(row.spot == suggested)("suggested"),
+            Option.when(HandicapProbabilityHints.isOverCap(row.spot, raceTo))(
+              "over-cap"
+            )
+          ).flatten.mkString(" ")
+          div(
+            cls := rowClass,
+            span(
+              cls := "handicap-spot",
+              HandicapProbabilityHints.formatSpot(row.spot)
+            ),
+            span(cls := "handicap-percent", row.weakerPercent)
+          )
+        }
+      )
     )
   }
 
-  private def toSharedRating(rating: PlayerRating): shared.PlayerRating =
-    shared.PlayerRating(
-      shared.Player(rating.player.name),
-      rating.rating,
-      rating.rd,
-      rating.wins,
-      rating.losses
-    )
-
-  private def toJsSuggestion(
-      suggestion: shared.HandicapSuggestion
-  ): HandicapSuggestion =
-    HandicapSuggestion(
-      Player(suggestion.weakerPlayer.name),
-      suggestion.handicap,
-      suggestion.raceTo
-    )
 }

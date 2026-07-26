@@ -82,9 +82,6 @@ object DirectorGuidance {
   def handicapCap(raceTo: Int): Int =
     HandicapCap.capFor(raceTo)
 
-  def handicapSpotLabel(weakerName: String, raceTo: Int, cap: Int): String =
-    s"Spot for $weakerName (max $cap for Race to $raceTo)."
-
   def friendlyApiError(raw: String): String =
     friendlyApiError(raw, None)
 

@@ -26,6 +26,9 @@ object Handicap {
       HandicapSuggestion(weaker.player, handicap, raceTo)
     }
 
+  def probabilityNeighborhoodSpots(suggested: Int): List[Int] =
+    List(0, math.max(0, suggested - 1), suggested, suggested + 1).distinct
+
   private def weakerAndStronger(
       a: PlayerRating,
       b: PlayerRating
