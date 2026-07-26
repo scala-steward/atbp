@@ -57,6 +57,11 @@ object MatchHandicapPreviewSpec extends ZIOSpecDefault {
       frozenRatings = frozenRatings
     )
 
+  private def handicapContext(
+      frozenRatings: List[PlayerRating]
+  ): BracketHandicapContext =
+    BracketHandicapContext(frozenRatings, Map("wb-1" -> 7))
+
   def spec = suite("MatchHandicapPreview")(
     test("fromMatch returns weaker-first ratings and shared suggestion") {
       val frozen = List(
@@ -85,6 +90,27 @@ object MatchHandicapPreviewSpec extends ZIOSpecDefault {
         MatchHandicapPreview
           .fromMatch(tournament(frozen), readyMatch, 7)
           .isEmpty
+      )
+    },
+    test("forMatch resolves preview from frozen ratings") {
+      val frozen = List(
+        jsRating(alice, 1700, 80),
+        jsRating(bob, 1450, 90)
+      )
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(alice),
+        playerB = Some(bob),
+        state = BracketMatchState.Started,
+        handicapApplied = Some(2)
+      )
+      assertTrue(
+        MatchHandicapPreview
+          .forMatch(handicapContext(frozen), matchDef)
+          .isDefined,
+        MatchHandicapPreview
+          .forMatch(handicapContext(frozen), matchDef)
+          .exists(_.weakerName == "Bob")
       )
     }
   )

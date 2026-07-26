@@ -201,4 +201,24 @@ object BracketLayout {
     } else {
       matchDef.result.map(result => s"${result.scoreA}–${result.scoreB}")
     }
+
+  enum AppliedHandicapSide {
+    case PlayerA
+    case PlayerB
+  }
+
+  /** Bracket/panel display for applied handicap: gated off, placed, or bug. */
+  enum AppliedHandicapDisplay {
+    case Hidden
+    case Placed(spot: Int, side: AppliedHandicapSide, weakerName: String)
+    case Unresolved(spot: Int)
+  }
+
+  /** Whether an applied-handicap side indicator should show on bracket rows. */
+  def showsAppliedHandicap(matchDef: BracketMatch): Boolean = {
+    val liveOrDone =
+      matchDef.state == BracketMatchState.Started ||
+        matchDef.state == BracketMatchState.Completed
+    liveOrDone && matchDef.handicapApplied.exists(_ > 0)
+  }
 }

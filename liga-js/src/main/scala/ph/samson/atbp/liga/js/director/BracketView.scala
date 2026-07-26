@@ -8,10 +8,11 @@ object BracketView {
 
   def apply(
       bracket: Bracket,
-      raceToByScope: Map[String, Int],
+      handicapContext: BracketHandicapContext,
       selectedMatchId: Signal[Option[String]],
       onSelect: Observer[String]
   ): Div = {
+    val raceToByScope = handicapContext.raceToByScope
     val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
     div(
       cls := "bracket",
@@ -35,7 +36,13 @@ object BracketView {
           div(
             cls := "round-matches",
             group.matches.map { matchDef =>
-              matchRow(matchDef, bracket.size, selectedMatchId, onSelect)
+              matchRow(
+                handicapContext,
+                matchDef,
+                bracket.size,
+                selectedMatchId,
+                onSelect
+              )
             }
           )
         )
@@ -44,6 +51,7 @@ object BracketView {
   }
 
   private def matchRow(
+      handicapContext: BracketHandicapContext,
       matchDef: BracketMatch,
       bracketSize: Int,
       selectedMatchId: Signal[Option[String]],
@@ -70,7 +78,10 @@ object BracketView {
       ),
       span(
         cls := "match-players",
-        s"${BracketLayout.playerLabel(matchDef.playerA)} vs ${BracketLayout.playerLabel(matchDef.playerB)}"
+        AppliedHandicapView.playersWithAppliedHandicap(
+          matchDef,
+          AppliedHandicapLabels.forMatch(handicapContext, matchDef)
+        )
       ),
       span(
         cls := "match-state",

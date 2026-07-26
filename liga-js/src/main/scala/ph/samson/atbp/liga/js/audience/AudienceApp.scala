@@ -4,6 +4,7 @@ import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.LatestRatingsView
 import ph.samson.atbp.liga.js.api.ApiClient
 import ph.samson.atbp.liga.js.api.Models.*
+import ph.samson.atbp.liga.js.director.BracketHandicapContext
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -98,7 +99,10 @@ object AudienceApp {
                     } else {
                       emptyNode
                     },
-                    AudienceBracketView(bracket, t.raceToByScope)
+                    AudienceBracketView(
+                      bracket,
+                      BracketHandicapContext.fromTournament(t)
+                    )
                   )
                 case None =>
                   div(p("Bracket not seeded yet."))
@@ -156,7 +160,7 @@ object AudienceApp {
       |.bracket-section h2 { font-size: 1.1rem; margin: 0 0 0.75rem; color: #333; }
       |.round-matches { display: flex; flex-direction: column; gap: 0.5rem; }
       |.match-row {
-      |  display: grid; grid-template-columns: 1fr auto auto auto;
+      |  display: grid; grid-template-columns: 1fr auto auto;
       |  gap: 1rem; align-items: center;
       |  padding: 0.6rem 0.9rem; border: 1px solid #ddd; border-radius: 6px;
       |  background: #fafafa; font-size: 1.1rem;
@@ -164,7 +168,7 @@ object AudienceApp {
       |.match-row.live { border-left: 4px solid #c62828; background: #fff5f5; }
       |.match-row.ready { border-left: 4px solid #f9a825; }
       |.match-state { text-transform: uppercase; font-size: 0.8rem; color: #666; }
-      |.match-handicap { font-size: 0.9rem; color: #555; }
+      |.match-vs-handicap { font-size: 0.85em; font-weight: 700; color: #c62828; }
       |.match-score { font-weight: 600; font-size: 1.2rem; }
       |.match-bye { font-style: italic; opacity: 0.75; }
       |""".stripMargin

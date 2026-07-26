@@ -232,7 +232,7 @@ object DirectorApp {
         cls := "bracket-column",
         BracketView(
           tournament.bracket.get,
-          tournament.raceToByScope,
+          BracketHandicapContext.fromTournament(tournament),
           selectedMatchId.signal,
           Observer[String](id => selectedMatchId.set(Some(id)))
         )

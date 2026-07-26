@@ -2,13 +2,20 @@ package ph.samson.atbp.liga.js.audience
 
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.api.Models.*
+import ph.samson.atbp.liga.js.director.AppliedHandicapLabels
+import ph.samson.atbp.liga.js.director.AppliedHandicapView
+import ph.samson.atbp.liga.js.director.BracketHandicapContext
 import ph.samson.atbp.liga.js.director.BracketLayout
 import ph.samson.atbp.liga.js.director.RaceToLabels
 
 /** Read-only bracket display for the audience screen. */
 object AudienceBracketView {
 
-  def apply(bracket: Bracket, raceToByScope: Map[String, Int]): Div = {
+  def apply(
+      bracket: Bracket,
+      handicapContext: BracketHandicapContext
+  ): Div = {
+    val raceToByScope = handicapContext.raceToByScope
     val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
     div(
       cls := "audience-bracket",
@@ -31,14 +38,17 @@ object AudienceBracketView {
           ),
           div(
             cls := "round-matches",
-            group.matches.map(matchRow)
+            group.matches.map(matchRow(handicapContext, _))
           )
         )
       }
     )
   }
 
-  private def matchRow(matchDef: BracketMatch): Div = {
+  private def matchRow(
+      handicapContext: BracketHandicapContext,
+      matchDef: BracketMatch
+  ): Div = {
     val isLive = matchDef.state == BracketMatchState.Started
     val isReady = matchDef.state == BracketMatchState.Ready
     div(
@@ -48,21 +58,18 @@ object AudienceBracketView {
         if (isReady) (withLive :+ "ready").mkString(" ")
         else withLive.mkString(" ")
       },
-      span(cls := "match-players", playersLabel(matchDef)),
+      span(
+        cls := "match-players",
+        AppliedHandicapView.playersWithAppliedHandicap(
+          matchDef,
+          AppliedHandicapLabels.forMatch(handicapContext, matchDef)
+        )
+      ),
       span(cls := "match-state", BracketLayout.stateLabel(matchDef.state)),
-      matchDef.handicapApplied.filter(_ > 0).map { handicap =>
-        span(cls := "match-handicap", s"spot $handicap")
-      },
       BracketLayout.resultLabel(matchDef).map { label =>
         val labelClass = if (matchDef.isBye) "match-bye" else "match-score"
         span(cls := labelClass, label)
       }
     )
-  }
-
-  private def playersLabel(matchDef: BracketMatch): String = {
-    val a = BracketLayout.playerLabel(matchDef.playerA)
-    val b = BracketLayout.playerLabel(matchDef.playerB)
-    s"$a vs $b"
   }
 }

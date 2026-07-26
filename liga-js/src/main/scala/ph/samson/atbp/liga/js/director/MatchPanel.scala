@@ -86,6 +86,28 @@ object MatchPanel {
       case Left(hint)   => p(cls := "race-to-error", hint)
     }
 
+  /** Started/Completed applied-handicap line; loud when weaker cannot resolve.
+    */
+  private def appliedHandicapStatusLine(
+      tournament: TournamentResponse,
+      matchDef: BracketMatch,
+      completed: Boolean
+  ): Node = {
+    val display = AppliedHandicapLabels.forMatch(
+      BracketHandicapContext.fromTournament(tournament),
+      matchDef
+    )
+    AppliedHandicapLabels.panelStatusMessage(display, completed) match {
+      case None       => emptyNode
+      case Some(text) =>
+        if (AppliedHandicapLabels.panelStatusIsError(display)) {
+          p(cls := "race-to-error", text)
+        } else {
+          p(text)
+        }
+    }
+  }
+
   private def missingRaceToControls(matchDef: BracketMatch): Div =
     div(
       p(
@@ -203,13 +225,7 @@ object MatchPanel {
 
       case (BracketMatchState.Started, Some(raceTo)) =>
         div(
-          matchDef.handicapApplied
-            .flatMap { h =>
-              weakerPlayerName(tournament, matchDef, raceTo).map { name =>
-                p(s"Handicap applied: $h spot to $name")
-              }
-            }
-            .getOrElse(emptyNode),
+          appliedHandicapStatusLine(tournament, matchDef, completed = false),
           p(
             cls := "guidance",
             DirectorGuidance.scoreboardScoreHint(raceTo)
@@ -264,33 +280,25 @@ object MatchPanel {
         )
 
       case (BracketMatchState.Completed, _) =>
+        val handicapLine =
+          appliedHandicapStatusLine(tournament, matchDef, completed = true)
         if (matchDef.isBye) {
           div(
             p("Bye — auto-advance"),
-            matchDef.handicapApplied.map(h => p(s"Handicap was $h"))
+            handicapLine
           )
         } else {
           matchDef.result match {
             case Some(result) =>
               div(
                 p(s"Final score: ${result.scoreA}–${result.scoreB}"),
-                matchDef.handicapApplied.map(h => p(s"Handicap was $h"))
+                handicapLine
               )
             case None =>
-              div(p("Match completed."))
+              div(p("Match completed."), handicapLine)
           }
         }
     }
-
-  private def weakerPlayerName(
-      tournament: TournamentResponse,
-      matchDef: BracketMatch,
-      raceTo: Int
-  ): Option[String] =
-    MatchHandicapPreview
-      .fromMatch(tournament, matchDef, raceTo)
-      .map(_.weakerName)
-      .filter(_.nonEmpty)
 
   private def probabilityNeighborhood(
       weaker: shared.PlayerRating,

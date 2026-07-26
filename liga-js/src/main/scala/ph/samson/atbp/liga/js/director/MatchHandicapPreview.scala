@@ -18,16 +18,14 @@ final case class MatchHandicapPreview(
 object MatchHandicapPreview {
 
   def fromMatch(
-      tournament: TournamentResponse,
+      frozenRatings: List[PlayerRating],
       matchDef: BracketMatch,
       raceTo: Int
   ): Option[MatchHandicapPreview] = {
-    val ratingA = matchDef.playerA.flatMap(p =>
-      tournament.frozenRatings.find(_.player.name == p.name)
-    )
-    val ratingB = matchDef.playerB.flatMap(p =>
-      tournament.frozenRatings.find(_.player.name == p.name)
-    )
+    val ratingA =
+      matchDef.playerA.flatMap(p => frozenRatings.find(_.player.name == p.name))
+    val ratingB =
+      matchDef.playerB.flatMap(p => frozenRatings.find(_.player.name == p.name))
     for {
       a <- ratingA
       b <- ratingB
@@ -42,6 +40,13 @@ object MatchHandicapPreview {
     }
   }
 
+  def fromMatch(
+      tournament: TournamentResponse,
+      matchDef: BracketMatch,
+      raceTo: Int
+  ): Option[MatchHandicapPreview] =
+    fromMatch(tournament.frozenRatings, matchDef, raceTo)
+
   private def toSharedRating(rating: PlayerRating): shared.PlayerRating =
     shared.PlayerRating(
       shared.Player(rating.player.name),
@@ -50,4 +55,12 @@ object MatchHandicapPreview {
       rating.wins,
       rating.losses
     )
+
+  def forMatch(
+      context: BracketHandicapContext,
+      matchDef: BracketMatch
+  ): Option[MatchHandicapPreview] =
+    BracketLayout
+      .resolveMatchRaceTo(matchDef, context.raceToByScope)
+      .flatMap(fromMatch(context.frozenRatings, matchDef, _))
 }
