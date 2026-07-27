@@ -6,6 +6,7 @@ import ph.samson.atbp.liga.js.director.AppliedHandicapLabels
 import ph.samson.atbp.liga.js.director.AppliedHandicapView
 import ph.samson.atbp.liga.js.director.BracketHandicapContext
 import ph.samson.atbp.liga.js.director.BracketLayout
+import ph.samson.atbp.liga.js.director.MatchScoreView
 import ph.samson.atbp.liga.js.director.RaceToLabels
 
 /** Read-only bracket display for the audience screen. */
@@ -62,14 +63,12 @@ object AudienceBracketView {
         cls := "match-players",
         AppliedHandicapView.playersWithAppliedHandicap(
           matchDef,
-          AppliedHandicapLabels.forMatch(handicapContext, matchDef)
+          AppliedHandicapLabels.forMatch(handicapContext, matchDef),
+          BracketLayout.winnerSide(matchDef)
         )
       ),
       span(cls := "match-state", BracketLayout.stateLabel(matchDef.state)),
-      BracketLayout.resultLabel(matchDef).map { label =>
-        val labelClass = if (matchDef.isBye) "match-bye" else "match-score"
-        span(cls := labelClass, label)
-      }
+      MatchScoreView(matchDef)
     )
   }
 }

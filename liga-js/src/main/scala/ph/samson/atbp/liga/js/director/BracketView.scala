@@ -80,17 +80,15 @@ object BracketView {
         cls := "match-players",
         AppliedHandicapView.playersWithAppliedHandicap(
           matchDef,
-          AppliedHandicapLabels.forMatch(handicapContext, matchDef)
+          AppliedHandicapLabels.forMatch(handicapContext, matchDef),
+          BracketLayout.winnerSide(matchDef)
         )
       ),
       span(
         cls := "match-state",
         BracketLayout.stateLabel(matchDef.state)
       ),
-      BracketLayout.resultLabel(matchDef).map { label =>
-        val labelClass = if (matchDef.isBye) "match-bye" else "match-score"
-        span(cls := labelClass, label)
-      }
+      MatchScoreView(matchDef)
     )
   }
 }

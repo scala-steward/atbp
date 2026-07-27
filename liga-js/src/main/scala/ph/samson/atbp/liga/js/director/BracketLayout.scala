@@ -202,6 +202,25 @@ object BracketLayout {
       matchDef.result.map(result => s"${result.scoreA}–${result.scoreB}")
     }
 
+  enum MatchWinnerSide {
+    case A
+    case B
+  }
+
+  /** Winning side for completed non-bye matches with a clear score winner. */
+  def winnerSide(matchDef: BracketMatch): Option[MatchWinnerSide] =
+    Option
+      .when(
+        matchDef.state == BracketMatchState.Completed && !matchDef.isBye
+      )(
+        matchDef.result.flatMap { result =>
+          if (result.scoreA > result.scoreB) Some(MatchWinnerSide.A)
+          else if (result.scoreB > result.scoreA) Some(MatchWinnerSide.B)
+          else None
+        }
+      )
+      .flatten
+
   enum AppliedHandicapSide {
     case PlayerA
     case PlayerB

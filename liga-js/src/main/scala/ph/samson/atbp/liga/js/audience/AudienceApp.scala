@@ -170,6 +170,7 @@ object AudienceApp {
       |.match-state { text-transform: uppercase; font-size: 0.8rem; color: #666; }
       |.match-vs-handicap { font-size: 0.85em; font-weight: 700; color: #c62828; }
       |.match-score { font-weight: 600; font-size: 1.2rem; }
+      |.match-winner { font-weight: 700; color: #2e7d32; font-size: 1.3em; }
       |.match-bye { font-style: italic; opacity: 0.75; }
       |""".stripMargin
 }

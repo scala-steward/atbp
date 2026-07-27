@@ -486,6 +486,74 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         BracketLayout.scopeRaceTo("wb-2-1", Map("wb-2" -> 9)) == Some(9),
         BracketLayout.scopeRaceTo("wb-2-1", Map.empty).isEmpty
       )
+    },
+    test("winnerSide returns A when completed non-bye scoreA > scoreB") {
+      val matchDef = completedMatch(scoreA = 7, scoreB = 4)
+      assertTrue(
+        BracketLayout.winnerSide(matchDef) == Some(
+          BracketLayout.MatchWinnerSide.A
+        )
+      )
+    },
+    test("winnerSide returns B when completed non-bye scoreB > scoreA") {
+      val matchDef = completedMatch(scoreA = 4, scoreB = 7)
+      assertTrue(
+        BracketLayout.winnerSide(matchDef) == Some(
+          BracketLayout.MatchWinnerSide.B
+        )
+      )
+    },
+    test("winnerSide returns None for completed tie") {
+      val matchDef = completedMatch(scoreA = 5, scoreB = 5)
+      assertTrue(BracketLayout.winnerSide(matchDef) == None)
+    },
+    test("winnerSide returns None for pending matches") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Pending
+      )
+      assertTrue(BracketLayout.winnerSide(matchDef) == None)
+    },
+    test("winnerSide returns None for started matches") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Started,
+        result = Some(MatchResult(scoreA = 3, scoreB = 1))
+      )
+      assertTrue(BracketLayout.winnerSide(matchDef) == None)
+    },
+    test("winnerSide returns None when completed but no result") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Completed
+      )
+      assertTrue(BracketLayout.winnerSide(matchDef) == None)
+    },
+    test("winnerSide returns None for completed bye matches") {
+      val byeMatch = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = None,
+        state = BracketMatchState.Completed,
+        result = Some(MatchResult(scoreA = 1, scoreB = 0)),
+        isBye = true
+      )
+      assertTrue(BracketLayout.winnerSide(byeMatch) == None)
     }
   )
+
+  private def completedMatch(scoreA: Int, scoreB: Int): BracketMatch =
+    BracketMatch(
+      id = "wb-1-2",
+      playerA = Some(Player("P1")),
+      playerB = Some(Player("P2")),
+      state = BracketMatchState.Completed,
+      result = Some(MatchResult(scoreA = scoreA, scoreB = scoreB))
+    )
 }

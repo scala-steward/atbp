@@ -46,7 +46,9 @@ Active-phase layout (`DirectorApp.mainLayout`): CSS grid — bracket column + ma
 |------|------|
 | `director/DirectorApp.scala` | Root app, phase routing, selection, actions |
 | `director/BracketView.scala` | Match list by section/round |
-| `director/BracketLayout.scala` | Grouping/order, labels, actionable detection |
+| `director/BracketLayout.scala` | Grouping/order, labels, winner-side helper, actionable detection |
+| `director/AppliedHandicapView.scala` | Player names + handicap markers on bracket rows |
+| `director/MatchScoreView.scala` | Shared score/bye rendering for director + audience brackets |
 | `director/MatchPanel.scala` | Ready / handicap / start / score controls |
 | `director/WizardView.scala` | Pre-seed setup (roster, race-to, seed) |
 | `director/DirectorGuidance.scala` | Copy / error hints |
