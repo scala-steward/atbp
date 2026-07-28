@@ -2,6 +2,7 @@ package ph.samson.atbp.liga.js.director
 
 import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.js.api.Models.*
+import ph.samson.atbp.liga.js.api.PlayerRatingConversions
 import ph.samson.atbp.liga.model as shared
 
 /** Single handicap preview for a bracket match from frozen tournament ratings.
@@ -30,8 +31,8 @@ object MatchHandicapPreview {
       a <- ratingA
       b <- ratingB
     } yield {
-      val sharedA = toSharedRating(a)
-      val sharedB = toSharedRating(b)
+      val sharedA = PlayerRatingConversions.toShared(a)
+      val sharedB = PlayerRatingConversions.toShared(b)
       val suggestion = Handicap.suggest(sharedA, sharedB, raceTo)
       val (weaker, stronger) =
         if (suggestion.weakerPlayer == sharedA.player) (sharedA, sharedB)
@@ -46,15 +47,6 @@ object MatchHandicapPreview {
       raceTo: Int
   ): Option[MatchHandicapPreview] =
     fromMatch(tournament.frozenRatings, matchDef, raceTo)
-
-  private def toSharedRating(rating: PlayerRating): shared.PlayerRating =
-    shared.PlayerRating(
-      shared.Player(rating.player.name),
-      rating.rating,
-      rating.rd,
-      rating.wins,
-      rating.losses
-    )
 
   def forMatch(
       context: BracketHandicapContext,

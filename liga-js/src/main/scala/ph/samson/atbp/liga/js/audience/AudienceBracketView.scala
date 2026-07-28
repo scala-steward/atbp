@@ -63,6 +63,7 @@ object AudienceBracketView {
         cls := "match-players",
         AppliedHandicapView.playersWithAppliedHandicap(
           matchDef,
+          handicapContext,
           AppliedHandicapLabels.forMatch(handicapContext, matchDef),
           BracketLayout.winnerSide(matchDef)
         )

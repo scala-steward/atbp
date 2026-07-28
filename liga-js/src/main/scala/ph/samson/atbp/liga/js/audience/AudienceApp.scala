@@ -171,6 +171,18 @@ object AudienceApp {
       |.match-vs-handicap { font-size: 0.85em; font-weight: 700; color: #c62828; }
       |.match-score { font-weight: 600; font-size: 1.2rem; }
       |.match-winner { font-weight: 700; color: #2e7d32; font-size: 1.3em; }
+      |.player-cell {
+      |  display: inline-flex;
+      |  flex-direction: column;
+      |  align-items: center;
+      |  vertical-align: middle;
+      |}
+      |.player-rating {
+      |  font-size: 0.7em;
+      |  color: #888;
+      |  font-variant-numeric: tabular-nums;
+      |  line-height: 1.1;
+      |}
       |.match-bye { font-style: italic; opacity: 0.75; }
       |""".stripMargin
 }
