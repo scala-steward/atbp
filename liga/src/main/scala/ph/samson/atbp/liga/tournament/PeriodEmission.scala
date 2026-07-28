@@ -37,22 +37,33 @@ object PeriodEmission {
       state: TournamentState,
       completed: LocalDate
   ): Either[String, Period] =
+    toPeriodWithMatchIds(state, completed).map(_._1)
+
+  /** Period plus bracket match IDs in the same order as `period.matches`. */
+  def toPeriodWithMatchIds(
+      state: TournamentState,
+      completed: LocalDate
+  ): Either[String, (Period, List[String])] =
     for {
       _ <- validateReady(state)
       bracket <- state.bracket.toRight("no bracket loaded")
-      matches <- bracket.matches
+      rows <- bracket.matches
         .filter(matchHasResult)
         .sortBy(_.id)
-        .foldLeft(Right(Nil): Either[String, List[PeriodMatch]]) {
+        .foldLeft(Right(Nil): Either[String, List[(PeriodMatch, String)]]) {
           case (Right(acc), matchDef) =>
-            toPeriodMatch(state, matchDef).map(acc :+ _)
+            toPeriodMatch(state, matchDef)
+              .map(row => acc :+ (row -> matchDef.id))
           case (left, _) => left
         }
-    } yield Period(
-      name = state.name,
-      completed = completed,
-      matches = matches
-    )
+    } yield {
+      val (matches, matchIds) = rows.unzip
+      Period(
+        name = state.name,
+        completed = completed,
+        matches = matches
+      ) -> matchIds
+    }
 
   def write(
       dataDir: File,
@@ -60,9 +71,10 @@ object PeriodEmission {
       completed: LocalDate
   ): Task[File] =
     for {
-      period <- ZIO.fromEither(
-        toPeriod(state, completed).left.map(EmissionError(_))
+      built <- ZIO.fromEither(
+        toPeriodWithMatchIds(state, completed).left.map(EmissionError(_))
       )
+      (period, matchIds) = built
       target = dataDir / periodFilename(state.name, completed)
       exists <- ZIO.attemptBlocking(target.exists)
       _ <- ZIO.when(exists) {
@@ -75,7 +87,10 @@ object PeriodEmission {
       _ <- ZIO.attemptBlocking(
         dataDir.createDirectoryIfNotExists(createParents = true)
       )
-      _ <- ZIO.attemptBlocking(target.write(PeriodWriter.write(period)))
+      hocon <- ZIO.fromEither(
+        PeriodWriter.write(period, matchIds).left.map(EmissionError(_))
+      )
+      _ <- ZIO.attemptBlocking(target.write(hocon))
     } yield target
 
   /** Write a new period file, or verify an existing file matches expected
@@ -90,16 +105,23 @@ object PeriodEmission {
       completed: LocalDate
   ): Task[Unit] =
     for {
-      period <- ZIO.fromEither(
-        toPeriod(state, completed).left.map(EmissionError(_))
+      built <- ZIO.fromEither(
+        toPeriodWithMatchIds(state, completed).left.map(EmissionError(_))
       )
+      (period, matchIds) = built
       target = dataDir / periodFilename(state.name, completed)
       exists <- ZIO.attemptBlocking(target.exists)
       _ <-
         if (!exists) {
-          ZIO.attemptBlocking(
-            dataDir.createDirectoryIfNotExists(createParents = true)
-          ) *> ZIO.attemptBlocking(target.write(PeriodWriter.write(period)))
+          for {
+            _ <- ZIO.attemptBlocking(
+              dataDir.createDirectoryIfNotExists(createParents = true)
+            )
+            hocon <- ZIO.fromEither(
+              PeriodWriter.write(period, matchIds).left.map(EmissionError(_))
+            )
+            _ <- ZIO.attemptBlocking(target.write(hocon))
+          } yield ()
         } else {
           for {
             onDisk <- PeriodCodec.parseFile(target)

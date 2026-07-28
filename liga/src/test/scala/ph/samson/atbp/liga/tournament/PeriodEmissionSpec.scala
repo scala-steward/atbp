@@ -4,6 +4,7 @@ import better.files.File
 import ph.samson.atbp.liga.io.PeriodCodec
 import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.testsupport.PeriodHoconTestSupport
 import zio.ZIO
 import zio.test.*
 
@@ -18,29 +19,97 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
 
   private val alice = rating("Alice", 1700)
   private val bob = rating("Bob", 1400)
+  private val carol = rating("Carol", 1500)
+
+  private def completedMatch(
+      id: String,
+      playerA: PlayerRating,
+      playerB: PlayerRating,
+      boardA: Int,
+      boardB: Int,
+      handicapApplied: Int
+  ): BracketMatch =
+    BracketMatch(
+      id = id,
+      playerA = Some(playerA.player),
+      playerB = Some(playerB.player),
+      state = BracketMatchState.Completed,
+      handicapSuggested = Some(handicapApplied),
+      handicapApplied = Some(handicapApplied),
+      result = Some(MatchResult(boardA, boardB))
+    )
 
   private def handicappedMatchState(
       boardA: Int,
       boardB: Int,
       handicapApplied: Int
   ): TournamentState = {
-    val completedMatch = BracketMatch(
-      id = "wb-1-1",
-      playerA = Some(alice.player),
-      playerB = Some(bob.player),
-      state = BracketMatchState.Completed,
-      handicapSuggested = Some(2),
-      handicapApplied = Some(handicapApplied),
-      result = Some(MatchResult(boardA, boardB))
-    )
     TournamentState(
       name = "Spring Open",
       players = List(alice.player, bob.player),
-      bracket = Some(Bracket(size = 8, matches = List(completedMatch))),
+      bracket = Some(
+        Bracket(
+          size = 8,
+          matches = List(
+            completedMatch(
+              "wb-1-1",
+              alice,
+              bob,
+              boardA,
+              boardB,
+              handicapApplied
+            )
+          )
+        )
+      ),
       frozenRatings = Map(alice.player -> alice, bob.player -> bob),
       raceToByScope = Map("wb-1" -> 7)
     )
   }
+
+  /** Minimal multi-match completed tournament spanning WB / LB / GF IDs. */
+  private def multiMatchCompletedState: TournamentState =
+    TournamentState(
+      name = "Spring Open",
+      players = List(alice.player, bob.player, carol.player),
+      bracket = Some(
+        Bracket(
+          size = 4,
+          matches = List(
+            completedMatch(
+              "wb-1-1",
+              alice,
+              bob,
+              boardA = 7,
+              boardB = 4,
+              handicapApplied = 0
+            ),
+            completedMatch(
+              "lb-1-1",
+              bob,
+              carol,
+              boardA = 5,
+              boardB = 7,
+              handicapApplied = 0
+            ),
+            completedMatch(
+              "gf-1",
+              alice,
+              carol,
+              boardA = 7,
+              boardB = 3,
+              handicapApplied = 0
+            )
+          )
+        )
+      ),
+      frozenRatings = Map(
+        alice.player -> alice,
+        bob.player -> bob,
+        carol.player -> carol
+      ),
+      raceToByScope = Map("wb-1" -> 7, "lb-1" -> 7, "gf" -> 7)
+    )
 
   def spec = suite("PeriodEmission")(
     test("periodFilename uses completed date and slugified tournament name") {
@@ -122,6 +191,78 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
             after.last.period.completed == completed
           )
         }
+      }
+    },
+    test("emitted match objects start with # <BracketMatch.id> comments") {
+      ZIO.acquireReleaseWith(
+        ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-period-match-id-comments")
+        )
+      )(root => ZIO.attemptBlocking(root.delete()).ignore) { root =>
+        for {
+          written <- PeriodEmission.write(
+            root,
+            multiMatchCompletedState,
+            completed
+          )
+          text <- ZIO.attemptBlocking(written.contentAsString)
+        } yield {
+          val firstLines = PeriodHoconTestSupport.firstInteriorLines(text)
+          assertTrue(
+            // Emission sorts matches by BracketMatch.id
+            firstLines == List("# gf-1", "# lb-1-1", "# wb-1-1"),
+            text.contains("# wb-1-1"),
+            text.contains("# lb-1-1"),
+            text.contains("# gf-1")
+          )
+        }
+      }
+    },
+    test("writeOrVerify succeeds when existing commented file matches period") {
+      ZIO.acquireReleaseWith(
+        ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-period-write-or-verify-ok")
+        )
+      )(root => ZIO.attemptBlocking(root.delete()).ignore) { root =>
+        val state = multiMatchCompletedState
+        for {
+          written <- PeriodEmission.write(root, state, completed)
+          before <- ZIO.attemptBlocking(written.contentAsString)
+          _ <- PeriodEmission.writeOrVerify(root, state, completed)
+          after <- ZIO.attemptBlocking(written.contentAsString)
+        } yield assertTrue(
+          before.contains("# wb-1-1"),
+          after == before
+        )
+      }
+    },
+    test("writeOrVerify fails when existing file differs semantically") {
+      ZIO.acquireReleaseWith(
+        ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-period-write-or-verify-mismatch")
+        )
+      )(root => ZIO.attemptBlocking(root.delete()).ignore) { root =>
+        val original = multiMatchCompletedState
+        val mismatched = original.copy(
+          bracket = original.bracket.map { bracket =>
+            bracket.copy(
+              matches = bracket.matches.map {
+                case m if m.id == "wb-1-1" =>
+                  m.copy(result = Some(MatchResult(7, 0)))
+                case other => other
+              }
+            )
+          }
+        )
+        for {
+          _ <- PeriodEmission.write(root, original, completed)
+          result <- PeriodEmission
+            .writeOrVerify(root, mismatched, completed)
+            .either
+        } yield assertTrue(
+          result.isLeft,
+          result.left.exists(_.getMessage.contains("mismatch"))
+        )
       }
     }
   )

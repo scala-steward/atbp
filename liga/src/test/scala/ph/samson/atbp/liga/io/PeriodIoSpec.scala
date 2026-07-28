@@ -2,6 +2,7 @@ package ph.samson.atbp.liga.io
 
 import better.files.File
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.testsupport.PeriodHoconTestSupport
 import zio.test.*
 
 import java.time.LocalDate
@@ -59,6 +60,69 @@ object PeriodIoSpec extends ZIOSpecDefault {
         written = PeriodWriter.write(parsed)
         roundTripped <- PeriodCodec.parseString(written)
       } yield assertTrue(roundTripped == parsed)
+    },
+    test("plain write does not emit bracket match-id comments") {
+      for {
+        parsed <- PeriodCodec.parseFile(springOpen)
+        written = PeriodWriter.write(parsed)
+      } yield assertTrue(
+        PeriodHoconTestSupport.matchObjectsLackBracketIdComments(written)
+      )
+    },
+    test("write with mismatched match ID count returns Left") {
+      for {
+        parsed <- PeriodCodec.parseFile(springOpen)
+      } yield {
+        val result = PeriodWriter.write(parsed, List("only-one"))
+        assertTrue(
+          result.isLeft,
+          result.left.exists(_.contains("match ID count"))
+        )
+      }
+    },
+    test("match ID comments ignore braces outside matches array") {
+      val hocon = """name = "Test"
+                    |completed = "2026-03-15"
+                    |notes = {
+                    |  reviewer = "human"
+                    |}
+                    |matches = [
+                    |  {
+                    |    player-a = "Alice"
+                    |    player-b = "Bob"
+                    |    score-a = 7
+                    |    score-b = 4
+                    |    race-to = 7
+                    |    handicap-suggested = 0
+                    |    handicap-applied = 0
+                    |  }
+                    |]
+                    |""".stripMargin
+      val result = PeriodWriter.injectMatchIdComments(hocon, List("wb-1-1"))
+      val written = result.getOrElse("")
+      val notesBlock = written.split("matches = \\[").head
+      assertTrue(
+        result.isRight,
+        written.contains("# wb-1-1"),
+        !notesBlock.contains("# wb-1-1")
+      )
+    },
+    test(
+      "write with match IDs puts # <id> as first line inside each match object"
+    ) {
+      for {
+        parsed <- PeriodCodec.parseFile(springOpen)
+        ids = List("wb-1-1", "wb-1-2")
+        written = PeriodWriter.write(parsed, ids).getOrElse("")
+        roundTripped <- PeriodCodec.parseString(written)
+      } yield {
+        val firstLines = PeriodHoconTestSupport.firstInteriorLines(written)
+        assertTrue(
+          PeriodWriter.write(parsed, ids).isRight,
+          firstLines == List("# wb-1-1", "# wb-1-2"),
+          roundTripped == parsed
+        )
+      }
     },
     test("invalid HOCON surfaces a clear error") {
       val invalid = """name = "Broken"
