@@ -20,6 +20,8 @@ that list into period checkboxes vs one-by-one guest entry is busywork.
 ## Success
 
 - Paste replaces the current local selection with the pasted names.
+- Non-name suffixes (email, ratings, parenthetical notes) are stripped from
+  each line before matching; only the player name is kept.
 - Exact string match against the period leaderboard preserves period ratings.
 - Non-matching names are guests (default rating at seed, as today).
 - Resulting roster displays ordered by descending rating, with guests highlighted.

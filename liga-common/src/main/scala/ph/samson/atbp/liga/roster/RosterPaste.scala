@@ -17,11 +17,18 @@ object RosterPaste {
     */
   val GuestDisplayRating: Double = Tuning.Default.initRating
 
+  private def isNameChar(ch: Char): Boolean =
+    ch.isLetter || ch == ' ' || ch == '-' || ch == '\'' || ch == '\u2019' || ch == '.'
+
+  private def cleanName(line: String): String =
+    line.takeWhile(isNameChar).trim
+
   def parsePaste(raw: String): List[String] =
     raw
       .split("\\r\\n|\\r|\\n")
       .iterator
       .map(_.trim)
+      .map(cleanName)
       .filter(_.nonEmpty)
       .toList
       .distinct

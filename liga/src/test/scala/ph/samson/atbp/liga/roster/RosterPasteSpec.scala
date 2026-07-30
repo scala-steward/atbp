@@ -34,6 +34,40 @@ object RosterPasteSpec extends ZIOSpecDefault {
       },
       test("empty paste yields no names") {
         assertTrue(RosterPaste.parsePaste("") == Nil)
+      },
+      test("strips email suffix") {
+        assertTrue(
+          RosterPaste.parsePaste("John Doe <john@doe.com>") == List("John Doe")
+        )
+      },
+      test("strips trailing rating") {
+        assertTrue(
+          RosterPaste.parsePaste("John Doe 1543") == List("John Doe")
+        )
+      },
+      test("strips parenthetical rating") {
+        assertTrue(
+          RosterPaste.parsePaste("John Doe (1543)") == List("John Doe")
+        )
+      },
+      test("keeps middle initial with period") {
+        assertTrue(
+          RosterPaste.parsePaste("John Q. Doe") == List("John Q. Doe")
+        )
+      },
+      test("keeps apostrophe in name") {
+        assertTrue(RosterPaste.parsePaste("O'Brien") == List("O'Brien"))
+      },
+      test("keeps curly apostrophe in name") {
+        assertTrue(
+          RosterPaste.parsePaste("O\u2019Brien") == List("O\u2019Brien")
+        )
+      },
+      test("keeps hyphenated name") {
+        assertTrue(RosterPaste.parsePaste("Mary-Jane") == List("Mary-Jane"))
+      },
+      test("drops line that is only junk after cleaning") {
+        assertTrue(RosterPaste.parsePaste("<x@y.z>") == Nil)
       }
     ),
     suite("resolveRoster")(
@@ -102,6 +136,14 @@ object RosterPasteSpec extends ZIOSpecDefault {
             RosterEntry("Carol", tuning.initRating, guest = false),
             RosterEntry("Ned", tuning.initRating, guest = true)
           )
+        )
+      },
+      test("cleaned paste name matches period instead of guest") {
+        val period = Map("John Doe" -> pr("John Doe", 1800, rd = 100))
+        val names = RosterPaste.parsePaste("John Doe 1543")
+        val roster = RosterPaste.resolveRoster(names, period)
+        assertTrue(
+          roster == List(RosterEntry("John Doe", 1800, guest = false))
         )
       }
     )
