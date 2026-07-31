@@ -40,6 +40,13 @@ object RosterPasteSpec extends ZIOSpecDefault {
           RosterPaste.parsePaste("John Doe <john@doe.com>") == List("John Doe")
         )
       },
+      test("strips email suffix and trailing tab from a copied table row") {
+        assertTrue(
+          RosterPaste.parsePaste(
+            "John Doe <john@doe.com>\t\nMary Roe <mary@roe.com>\t"
+          ) == List("John Doe", "Mary Roe")
+        )
+      },
       test("strips trailing rating") {
         assertTrue(
           RosterPaste.parsePaste("John Doe 1543") == List("John Doe")
