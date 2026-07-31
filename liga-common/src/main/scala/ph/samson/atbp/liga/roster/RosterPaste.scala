@@ -33,6 +33,10 @@ object RosterPaste {
       .toList
       .distinct
 
+  /** Render cleaned names as textarea content (no trailing newline). */
+  def formatPaste(names: List[String]): String =
+    names.mkString("\n")
+
   def resolveRoster(
       names: List[String],
       periodByName: Map[String, PlayerRating]

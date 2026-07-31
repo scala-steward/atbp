@@ -77,6 +77,33 @@ object RosterPasteSpec extends ZIOSpecDefault {
         assertTrue(RosterPaste.parsePaste("<x@y.z>") == Nil)
       }
     ),
+    suite("formatPaste")(
+      test("empty list yields empty string") {
+        assertTrue(RosterPaste.formatPaste(Nil) == "")
+      },
+      test("single name is unchanged") {
+        assertTrue(RosterPaste.formatPaste(List("Alice")) == "Alice")
+      },
+      test("several names joined by newline with no trailing newline") {
+        assertTrue(
+          RosterPaste.formatPaste(List("Alice", "Bob", "Carol")) ==
+            "Alice\nBob\nCarol"
+        )
+      },
+      test(
+        "formatPaste(parsePaste(raw)) has no leading or trailing whitespace"
+      ) {
+        val raw = "  Alice <a@b.c>\n\nBob 1543  \n\n"
+        val formatted = RosterPaste.formatPaste(RosterPaste.parsePaste(raw))
+        assertTrue(
+          formatted.nonEmpty &&
+            !formatted.startsWith(" ") &&
+            !formatted.endsWith(" ") &&
+            !formatted.startsWith("\n") &&
+            !formatted.endsWith("\n")
+        )
+      }
+    ),
     suite("resolveRoster")(
       test("exact match keeps period rating; unknown is guest at initRating") {
         val period = Map(

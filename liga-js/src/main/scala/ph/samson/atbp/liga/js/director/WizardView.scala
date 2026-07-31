@@ -42,8 +42,16 @@ object WizardView {
       onSetPlayers: Observer[List[Player]],
       onSaveAndLock: Observer[List[Player]]
   ): Div = {
-    val names = Var(tournament.players.map(_.name))
-    val pasteText = Var(tournament.players.map(_.name).mkString("\n"))
+    val initialNames = tournament.players.map(_.name)
+    val names = Var(initialNames)
+    val pasteText = Var(RosterPaste.formatPaste(initialNames))
+
+    def applyCleanedPaste(): List[String] = {
+      val rosterNames = RosterPaste.parsePaste(pasteText.now())
+      names.set(rosterNames)
+      pasteText.set(RosterPaste.formatPaste(rosterNames))
+      rosterNames
+    }
 
     val pasteDirty: Signal[Boolean] =
       pasteText.signal
@@ -96,7 +104,7 @@ object WizardView {
         button(
           disabled <-- pasteText.signal.map(_.trim.isEmpty),
           onClick.mapTo(()) --> Observer[Unit] { _ =>
-            names.set(RosterPaste.parsePaste(pasteText.now()))
+            val _ = applyCleanedPaste()
           },
           "Apply paste"
         ),
@@ -170,8 +178,7 @@ object WizardView {
             isBusy || !TournamentBounds.validPlayerCount(count)
           },
           onClick.mapTo(()) --> Observer[Unit] { _ =>
-            val rosterNames = RosterPaste.parsePaste(pasteText.now())
-            names.set(rosterNames)
+            val rosterNames = applyCleanedPaste()
             onSaveAndLock.onNext(rosterNames.map(Player(_)))
           },
           "Lock roster"
