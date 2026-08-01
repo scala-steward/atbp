@@ -259,6 +259,24 @@ object BracketSpec extends ZIOSpecDefault {
         val lb1 = findMatch(after.bracket, "lb-1-2")
         assertTrue(lb1.playerB.contains(Player("P6")))
       },
+      test("advance without placeholder result completes without scores") {
+        val players = ratings((1 to 8).map(i => s"P$i").toList)
+        val bracket = BracketGen.generate(players)
+        val after = Advancement
+          .advance(
+            bracket,
+            "wb-1-4",
+            Player("P3"),
+            recordPlaceholderResult = false
+          )
+          .toOption
+          .get
+        val completed = findMatch(after.bracket, "wb-1-4")
+        assertTrue(
+          completed.state == BracketMatchState.Completed,
+          completed.result.isEmpty
+        )
+      },
       test("grand final becomes ready when both brackets resolve") {
         val players = ratings((1 to 8).map(i => s"P$i").toList)
         val played = playOutTournament(players, maxSteps = 100)

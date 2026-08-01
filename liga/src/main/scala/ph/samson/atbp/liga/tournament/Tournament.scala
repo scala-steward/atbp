@@ -249,6 +249,32 @@ object Tournament {
       )
     )
 
+  def recordForfeit(
+      state: TournamentState,
+      matchId: String,
+      forfeitingSide: String,
+      reason: String,
+      seq: Int,
+      at: Instant
+  ): Either[Error, TournamentEvent.MatchForfeit] =
+    for {
+      _ <- MatchLifecycle.requireActive(state)
+      matchDef <- MatchLifecycle.findMatch(state, matchId)
+      (side, trimmedReason) <- MatchLifecycle.validateForfeit(
+        matchDef,
+        forfeitingSide,
+        reason
+      )
+    } yield TournamentEvent.MatchForfeit(
+      seq = seq,
+      at = at,
+      payload = MatchForfeitPayload(
+        matchId = matchId,
+        forfeitingSide = MatchSide.wire(side),
+        reason = trimmedReason
+      )
+    )
+
   def complete(
       state: TournamentState,
       completed: LocalDate,

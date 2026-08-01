@@ -248,6 +248,9 @@ object DirectorApp {
               Observer[Unit](_ => runAction(client.start(matchDef.id))),
               Observer[(Int, Int)] { case (scoreA, scoreB) =>
                 runAction(client.recordResult(matchDef.id, scoreA, scoreB))
+              },
+              Observer[(String, String)] { case (side, reason) =>
+                runAction(client.recordForfeit(matchDef.id, side, reason))
               }
             )
           case None =>

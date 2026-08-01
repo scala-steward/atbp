@@ -176,6 +176,8 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         RaceToRequest(Map("wb-1" -> 7)).toJson.contains("\"raceToByScope\""),
         HandicapRequest(3).toJson == """{"handicap":3}""",
         ResultRequest(7, 4).toJson == """{"scoreA":7,"scoreB":4}""",
+        ForfeitRequest("A", "no-show").toJson ==
+          """{"forfeitingSide":"A","reason":"no-show"}""",
         CompleteRequest(None).toJson == "{}",
         CompleteRequest(Some(LocalDate.parse("2026-03-15"))).toJson ==
           """{"completed":"2026-03-15"}"""

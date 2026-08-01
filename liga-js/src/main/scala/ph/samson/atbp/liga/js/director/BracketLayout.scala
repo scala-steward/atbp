@@ -3,6 +3,7 @@ package ph.samson.atbp.liga.js.director
 import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
+import ph.samson.atbp.liga.model.MatchSide
 
 /** Pure bracket layout helpers for the director UI. */
 object BracketLayout {
@@ -198,6 +199,10 @@ object BracketLayout {
   def resultLabel(matchDef: BracketMatch): Option[String] =
     if (matchDef.isBye && matchDef.state == BracketMatchState.Completed) {
       Some("bye")
+    } else if (
+      matchDef.state == BracketMatchState.Completed && matchDef.forfeit.nonEmpty
+    ) {
+      matchDef.forfeit.map(info => s"forfeit: ${info.reason}")
     } else {
       matchDef.result.map(result => s"${result.scoreA}–${result.scoreB}")
     }
@@ -207,17 +212,31 @@ object BracketLayout {
     case B
   }
 
-  /** Winning side for completed non-bye matches with a clear score winner. */
+  /** Winning side for completed non-bye matches with a clear score or forfeit
+    * winner.
+    */
   def winnerSide(matchDef: BracketMatch): Option[MatchWinnerSide] =
     Option
       .when(
         matchDef.state == BracketMatchState.Completed && !matchDef.isBye
       )(
-        matchDef.result.flatMap { result =>
-          if (result.scoreA > result.scoreB) Some(MatchWinnerSide.A)
-          else if (result.scoreB > result.scoreA) Some(MatchWinnerSide.B)
-          else None
-        }
+        matchDef.forfeit
+          .flatMap { info =>
+            MatchSide.parse(info.forfeitingSide).map { forfeiting =>
+              MatchSide.select(
+                MatchSide.winnerFromForfeiting(forfeiting),
+                MatchWinnerSide.A,
+                MatchWinnerSide.B
+              )
+            }
+          }
+          .orElse(
+            matchDef.result.flatMap { result =>
+              if (result.scoreA > result.scoreB) Some(MatchWinnerSide.A)
+              else if (result.scoreB > result.scoreA) Some(MatchWinnerSide.B)
+              else None
+            }
+          )
       )
       .flatten
 

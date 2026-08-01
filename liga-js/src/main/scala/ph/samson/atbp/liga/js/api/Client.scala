@@ -80,6 +80,16 @@ final class ApiClient private (baseUrl: String)(using ExecutionContext) {
       Some(ResultRequest(scoreA, scoreB).toJson)
     )
 
+  def recordForfeit(
+      matchId: String,
+      forfeitingSide: String,
+      reason: String
+  ): Future[TournamentResponse] =
+    post(
+      s"/api/matches/$matchId/forfeit",
+      Some(ForfeitRequest(forfeitingSide, reason).toJson)
+    )
+
   def completeTournament(): Future[TournamentResponse] =
     post(
       "/api/tournament/complete",

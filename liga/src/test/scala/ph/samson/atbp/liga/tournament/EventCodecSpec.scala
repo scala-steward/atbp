@@ -2,7 +2,9 @@ package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.bracket.BracketGen
 import ph.samson.atbp.liga.model.*
+import ph.samson.atbp.liga.tournament.EventCodec.given
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
+import zio.json.*
 import zio.test.*
 
 import java.time.Instant
@@ -88,6 +90,48 @@ object EventCodecSpec extends ZIOSpecDefault {
         payload = MatchResultPayload(matchId = "wb-1-1", scoreA = 7, scoreB = 4)
       )
       assertTrue(roundTrip(event))
+    },
+    test("MatchForfeit round-trips through JSON") {
+      val event = TournamentEvent.MatchForfeit(
+        seq = 11,
+        at = at,
+        payload = MatchForfeitPayload(
+          matchId = "wb-1-1",
+          forfeitingSide = "A",
+          reason = "no-show"
+        )
+      )
+      assertTrue(
+        roundTrip(event),
+        EventCodec.encode(event).contains("\"type\":\"MatchForfeit\"")
+      )
+    },
+    test("BracketMatch without forfeit field decodes to None") {
+      val json =
+        """{"id":"wb-1-1","playerA":{"name":"Alice"},"playerB":{"name":"Bob"},"state":"Ready"}"""
+      val decoded = json.fromJson[BracketMatch]
+      assertTrue(
+        decoded == Right(
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("Alice")),
+            playerB = Some(Player("Bob")),
+            state = BracketMatchState.Ready
+          )
+        )
+      )
+    },
+    test("filenameFor MatchForfeit") {
+      val forfeit = TournamentEvent.MatchForfeit(
+        seq = 12,
+        at = at,
+        payload = MatchForfeitPayload(
+          matchId = "wb-1-1",
+          forfeitingSide = "B",
+          reason = "illness"
+        )
+      )
+      assertTrue(EventLog.filenameFor(forfeit) == "000012-forfeit.json")
     },
     test("TournamentCompleted round-trips through JSON") {
       val event = TournamentEvent.TournamentCompleted(

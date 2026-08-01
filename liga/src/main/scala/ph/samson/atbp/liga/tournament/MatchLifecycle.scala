@@ -78,18 +78,7 @@ object MatchLifecycle {
             )
           )
         }
-      _ <-
-        if (matchDef.playerA.nonEmpty && matchDef.playerB.nonEmpty) {
-          Right(())
-        } else {
-          Left(
-            InvalidTransitionError(
-              matchDef.id,
-              "ready",
-              "both players must be assigned"
-            )
-          )
-        }
+      _ <- requireBothPlayers(matchDef, "ready")
       _ <-
         if (matchDef.handicapSuggested.isEmpty) {
           Right(())
@@ -173,6 +162,51 @@ object MatchLifecycle {
       )
     }
 
+  def validateForfeit(
+      matchDef: BracketMatch,
+      forfeitingSide: String,
+      reason: String
+  ): Either[Error, (MatchSide, String)] =
+    for {
+      _ <-
+        if (
+          matchDef.state == BracketMatchState.Ready ||
+          matchDef.state == BracketMatchState.Started
+        ) {
+          Right(())
+        } else {
+          Left(
+            InvalidTransitionError(
+              matchDef.id,
+              "forfeit",
+              s"match is ${matchDef.state}"
+            )
+          )
+        }
+      _ <- requireBothPlayers(matchDef, "forfeit")
+      side <- MatchSide
+        .parse(forfeitingSide)
+        .toRight(
+          InvalidTransitionError(
+            matchDef.id,
+            "forfeit",
+            "forfeitingSide must be A or B"
+          )
+        )
+      trimmed <-
+        if (reason.trim.nonEmpty) {
+          Right(reason.trim)
+        } else {
+          Left(
+            InvalidTransitionError(
+              matchDef.id,
+              "forfeit",
+              "reason must be non-blank"
+            )
+          )
+        }
+    } yield (side, trimmed)
+
   def resolveRaceTo(
       state: TournamentState,
       matchId: String
@@ -191,4 +225,20 @@ object MatchLifecycle {
         .get(scope)
         .toRight(MissingRaceToError(matchId, scope))
     } yield raceTo
+
+  private def requireBothPlayers(
+      matchDef: BracketMatch,
+      action: String
+  ): Either[Error, Unit] =
+    if (matchDef.playerA.nonEmpty && matchDef.playerB.nonEmpty) {
+      Right(())
+    } else {
+      Left(
+        InvalidTransitionError(
+          matchDef.id,
+          action,
+          "both players must be assigned"
+        )
+      )
+    }
 }

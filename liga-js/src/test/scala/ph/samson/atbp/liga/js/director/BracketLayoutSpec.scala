@@ -347,6 +347,19 @@ object BracketLayoutSpec extends ZIOSpecDefault {
       )
       assertTrue(BracketLayout.resultLabel(matchDef) == Some("7–4"))
     },
+    test("resultLabel shows forfeit reason for completed forfeits") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Completed,
+        forfeit =
+          Some(MatchForfeitInfo(forfeitingSide = "A", reason = "no-show"))
+      )
+      assertTrue(
+        BracketLayout.resultLabel(matchDef) == Some("forfeit: no-show")
+      )
+    },
     test("resultLabel is empty for pending matches") {
       val matchDef = BracketMatch(
         id = "wb-2-1",
@@ -534,6 +547,21 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         state = BracketMatchState.Completed
       )
       assertTrue(BracketLayout.winnerSide(matchDef) == None)
+    },
+    test("winnerSide returns non-forfeiting side for completed forfeit") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = Some(Player("P2")),
+        state = BracketMatchState.Completed,
+        forfeit =
+          Some(MatchForfeitInfo(forfeitingSide = "A", reason = "no-show"))
+      )
+      assertTrue(
+        BracketLayout.winnerSide(matchDef) == Some(
+          BracketLayout.MatchWinnerSide.B
+        )
+      )
     },
     test("winnerSide returns None for completed bye matches") {
       val byeMatch = BracketMatch(

@@ -184,5 +184,6 @@ object AudienceApp {
       |  line-height: 1.1;
       |}
       |.match-bye { font-style: italic; opacity: 0.75; }
+      |.match-forfeit { font-style: italic; opacity: 0.75; }
       |""".stripMargin
 }

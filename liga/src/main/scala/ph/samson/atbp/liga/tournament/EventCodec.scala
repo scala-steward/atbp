@@ -9,6 +9,7 @@ object EventCodec {
   given JsonCodec[Player] = DeriveJsonCodec.gen
   given JsonCodec[PlayerRating] = DeriveJsonCodec.gen
   given JsonCodec[MatchResult] = DeriveJsonCodec.gen
+  given JsonCodec[MatchForfeitInfo] = DeriveJsonCodec.gen
   given JsonCodec[BracketMatchState] = DeriveJsonCodec.gen
   given JsonCodec[BracketMatch] = DeriveJsonCodec.gen
   given JsonCodec[Bracket] = DeriveJsonCodec.gen
@@ -21,6 +22,7 @@ object EventCodec {
   given JsonCodec[HandicapAppliedPayload] = DeriveJsonCodec.gen
   given JsonCodec[MatchStartedPayload] = DeriveJsonCodec.gen
   given JsonCodec[MatchResultPayload] = DeriveJsonCodec.gen
+  given JsonCodec[MatchForfeitPayload] = DeriveJsonCodec.gen
   given JsonCodec[TournamentCompletedPayload] = DeriveJsonCodec.gen
   given JsonCodec[TournamentEvent] = DeriveJsonCodec.gen
 

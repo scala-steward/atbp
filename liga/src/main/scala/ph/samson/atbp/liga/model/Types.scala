@@ -8,6 +8,12 @@ final case class MatchResult(
     scoreB: Int
 )
 
+/** Forfeit metadata stored on a completed bracket match (no scores). */
+final case class MatchForfeitInfo(
+    forfeitingSide: String,
+    reason: String
+)
+
 /** One completed period (typically one tournament) from a `*.liga` file. */
 final case class Period(
     name: String,
@@ -43,7 +49,8 @@ final case class BracketMatch(
     handicapSuggested: Option[Int] = None,
     handicapApplied: Option[Int] = None,
     result: Option[MatchResult] = None,
-    isBye: Boolean = false
+    isBye: Boolean = false,
+    forfeit: Option[MatchForfeitInfo] = None
 )
 
 /** Full bracket tree for a tournament. */
@@ -104,6 +111,12 @@ final case class MatchResultPayload(
     matchId: String,
     scoreA: Int,
     scoreB: Int
+)
+
+final case class MatchForfeitPayload(
+    matchId: String,
+    forfeitingSide: String,
+    reason: String
 )
 
 final case class TournamentCompletedPayload(

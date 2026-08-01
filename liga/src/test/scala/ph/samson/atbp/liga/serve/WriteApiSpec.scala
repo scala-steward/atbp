@@ -438,6 +438,59 @@ object WriteApiSpec extends ZIOSpecDefault {
         matchDef.result.contains(MatchResult(7, 4))
       )
     },
+    test(
+      "POST /api/matches/{id}/forfeit completes Ready match without scores"
+    ) {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        seed <- seedTournament(ctx)
+        ready <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        forfeit <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/forfeit",
+              """{"forfeitingSide":"A","reason":"no-show"}"""
+            )
+          )
+        body <- forfeit.body.asString
+        finalState <- ZIO.fromEither(body.fromJson[TournamentResponse])
+        matchDef = finalState.bracket
+          .flatMap(_.matches.find(_.id == "wb-1-1"))
+          .get
+        _ <- cleanup(root)
+      } yield assertTrue(
+        seed.status == Status.Ok,
+        ready.status == Status.Ok,
+        forfeit.status == Status.Ok,
+        matchDef.state == BracketMatchState.Completed,
+        matchDef.result.isEmpty,
+        !matchDef.isBye,
+        matchDef.forfeit.contains(
+          MatchForfeitInfo(forfeitingSide = "A", reason = "no-show")
+        )
+      )
+    },
+    test("POST /api/matches/{id}/forfeit rejects blank reason with 400") {
+      for {
+        (ctx, root) <- withTempTournament(seeded = false)
+        _ <- seedTournament(ctx)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-1/ready", ""))
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-1/forfeit",
+              """{"forfeitingSide":"A","reason":"   "}"""
+            )
+          )
+        _ <- cleanup(root)
+      } yield assertTrue(response.status == Status.BadRequest)
+    },
     test("write routes reject non-localhost requests with 403") {
       for {
         (ctx, root) <- withTempTournament(seeded = false)

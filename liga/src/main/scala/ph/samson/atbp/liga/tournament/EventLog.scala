@@ -59,6 +59,7 @@ object EventLog {
       case _: TournamentEvent.HandicapApplied     => "handicap"
       case _: TournamentEvent.MatchStarted        => "started"
       case _: TournamentEvent.MatchResult         => "result"
+      case _: TournamentEvent.MatchForfeit        => "forfeit"
       case _: TournamentEvent.TournamentCompleted => "completed"
     }
 

@@ -12,6 +12,10 @@ object MatchScoreView {
       BracketLayout
         .resultLabel(matchDef)
         .map(label => span(cls := "match-bye", label))
+    } else if (matchDef.forfeit.nonEmpty) {
+      BracketLayout
+        .resultLabel(matchDef)
+        .map(label => span(cls := "match-forfeit", label))
     } else {
       matchDef.result.map { result =>
         val winner = BracketLayout.winnerSide(matchDef)

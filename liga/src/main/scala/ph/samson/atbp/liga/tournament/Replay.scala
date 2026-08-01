@@ -130,6 +130,21 @@ object Replay {
           result <- applyMatchResult(state, payload)
         } yield result
 
+      case TournamentEvent.MatchForfeit(_, _, payload) =>
+        for {
+          _ <- MatchLifecycle.requireActive(state).left.map(_.message)
+          matchDef <- findMatch(state, payload.matchId)
+          _ <- MatchLifecycle
+            .validateForfeit(
+              matchDef,
+              payload.forfeitingSide,
+              payload.reason
+            )
+            .left
+            .map(_.message)
+          result <- applyMatchForfeit(state, payload)
+        } yield result
+
       case TournamentEvent.TournamentCompleted(_, _, _) =>
         Right(state.copy(completed = true))
     }
@@ -169,19 +184,51 @@ object Replay {
         .toRight(s"unknown match: ${payload.matchId}")
       winner <- winnerFromScores(matchDef, payload.scoreA, payload.scoreB)
       advanced <- Advancement.advance(bracket, payload.matchId, winner)
-      withScores = advanced.bracket.copy(
-        matches = advanced.bracket.matches.map { current =>
-          if (current.id == payload.matchId) {
-            current.copy(
-              state = BracketMatchState.Completed,
-              result = Some(MatchResult(payload.scoreA, payload.scoreB))
-            )
-          } else {
-            current
-          }
-        }
-      )
+      withScores = patchMatch(advanced.bracket, payload.matchId) { current =>
+        current.copy(
+          state = BracketMatchState.Completed,
+          result = Some(MatchResult(payload.scoreA, payload.scoreB))
+        )
+      }
     } yield state.copy(bracket = Some(withScores))
+
+  private def applyMatchForfeit(
+      state: TournamentState,
+      payload: MatchForfeitPayload
+  ): Either[String, TournamentState] =
+    for {
+      bracket <- state.bracket.toRight("no bracket loaded for match forfeit")
+      matchDef <- bracket.matches
+        .find(_.id == payload.matchId)
+        .toRight(s"unknown match: ${payload.matchId}")
+      winner <- winnerFromForfeit(matchDef, payload.forfeitingSide)
+      advanced <- Advancement.advance(
+        bracket,
+        payload.matchId,
+        winner,
+        recordPlaceholderResult = false
+      )
+      withForfeit = patchMatch(advanced.bracket, payload.matchId) { current =>
+        current.copy(
+          forfeit = Some(
+            MatchForfeitInfo(
+              forfeitingSide = payload.forfeitingSide,
+              reason = payload.reason
+            )
+          )
+        )
+      }
+    } yield state.copy(bracket = Some(withForfeit))
+
+  private def patchMatch(
+      bracket: Bracket,
+      matchId: String
+  )(update: BracketMatch => BracketMatch): Bracket =
+    bracket.copy(
+      matches = bracket.matches.map { current =>
+        if (current.id == matchId) update(current) else current
+      }
+    )
 
   private def winnerFromScores(
       matchDef: BracketMatch,
@@ -195,4 +242,20 @@ object Replay {
     } else {
       matchDef.playerB.toRight(s"no player B in ${matchDef.id}")
     }
+
+  private def winnerFromForfeit(
+      matchDef: BracketMatch,
+      forfeitingSide: String
+  ): Either[String, Player] =
+    for {
+      side <- MatchSide
+        .parse(forfeitingSide)
+        .toRight(s"invalid forfeitingSide $forfeitingSide in ${matchDef.id}")
+      winnerSide = MatchSide.winnerFromForfeiting(side)
+      player <- MatchSide
+        .select(winnerSide, matchDef.playerA, matchDef.playerB)
+        .toRight(
+          s"no player ${MatchSide.wire(winnerSide)} in ${matchDef.id}"
+        )
+    } yield player
 }

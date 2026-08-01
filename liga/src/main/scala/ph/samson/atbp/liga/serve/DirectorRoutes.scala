@@ -27,6 +27,7 @@ object DirectorRoutes {
   final case class HandicapRequest(handicap: Int)
   final case class CompleteRequest(completed: Option[LocalDate] = None)
   final case class ResultRequest(scoreA: Int, scoreB: Int)
+  final case class ForfeitRequest(forfeitingSide: String, reason: String)
 
   given JsonCodec[CompleteRequest] = DeriveJsonCodec.gen
 
@@ -36,6 +37,7 @@ object DirectorRoutes {
   given JsonCodec[SeedRequest] = DeriveJsonCodec.gen
   given JsonCodec[HandicapRequest] = DeriveJsonCodec.gen
   given JsonCodec[ResultRequest] = DeriveJsonCodec.gen
+  given JsonCodec[ForfeitRequest] = DeriveJsonCodec.gen
 
   def routes(ctx: ServeContext): Routes[Any, Response] =
     zio.http.Routes(
@@ -74,6 +76,11 @@ object DirectorRoutes {
         "matchId"
       ) / "result" -> handler { (matchId: String, req: Request) =>
         directorOnly(req)(handleResult(ctx, matchId, req))
+      },
+      Method.POST / "api" / "matches" / string(
+        "matchId"
+      ) / "forfeit" -> handler { (matchId: String, req: Request) =>
+        directorOnly(req)(handleForfeit(ctx, matchId, req))
       },
       Method.POST / "api" / "tournament" / "complete" -> handler {
         (req: Request) =>
@@ -230,6 +237,27 @@ object DirectorRoutes {
           matchId,
           parsed.scoreA,
           parsed.scoreB,
+          seq,
+          at
+        )
+      }
+      response <- jsonState(ctx, state)
+    } yield response
+
+  private def handleForfeit(
+      ctx: ServeContext,
+      matchId: String,
+      req: Request
+  ): Task[Response] =
+    for {
+      body <- req.body.asString
+      parsed <- parseJson[ForfeitRequest](body)
+      state <- ctx.applyMatchCommand { (current, seq, at) =>
+        Tournament.recordForfeit(
+          current,
+          matchId,
+          parsed.forfeitingSide,
+          parsed.reason,
           seq,
           at
         )

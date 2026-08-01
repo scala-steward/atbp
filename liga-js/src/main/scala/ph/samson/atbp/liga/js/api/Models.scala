@@ -20,6 +20,11 @@ object Models {
       scoreB: Int
   )
 
+  final case class MatchForfeitInfo(
+      forfeitingSide: String,
+      reason: String
+  )
+
   enum BracketMatchState {
     case Pending, Ready, Started, Completed
   }
@@ -33,7 +38,8 @@ object Models {
       handicapSuggested: Option[Int] = None,
       handicapApplied: Option[Int] = None,
       result: Option[MatchResult] = None,
-      isBye: Boolean = false
+      isBye: Boolean = false,
+      forfeit: Option[MatchForfeitInfo] = None
   )
 
   final case class Bracket(
@@ -98,6 +104,8 @@ object Models {
 
   final case class ResultRequest(scoreA: Int, scoreB: Int)
 
+  final case class ForfeitRequest(forfeitingSide: String, reason: String)
+
   final case class CompleteRequest(completed: Option[String] = None)
 
   final case class HandicapSuggestion(
@@ -109,6 +117,7 @@ object Models {
   given JsonCodec[Player] = DeriveJsonCodec.gen
   given JsonCodec[PlayerRating] = DeriveJsonCodec.gen
   given JsonCodec[MatchResult] = DeriveJsonCodec.gen
+  given JsonCodec[MatchForfeitInfo] = DeriveJsonCodec.gen
   given JsonCodec[BracketMatchState] = DeriveJsonCodec.gen
   given JsonCodec[BracketMatch] = DeriveJsonCodec.gen
   given JsonCodec[Bracket] = DeriveJsonCodec.gen
@@ -123,5 +132,6 @@ object Models {
   given JsonEncoder[RaceToRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[HandicapRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[ResultRequest] = DeriveJsonEncoder.gen
+  given JsonEncoder[ForfeitRequest] = DeriveJsonEncoder.gen
   given JsonEncoder[CompleteRequest] = DeriveJsonEncoder.gen
 }

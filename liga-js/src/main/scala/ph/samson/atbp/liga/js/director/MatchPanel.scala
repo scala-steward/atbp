@@ -3,8 +3,9 @@ package ph.samson.atbp.liga.js.director
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.api.Models.*
 import ph.samson.atbp.liga.model as shared
+import ph.samson.atbp.liga.model.MatchSide
 
-/** Match control panel: ready, handicap, start, and result entry. */
+/** Match control panel: ready, handicap, start, result, and forfeit. */
 object MatchPanel {
 
   def apply(
@@ -14,7 +15,8 @@ object MatchPanel {
       onReady: Observer[Unit],
       onApplyHandicap: Observer[Int],
       onStart: Observer[Unit],
-      onResult: Observer[(Int, Int)]
+      onResult: Observer[(Int, Int)],
+      onForfeit: Observer[(String, String)]
   ): Div = {
     val resolvedRaceTo =
       BracketLayout.resolveMatchRaceTo(matchDef, tournament.raceToByScope)
@@ -37,7 +39,10 @@ object MatchPanel {
     val scoreBInput = Var(
       matchDef.result.map(_.scoreB.toString).getOrElse("0")
     )
+    val forfeitingSide = Var("A")
+    val forfeitReason = Var("")
     val validationError = Var("")
+    val forfeitValidationError = Var("")
 
     div(
       cls := "match-panel",
@@ -67,12 +72,16 @@ object MatchPanel {
         handicapInput,
         scoreAInput,
         scoreBInput,
+        forfeitingSide,
+        forfeitReason,
         validationError,
+        forfeitValidationError,
         busy,
         onReady,
         onApplyHandicap,
         onStart,
-        onResult
+        onResult,
+        onForfeit
       )
     )
   }
@@ -123,182 +132,364 @@ object MatchPanel {
       handicapInput: Var[String],
       scoreAInput: Var[String],
       scoreBInput: Var[String],
+      forfeitingSide: Var[String],
+      forfeitReason: Var[String],
       validationError: Var[String],
+      forfeitValidationError: Var[String],
       busy: Signal[Boolean],
       onReady: Observer[Unit],
       onApplyHandicap: Observer[Int],
       onStart: Observer[Unit],
-      onResult: Observer[(Int, Int)]
-  ): Div =
-    (matchDef.state, resolvedRaceTo) match {
-      case (BracketMatchState.Pending, _) =>
+      onResult: Observer[(Int, Int)],
+      onForfeit: Observer[(String, String)]
+  ): Div = {
+    def withForfeit(body: Node): Div =
+      div(
+        body,
+        forfeitControls(
+          matchDef,
+          forfeitingSide,
+          forfeitReason,
+          forfeitValidationError,
+          busy,
+          onForfeit
+        )
+      )
+
+    matchDef.state match {
+      case BracketMatchState.Pending =>
         div(p("Waiting for players."))
 
-      case (BracketMatchState.Ready | BracketMatchState.Started, None) =>
-        missingRaceToControls(matchDef)
+      case BracketMatchState.Ready =>
+        withForfeit(
+          resolvedRaceTo match {
+            case None =>
+              missingRaceToControls(matchDef)
+            case Some(raceTo) =>
+              readyControls(
+                matchDef,
+                tournament,
+                raceTo,
+                handicapInput,
+                busy,
+                onReady,
+                onApplyHandicap,
+                onStart
+              )
+          }
+        )
 
-      case (BracketMatchState.Ready, Some(raceTo)) =>
-        val preview =
-          MatchHandicapPreview.fromMatch(tournament, matchDef, raceTo)
-        ReadyHandicapPolicy.surface(matchDef, preview) match {
-          case ReadyHandicapPolicy.Surface.Preview(handicapPreview) =>
-            div(
+      case BracketMatchState.Started =>
+        withForfeit(
+          resolvedRaceTo match {
+            case None =>
+              missingRaceToControls(matchDef)
+            case Some(raceTo) =>
+              startedControls(
+                tournament,
+                matchDef,
+                raceTo,
+                scoreAInput,
+                scoreBInput,
+                validationError,
+                busy,
+                onResult
+              )
+          }
+        )
+
+      case BracketMatchState.Completed =>
+        completedSummary(tournament, matchDef)
+    }
+  }
+
+  private def completedSummary(
+      tournament: TournamentResponse,
+      matchDef: BracketMatch
+  ): Div = {
+    val handicapLine =
+      appliedHandicapStatusLine(tournament, matchDef, completed = true)
+    (matchDef.isBye, matchDef.forfeit, matchDef.result) match {
+      case (true, _, _) =>
+        div(
+          p("Bye — auto-advance"),
+          handicapLine
+        )
+      case (_, Some(info), _) =>
+        div(
+          p(s"Forfeit: ${info.reason}"),
+          p(
+            s"Forfeiting side: ${forfeitSideLabel(matchDef, info.forfeitingSide)}"
+          ),
+          handicapLine
+        )
+      case (_, None, Some(result)) =>
+        div(
+          p(s"Final score: ${result.scoreA}–${result.scoreB}"),
+          handicapLine
+        )
+      case _ =>
+        div(p("Match completed."), handicapLine)
+    }
+  }
+
+  private def readyControls(
+      matchDef: BracketMatch,
+      tournament: TournamentResponse,
+      raceTo: Int,
+      handicapInput: Var[String],
+      busy: Signal[Boolean],
+      onReady: Observer[Unit],
+      onApplyHandicap: Observer[Int],
+      onStart: Observer[Unit]
+  ): Div = {
+    val preview = MatchHandicapPreview.fromMatch(tournament, matchDef, raceTo)
+    ReadyHandicapPolicy.surface(matchDef, preview) match {
+      case ReadyHandicapPolicy.Surface.Preview(handicapPreview) =>
+        div(
+          probabilityNeighborhood(
+            handicapPreview.weaker,
+            handicapPreview.stronger,
+            raceTo,
+            handicapPreview.suggestedHandicap
+          ),
+          button(
+            cls := "primary",
+            disabled <-- busy,
+            onClick.mapTo(()) --> onReady,
+            "Ready match"
+          )
+        )
+      case ReadyHandicapPolicy.Surface.PreviewWaiting =>
+        div(p(ReadyHandicapPolicy.previewWaitingMessage))
+      case ReadyHandicapPolicy.Surface.Adjust(suggested, maybePreview) =>
+        div(
+          maybePreview match {
+            case Some(handicapPreview) =>
               probabilityNeighborhood(
                 handicapPreview.weaker,
                 handicapPreview.stronger,
                 raceTo,
-                handicapPreview.suggestedHandicap
-              ),
-              button(
-                cls := "primary",
-                disabled <-- busy,
-                onClick.mapTo(()) --> onReady,
-                "Ready match"
+                suggested
               )
-            )
-          case ReadyHandicapPolicy.Surface.PreviewWaiting =>
-            div(p(ReadyHandicapPolicy.previewWaitingMessage))
-          case ReadyHandicapPolicy.Surface.Adjust(suggested, maybePreview) =>
-            div(
-              maybePreview match {
-                case Some(handicapPreview) =>
-                  probabilityNeighborhood(
+            case None =>
+              p(ReadyHandicapPolicy.previewWaitingMessage)
+          },
+          div(
+            label(
+              "Handicap (games spotted to weaker player): ",
+              input(
+                typ := "number",
+                value <-- handicapInput,
+                onInput.mapToValue --> handicapInput
+              )
+            ),
+            maybePreview match {
+              case Some(handicapPreview) =>
+                child <-- handicapInput.signal.map { input =>
+                  HandicapProbabilityHints.typedSpotHint(
                     handicapPreview.weaker,
                     handicapPreview.stronger,
                     raceTo,
-                    suggested
-                  )
-                case None =>
-                  p(ReadyHandicapPolicy.previewWaitingMessage)
-              },
-              div(
-                label(
-                  "Handicap (games spotted to weaker player): ",
-                  input(
-                    typ := "number",
-                    value <-- handicapInput,
-                    onInput.mapToValue --> handicapInput
-                  )
-                ),
-                maybePreview match {
-                  case Some(handicapPreview) =>
-                    child <-- handicapInput.signal.map { input =>
-                      HandicapProbabilityHints.typedSpotHint(
-                        handicapPreview.weaker,
-                        handicapPreview.stronger,
-                        raceTo,
-                        suggested,
-                        input
-                      ) match {
-                        case Some(hint) =>
-                          p(cls := "hint typed-spot-hint", hint)
-                        case None => emptyNode
-                      }
-                    }
-                  case None => emptyNode
+                    suggested,
+                    input
+                  ) match {
+                    case Some(hint) =>
+                      p(cls := "hint typed-spot-hint", hint)
+                    case None => emptyNode
+                  }
+                }
+              case None => emptyNode
+            },
+            div(
+              cls := "actions",
+              button(
+                disabled <-- busy,
+                onClick --> onApplyHandicap.contramap { _ =>
+                  handicapInput.now().toIntOption.getOrElse(0)
                 },
-                div(
-                  cls := "actions",
-                  button(
-                    disabled <-- busy,
-                    onClick --> onApplyHandicap.contramap { _ =>
-                      handicapInput.now().toIntOption.getOrElse(0)
-                    },
-                    "Apply handicap"
-                  ),
-                  button(
-                    cls := "primary",
-                    disabled <-- busy.combineWith(handicapInput.signal).map {
-                      case (isBusy, _) =>
-                        isBusy || matchDef.handicapApplied.isEmpty
-                    },
-                    onClick.mapTo(()) --> onStart,
-                    "Start match"
-                  )
-                ),
-                Option.when(matchDef.handicapApplied.isEmpty)(
-                  p(cls := "hint", "Apply handicap before starting.")
-                )
+                "Apply handicap"
+              ),
+              button(
+                cls := "primary",
+                disabled <-- busy.combineWith(handicapInput.signal).map {
+                  case (isBusy, _) =>
+                    isBusy || matchDef.handicapApplied.isEmpty
+                },
+                onClick.mapTo(()) --> onStart,
+                "Start match"
               )
+            ),
+            Option.when(matchDef.handicapApplied.isEmpty)(
+              p(cls := "hint", "Apply handicap before starting.")
             )
-        }
+          )
+        )
+    }
+  }
 
-      case (BracketMatchState.Started, Some(raceTo)) =>
-        div(
-          appliedHandicapStatusLine(tournament, matchDef, completed = false),
-          p(
-            cls := "guidance",
-            DirectorGuidance.scoreboardScoreHint(raceTo)
-          ),
+  private def startedControls(
+      tournament: TournamentResponse,
+      matchDef: BracketMatch,
+      raceTo: Int,
+      scoreAInput: Var[String],
+      scoreBInput: Var[String],
+      validationError: Var[String],
+      busy: Signal[Boolean],
+      onResult: Observer[(Int, Int)]
+  ): Div =
+    div(
+      appliedHandicapStatusLine(tournament, matchDef, completed = false),
+      p(
+        cls := "guidance",
+        DirectorGuidance.scoreboardScoreHint(raceTo)
+      ),
+      div(
+        cls := "score-entry",
+        label(
+          s"${BracketLayout.playerLabel(matchDef.playerA)}: ",
+          input(
+            typ := "number",
+            value <-- scoreAInput,
+            onInput.mapToValue --> scoreAInput
+          )
+        ),
+        label(
+          s"${BracketLayout.playerLabel(matchDef.playerB)}: ",
+          input(
+            typ := "number",
+            value <-- scoreBInput,
+            onInput.mapToValue --> scoreBInput
+          )
+        )
+      ),
+      child <-- validationError.signal.map { msg =>
+        if (msg.nonEmpty) div(cls := "validation-error", msg)
+        else emptyNode
+      },
+      button(
+        cls := "primary",
+        disabled <-- busy,
+        onClick.mapTo(()) --> Observer[Unit] { _ =>
+          val scoreA = scoreAInput.now().toIntOption
+          val scoreB = scoreBInput.now().toIntOption
+          (scoreA, scoreB) match {
+            case (Some(a), Some(b)) if a == b =>
+              validationError.set(
+                "Scores cannot tie — one player must win."
+              )
+            case (Some(a), Some(b)) if a < 0 || b < 0 =>
+              validationError.set("Scores must be zero or greater.")
+            case (Some(a), Some(b)) =>
+              validationError.set("")
+              onResult.onNext((a, b))
+            case _ =>
+              validationError.set(
+                "Enter valid scores for both players."
+              )
+          }
+        },
+        "Record result"
+      )
+    )
+
+  private def forfeitSideLabel(
+      matchDef: BracketMatch,
+      side: String
+  ): String =
+    MatchSide.parse(side) match {
+      case Some(MatchSide.A) => BracketLayout.playerLabel(matchDef.playerA)
+      case Some(MatchSide.B) => BracketLayout.playerLabel(matchDef.playerB)
+      case None              => side
+    }
+
+  private def forfeitControls(
+      matchDef: BracketMatch,
+      forfeitingSide: Var[String],
+      forfeitReason: Var[String],
+      forfeitValidationError: Var[String],
+      busy: Signal[Boolean],
+      onForfeit: Observer[(String, String)]
+  ): Div = {
+    val forfeitOpen = Var(false)
+    div(
+      cls := "forfeit-entry",
+      child <-- forfeitOpen.signal.map {
+        case false =>
+          button(
+            cls := "forfeit-open",
+            disabled <-- busy,
+            onClick.mapTo(true) --> forfeitOpen,
+            "Record forfeit"
+          )
+        case true =>
           div(
-            cls := "score-entry",
+            cls := "forfeit-form",
+            h3("Forfeit"),
+            p(
+              cls := "hint",
+              "Completes the match without scores. The non-forfeiting player advances."
+            ),
             label(
-              s"${BracketLayout.playerLabel(matchDef.playerA)}: ",
-              input(
-                typ := "number",
-                value <-- scoreAInput,
-                onInput.mapToValue --> scoreAInput
+              "Who forfeits: ",
+              select(
+                value <-- forfeitingSide,
+                onChange.mapToValue --> forfeitingSide,
+                option(
+                  value := "A",
+                  BracketLayout.playerLabel(matchDef.playerA)
+                ),
+                option(
+                  value := "B",
+                  BracketLayout.playerLabel(matchDef.playerB)
+                )
               )
             ),
             label(
-              s"${BracketLayout.playerLabel(matchDef.playerB)}: ",
+              "Reason (required): ",
               input(
-                typ := "number",
-                value <-- scoreBInput,
-                onInput.mapToValue --> scoreBInput
+                typ := "text",
+                placeholder := "e.g. no-show",
+                value <-- forfeitReason,
+                onInput.mapToValue --> forfeitReason
+              )
+            ),
+            child <-- forfeitValidationError.signal.map { msg =>
+              if (msg.nonEmpty) div(cls := "validation-error", msg)
+              else emptyNode
+            },
+            div(
+              cls := "actions",
+              button(
+                disabled <-- busy.combineWith(forfeitReason.signal).map {
+                  case (isBusy, reason) => isBusy || reason.trim.isEmpty
+                },
+                onClick.mapTo(()) --> Observer[Unit] { _ =>
+                  ForfeitSubmitPolicy.validate(
+                    forfeitingSide.now(),
+                    forfeitReason.now()
+                  ) match {
+                    case ForfeitSubmitPolicy.Outcome.BlankReason =>
+                      forfeitValidationError.set(
+                        ForfeitSubmitPolicy.blankReasonMessage
+                      )
+                    case ForfeitSubmitPolicy.Outcome.Ready(submit) =>
+                      forfeitValidationError.set("")
+                      onForfeit.onNext((submit.side, submit.reason))
+                  }
+                },
+                "Submit forfeit"
+              ),
+              button(
+                disabled <-- busy,
+                onClick.mapTo(false) --> forfeitOpen,
+                "Cancel"
               )
             )
-          ),
-          child <-- validationError.signal.map { msg =>
-            if (msg.nonEmpty) div(cls := "validation-error", msg)
-            else emptyNode
-          },
-          button(
-            cls := "primary",
-            disabled <-- busy,
-            onClick.mapTo(()) --> Observer[Unit] { _ =>
-              val scoreA = scoreAInput.now().toIntOption
-              val scoreB = scoreBInput.now().toIntOption
-              (scoreA, scoreB) match {
-                case (Some(a), Some(b)) if a == b =>
-                  validationError.set(
-                    "Scores cannot tie — one player must win."
-                  )
-                case (Some(a), Some(b)) if a < 0 || b < 0 =>
-                  validationError.set("Scores must be zero or greater.")
-                case (Some(a), Some(b)) =>
-                  validationError.set("")
-                  onResult.onNext((a, b))
-                case _ =>
-                  validationError.set(
-                    "Enter valid scores for both players."
-                  )
-              }
-            },
-            "Record result"
           )
-        )
-
-      case (BracketMatchState.Completed, _) =>
-        val handicapLine =
-          appliedHandicapStatusLine(tournament, matchDef, completed = true)
-        if (matchDef.isBye) {
-          div(
-            p("Bye — auto-advance"),
-            handicapLine
-          )
-        } else {
-          matchDef.result match {
-            case Some(result) =>
-              div(
-                p(s"Final score: ${result.scoreA}–${result.scoreB}"),
-                handicapLine
-              )
-            case None =>
-              div(p("Match completed."), handicapLine)
-          }
-        }
-    }
+      }
+    )
+  }
 
   private def probabilityNeighborhood(
       weaker: shared.PlayerRating,

@@ -77,6 +77,13 @@ object TournamentEvent {
       payload: MatchResultPayload
   ) extends TournamentEvent
 
+  @jsonHint("MatchForfeit")
+  final case class MatchForfeit(
+      seq: Int,
+      at: Instant,
+      payload: MatchForfeitPayload
+  ) extends TournamentEvent
+
   @jsonHint("TournamentCompleted")
   final case class TournamentCompleted(
       seq: Int,

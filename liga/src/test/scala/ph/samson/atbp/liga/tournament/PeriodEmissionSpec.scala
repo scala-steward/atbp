@@ -39,6 +39,25 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
       result = Some(MatchResult(boardA, boardB))
     )
 
+  private def forfeitedMatch(
+      id: String,
+      playerA: PlayerRating,
+      playerB: PlayerRating,
+      forfeitingSide: String,
+      reason: String
+  ): BracketMatch =
+    BracketMatch(
+      id = id,
+      playerA = Some(playerA.player),
+      playerB = Some(playerB.player),
+      state = BracketMatchState.Completed,
+      result = None,
+      isBye = false,
+      forfeit = Some(
+        MatchForfeitInfo(forfeitingSide = forfeitingSide, reason = reason)
+      )
+    )
+
   private def handicappedMatchState(
       boardA: Int,
       boardB: Int,
@@ -264,6 +283,82 @@ object PeriodEmissionSpec extends ZIOSpecDefault {
           result.left.exists(_.getMessage.contains("mismatch"))
         )
       }
+    },
+    test("forfeited matches are omitted while scored matches still emit") {
+      val state = TournamentState(
+        name = "Spring Open",
+        players = List(alice.player, bob.player, carol.player),
+        bracket = Some(
+          Bracket(
+            size = 4,
+            matches = List(
+              completedMatch(
+                "wb-1-1",
+                alice,
+                bob,
+                boardA = 7,
+                boardB = 4,
+                handicapApplied = 0
+              ),
+              forfeitedMatch(
+                "lb-1-1",
+                bob,
+                carol,
+                forfeitingSide = "A",
+                reason = "no-show"
+              ),
+              completedMatch(
+                "gf-1",
+                alice,
+                carol,
+                boardA = 7,
+                boardB = 3,
+                handicapApplied = 0
+              )
+            )
+          )
+        ),
+        frozenRatings = Map(
+          alice.player -> alice,
+          bob.player -> bob,
+          carol.player -> carol
+        ),
+        raceToByScope = Map("wb-1" -> 7, "lb-1" -> 7, "gf" -> 7)
+      )
+      val period = PeriodEmission.toPeriod(state, completed).toOption.get
+      val pairs =
+        period.matches.map(m => (m.playerA.name, m.playerB.name)).toSet
+      assertTrue(
+        period.matches.size == 2,
+        pairs == Set(("Alice", "Bob"), ("Alice", "Carol"))
+      )
+    },
+    test("all-forfeit tournament cannot emit a period") {
+      val state = TournamentState(
+        name = "Spring Open",
+        players = List(alice.player, bob.player),
+        bracket = Some(
+          Bracket(
+            size = 2,
+            matches = List(
+              forfeitedMatch(
+                "wb-1-1",
+                alice,
+                bob,
+                forfeitingSide = "B",
+                reason = "illness"
+              )
+            )
+          )
+        ),
+        frozenRatings = Map(alice.player -> alice, bob.player -> bob),
+        raceToByScope = Map("wb-1" -> 7)
+      )
+      val result = PeriodEmission.toPeriod(state, completed)
+      assertTrue(
+        result.isLeft,
+        result.left.exists(_.contains("no recorded match results"))
+      )
     }
   )
 }
