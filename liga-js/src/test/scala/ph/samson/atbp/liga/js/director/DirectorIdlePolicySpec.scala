@@ -17,7 +17,6 @@ object DirectorIdlePolicySpec extends ZIOSpecDefault {
 
   private val idleTournament = activeTournament.copy(phase = "none")
   private val definingTournament = activeTournament.copy(phase = "defining")
-  private val emptyLeaderboard = LeaderboardResponse(Nil)
   private val emptyLatest = LatestRatingsResponse(Nil)
 
   def spec = suite("DirectorIdlePolicy")(
@@ -44,7 +43,6 @@ object DirectorIdlePolicySpec extends ZIOSpecDefault {
       assertTrue(
         DirectorIdlePolicy.view(
           maybeTournament = Some(activeTournament),
-          maybeLeaderboard = None,
           maybeLatestRatings = None
         ) == DirectorIdlePolicy.View.Live(activeTournament)
       )
@@ -53,36 +51,25 @@ object DirectorIdlePolicySpec extends ZIOSpecDefault {
       assertTrue(
         DirectorIdlePolicy.view(
           maybeTournament = Some(idleTournament),
-          maybeLeaderboard = None,
           maybeLatestRatings = None
         ) == DirectorIdlePolicy.View.LoadingLatestRatings,
         DirectorIdlePolicy.view(
           maybeTournament = Some(idleTournament),
-          maybeLeaderboard = None,
           maybeLatestRatings = Some(emptyLatest)
         ) == DirectorIdlePolicy.View.Idle(emptyLatest)
       )
     },
-    test("wizard phase waits for leaderboard then yields Wizard payload") {
+    test("wizard phase yields Wizard without waiting on leaderboard") {
       assertTrue(
         DirectorIdlePolicy.view(
           maybeTournament = Some(definingTournament),
-          maybeLeaderboard = None,
           maybeLatestRatings = None
-        ) == DirectorIdlePolicy.View.LoadingLeaderboard,
-        DirectorIdlePolicy.view(
-          maybeTournament = Some(definingTournament),
-          maybeLeaderboard = Some(emptyLeaderboard),
-          maybeLatestRatings = None
-        ) == DirectorIdlePolicy.View.Wizard(
-          definingTournament,
-          emptyLeaderboard
-        )
+        ) == DirectorIdlePolicy.View.Wizard(definingTournament)
       )
     },
     test("waits for tournament before anything else") {
       assertTrue(
-        DirectorIdlePolicy.view(None, None, None) ==
+        DirectorIdlePolicy.view(None, None) ==
           DirectorIdlePolicy.View.LoadingTournament
       )
     }

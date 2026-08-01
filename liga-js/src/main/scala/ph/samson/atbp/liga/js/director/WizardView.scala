@@ -15,7 +15,7 @@ object WizardView {
 
   def apply(
       tournament: TournamentResponse,
-      leaderboard: LeaderboardResponse,
+      leaderboard: Signal[Option[LeaderboardResponse]],
       busy: Signal[Boolean],
       onSetPlayers: Observer[List[Player]],
       onSaveAndLock: Observer[List[Player]],
@@ -35,9 +35,47 @@ object WizardView {
     }
   }
 
+  private def periodRatings(
+      leaderboard: LeaderboardResponse
+  ): Map[String, CommonPlayerRating] =
+    leaderboard.ratings
+      .map(r =>
+        r.player.name -> CommonPlayerRating(
+          player = CommonPlayer(r.player.name),
+          rating = r.rating,
+          rd = r.rd,
+          wins = r.wins,
+          losses = r.losses
+        )
+      )
+      .toMap
+
   private def definingStep(
       tournament: TournamentResponse,
-      leaderboard: LeaderboardResponse,
+      leaderboard: Signal[Option[LeaderboardResponse]],
+      busy: Signal[Boolean],
+      onSetPlayers: Observer[List[Player]],
+      onSaveAndLock: Observer[List[Player]]
+  ): Div =
+    div(
+      cls := "wizard-panel",
+      child <-- leaderboard.map(_.isDefined).distinct.map {
+        case false =>
+          div(p("Loading leaderboard…"))
+        case true =>
+          definingRosterForm(
+            tournament,
+            leaderboard.map(_.map(periodRatings).getOrElse(Map.empty)),
+            busy,
+            onSetPlayers,
+            onSaveAndLock
+          )
+      }
+    )
+
+  private def definingRosterForm(
+      tournament: TournamentResponse,
+      periodByName: Signal[Map[String, CommonPlayerRating]],
       busy: Signal[Boolean],
       onSetPlayers: Observer[List[Player]],
       onSaveAndLock: Observer[List[Player]]
@@ -45,13 +83,18 @@ object WizardView {
     val initialNames = tournament.players.map(_.name)
     val names = Var(initialNames)
     val pasteText = Var(RosterPaste.formatPaste(initialNames))
+    val removedNames = Var(Set.empty[String])
 
     def applyCleanedPaste(): List[String] = {
       val rosterNames = RosterPaste.parsePaste(pasteText.now())
       names.set(rosterNames)
       pasteText.set(RosterPaste.formatPaste(rosterNames))
+      removedNames.set(Set.empty)
       rosterNames
     }
+
+    def activeRosterNames(): List[String] =
+      RosterSoftRemove.commitNames(names.now(), removedNames.now())
 
     val pasteDirty: Signal[Boolean] =
       pasteText.signal
@@ -60,27 +103,19 @@ object WizardView {
           RosterPaste.parsePaste(text) != applied
         }
 
-    val lockCount: Signal[Int] =
-      pasteText.signal.map(text => RosterPaste.parsePaste(text).size)
-
-    val periodByName: Map[String, CommonPlayerRating] =
-      leaderboard.ratings
-        .map(r =>
-          r.player.name -> CommonPlayerRating(
-            player = CommonPlayer(r.player.name),
-            rating = r.rating,
-            rd = r.rd,
-            wins = r.wins,
-            losses = r.losses
-          )
-        )
-        .toMap
+    val activeCount: Signal[Int] =
+      names.signal.combineWith(removedNames.signal).map {
+        case (rosterNames, removed) =>
+          RosterSoftRemove.activeNames(rosterNames, removed).size
+      }
 
     val rosterSignal: Signal[List[RosterEntry]] =
-      names.signal.map(RosterPaste.resolveRoster(_, periodByName))
+      names.signal.combineWith(periodByName).map {
+        case (rosterNames, ratings) =>
+          RosterPaste.resolveRoster(rosterNames, ratings)
+      }
 
     div(
-      cls := "wizard-panel",
       h2("Define roster"),
       p(tournament.name).amend(cls := "tournament-title"),
       p(
@@ -108,59 +143,56 @@ object WizardView {
           },
           "Apply paste"
         ),
-        child <-- pasteText.signal.combineWith(pasteDirty).map {
-          case (text, dirty) =>
-            val count = RosterPaste.parsePaste(text).size
-            val hints = List.newBuilder[Node]
-            if (dirty) {
-              hints += p(cls := "hint", DirectorGuidance.applyPasteHint)
-            }
-            if (count > 0) {
-              val lockHint = DirectorGuidance.lockRosterHint(count)
-              if (lockHint.nonEmpty) {
-                hints += p(cls := "hint", lockHint)
-              }
-            }
-            if (hints.result().isEmpty) emptyNode
-            else div(hints.result())
+        child <-- pasteDirty.map { dirty =>
+          val hints = DirectorGuidance.definePasteAreaHints(dirty)
+          if (hints.isEmpty) emptyNode
+          else div(hints.map(text => p(cls := "hint", text)))
         }
       ),
       div(
         cls := "roster-list",
         h3("Roster"),
-        children <-- rosterSignal.map { entries =>
-          if (entries.isEmpty) {
-            List(p(cls := "hint", "No players yet — paste a signup list."))
-          } else {
-            entries.map { entry =>
-              div(
-                cls := (if (entry.guest) "roster-row guest" else "roster-row"),
-                span(cls := "roster-name", entry.name),
-                span(cls := "roster-rating", f"${entry.rating}%.0f"),
-                if (entry.guest) span(cls := "guest-badge", "guest")
-                else emptyNode
-              )
+        children <-- rosterSignal.combineWith(removedNames.signal).map {
+          case (entries, removed) =>
+            if (entries.isEmpty) {
+              List(p(cls := "hint", "No players yet — paste a signup list."))
+            } else {
+              entries.map { entry =>
+                val isRemoved = removed.contains(entry.name)
+                div(
+                  cls := (
+                    List("roster-row") ++
+                      (if (entry.guest) List("guest") else Nil) ++
+                      (if (isRemoved) List("removed") else Nil)
+                  ).mkString(" "),
+                  span(cls := "roster-name", entry.name),
+                  span(cls := "roster-rating", f"${entry.rating}%.0f"),
+                  span(
+                    cls := "guest-badge",
+                    RosterSoftRemove.guestBadgeText(entry.guest)
+                  ),
+                  button(
+                    cls := "roster-remove",
+                    onClick.mapTo(()) --> Observer[Unit] { _ =>
+                      removedNames.update(
+                        RosterSoftRemove.toggle(_, entry.name)
+                      )
+                    },
+                    if (isRemoved) "Restore" else "Remove"
+                  )
+                )
+              }
             }
-          }
         }
       ),
       div(
         cls := "roster-summary",
-        child.text <-- names.signal.map(ns => s"${ns.size} players in roster"),
-        child <-- pasteDirty.map { dirty =>
-          if (!dirty) {
-            p(cls := "hint", DirectorGuidance.lockSavesHint)
-          } else {
-            emptyNode
-          }
-        },
-        child <-- names.signal.combineWith(pasteDirty).map { case (ns, dirty) =>
-          if (!dirty) {
-            val hint = DirectorGuidance.lockRosterHint(ns.size)
-            if (hint.nonEmpty) p(cls := "hint", hint) else emptyNode
-          } else {
-            emptyNode
-          }
+        child.text <-- activeCount.map(n => s"$n players in roster"),
+        child <-- activeCount.combineWith(pasteDirty).map {
+          case (count, dirty) =>
+            val hints = DirectorGuidance.defineSummaryHints(count, dirty)
+            if (hints.isEmpty) emptyNode
+            else div(hints.map(text => p(cls := "hint", text)))
         }
       ),
       div(
@@ -169,17 +201,17 @@ object WizardView {
           cls := "primary",
           disabled <-- busy,
           onClick.mapTo(()) --> Observer[Unit] { _ =>
-            onSetPlayers.onNext(names.now().map(Player(_)))
+            onSetPlayers.onNext(activeRosterNames().map(Player(_)))
           },
           "Save roster"
         ),
         button(
-          disabled <-- busy.combineWith(lockCount).map { case (isBusy, count) =>
-            isBusy || !TournamentBounds.validPlayerCount(count)
+          disabled <-- busy.combineWith(activeCount).map {
+            case (isBusy, count) =>
+              isBusy || !TournamentBounds.validPlayerCount(count)
           },
           onClick.mapTo(()) --> Observer[Unit] { _ =>
-            val rosterNames = applyCleanedPaste()
-            onSaveAndLock.onNext(rosterNames.map(Player(_)))
+            onSaveAndLock.onNext(activeRosterNames().map(Player(_)))
           },
           "Lock roster"
         )

@@ -7,16 +7,16 @@ object DirectorIdlePolicy {
 
   /** Phase-scoped director UI: loading stages carry no payload; ready stages
     * do.
+    *
+    * Wizard does not embed the leaderboard: Define soft-remove state must
+    * survive leaderboard refreshes, so the shell remounts on tournament (and
+    * idle latest-ratings) changes only. Leaderboard arrives via signal.
     */
   enum View {
     case LoadingTournament
-    case LoadingLeaderboard
     case LoadingLatestRatings
     case Idle(latestRatings: LatestRatingsResponse)
-    case Wizard(
-        tournament: TournamentResponse,
-        leaderboard: LeaderboardResponse
-    )
+    case Wizard(tournament: TournamentResponse)
     case Live(tournament: TournamentResponse)
   }
 
@@ -35,7 +35,6 @@ object DirectorIdlePolicy {
 
   def view(
       maybeTournament: Option[TournamentResponse],
-      maybeLeaderboard: Option[LeaderboardResponse],
       maybeLatestRatings: Option[LatestRatingsResponse]
   ): View =
     maybeTournament match {
@@ -43,10 +42,7 @@ object DirectorIdlePolicy {
       case Some(tournament) =>
         val phase = TournamentPhase.fromApi(tournament.phase)
         if (needsLeaderboard(phase)) {
-          maybeLeaderboard match {
-            case None     => View.LoadingLeaderboard
-            case Some(lb) => View.Wizard(tournament, lb)
-          }
+          View.Wizard(tournament)
         } else if (needsLatestRatings(phase)) {
           maybeLatestRatings match {
             case None     => View.LoadingLatestRatings

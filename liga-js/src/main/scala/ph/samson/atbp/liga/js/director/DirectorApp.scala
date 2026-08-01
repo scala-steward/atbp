@@ -127,18 +127,14 @@ object DirectorApp {
             emptyNode
           }
         },
+      // Remount on tournament / idle latest-ratings only. Leaderboard is a
+      // signal into WizardView so Define soft-remove marks survive refresh.
       child <-- tournament.signal
-        .combineWith(leaderboard.signal, latestRatings.signal)
-        .map { case (maybeTournament, maybeLeaderboard, maybeLatestRatings) =>
-          DirectorIdlePolicy.view(
-            maybeTournament,
-            maybeLeaderboard,
-            maybeLatestRatings
-          ) match {
+        .combineWith(latestRatings.signal)
+        .map { case (maybeTournament, maybeLatestRatings) =>
+          DirectorIdlePolicy.view(maybeTournament, maybeLatestRatings) match {
             case DirectorIdlePolicy.View.LoadingTournament =>
               div(p("Loading…"))
-            case DirectorIdlePolicy.View.LoadingLeaderboard =>
-              div(p("Loading leaderboard…"))
             case DirectorIdlePolicy.View.LoadingLatestRatings =>
               div(p("Loading latest ratings…"))
             case DirectorIdlePolicy.View.Idle(latest) =>
@@ -149,10 +145,10 @@ object DirectorApp {
                   runAction(client.createTournament(name))
                 )
               )
-            case DirectorIdlePolicy.View.Wizard(t, lb) =>
+            case DirectorIdlePolicy.View.Wizard(t) =>
               WizardView(
                 t,
-                lb,
+                leaderboard.signal,
                 busy.signal,
                 Observer[List[Player]](players =>
                   runAction(client.setPlayers(players))

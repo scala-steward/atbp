@@ -27,6 +27,41 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
         )
       }
     ),
+    test("applyPasteHint tells director to Apply paste, not Lock") {
+      assertTrue(
+        DirectorGuidance.applyPasteHint.contains("Apply paste"),
+        !DirectorGuidance.applyPasteHint.toLowerCase.contains("lock")
+      )
+    },
+    suite("define roster hint placement")(
+      test("summary keeps below-min lock hint when paste is dirty") {
+        val hints = DirectorGuidance.defineSummaryHints(
+          activeCount = 0,
+          pasteDirty = true
+        )
+        assertTrue(
+          hints.exists(_.contains("Need at least")),
+          !hints.contains(DirectorGuidance.lockSavesHint)
+        )
+      },
+      test("summary includes lock-saves only when paste is clean") {
+        assertTrue(
+          DirectorGuidance
+            .defineSummaryHints(activeCount = 4, pasteDirty = false)
+            .contains(DirectorGuidance.lockSavesHint),
+          !DirectorGuidance
+            .defineSummaryHints(activeCount = 4, pasteDirty = true)
+            .contains(DirectorGuidance.lockSavesHint)
+        )
+      },
+      test("paste area only shows Apply hint when dirty") {
+        assertTrue(
+          DirectorGuidance.definePasteAreaHints(pasteDirty = true) ==
+            List(DirectorGuidance.applyPasteHint),
+          DirectorGuidance.definePasteAreaHints(pasteDirty = false).isEmpty
+        )
+      }
+    ),
     test("friendlyApiError translates player count validation") {
       assertTrue(
         DirectorGuidance.friendlyApiError(

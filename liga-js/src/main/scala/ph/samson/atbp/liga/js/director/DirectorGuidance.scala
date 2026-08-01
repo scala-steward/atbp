@@ -43,7 +43,31 @@ object DirectorGuidance {
     "Lock saves your roster."
 
   val applyPasteHint: String =
-    "Apply paste to update the preview — or Lock will use your pasted list."
+    "Apply paste to update the roster from your signup list."
+
+  /** Paste-area copy only. Lock-bound count hints live in the summary so dirty
+    * paste cannot hide below-min / above-max guidance.
+    */
+  def definePasteAreaHints(pasteDirty: Boolean): List[String] =
+    if (pasteDirty) List(applyPasteHint) else Nil
+
+  /** Summary hints for Define. Lock roster hints always follow active count;
+    * paste dirtiness only gates the "Lock saves" reminder.
+    */
+  def defineSummaryHints(
+      activeCount: Int,
+      pasteDirty: Boolean
+  ): List[String] = {
+    val hints = List.newBuilder[String]
+    if (!pasteDirty) {
+      hints += lockSavesHint
+    }
+    val lockHint = lockRosterHint(activeCount)
+    if (lockHint.nonEmpty) {
+      hints += lockHint
+    }
+    hints.result()
+  }
 
   def seedHint: String =
     "Seeding freezes each player's rating from the period leaderboard. " +
