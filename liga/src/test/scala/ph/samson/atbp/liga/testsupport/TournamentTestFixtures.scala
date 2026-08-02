@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.testsupport
 
 import ph.samson.atbp.liga.bracket.BracketGen
+import ph.samson.atbp.liga.glicko.Tuning
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 
@@ -12,6 +13,26 @@ object TournamentTestFixtures {
 
   def rating(name: String, r: Double): PlayerRating =
     PlayerRating(Player(name), r, rd = 100, wins = 0, losses = 0)
+
+  def unratedRating(name: String): PlayerRating = {
+    val tuning = Tuning.Default
+    PlayerRating(
+      Player(name),
+      tuning.initRating,
+      tuning.maxDeviation,
+      wins = 0,
+      losses = 0
+    )
+  }
+
+  def withUnratedFrozenRating(
+      state: TournamentState,
+      player: Player
+  ): TournamentState =
+    state.copy(
+      frozenRatings =
+        state.frozenRatings.updated(player, unratedRating(player.name))
+    )
 
   val eightPlayerRatings: List[PlayerRating] =
     (1 to 8).map(i => rating(s"P$i", 1700 - i * 10)).toList

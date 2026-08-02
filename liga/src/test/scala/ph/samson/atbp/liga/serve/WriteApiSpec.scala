@@ -567,6 +567,120 @@ object WriteApiSpec extends ZIOSpecDefault {
         body.contains("handicap must be at most 5")
       )
     },
+    test(
+      "POST /api/matches/{id}/ready auto-applies zero handicap for unrated player"
+    ) {
+      val playersJson =
+        (1 to 7)
+          .map(i => s"""{"name":"P$i"}""")
+          .mkString("[", ",", """,{"name":"Guest"}]""")
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-unrated-ready")
+        )
+        dataDir = root / "data"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dataDir / "eight-player-seed.liga")
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/create",
+              """{"name":"Spring Open"}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/players",
+              s"""{"players":$playersJson}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/tournament/lock", "{}"))
+        seed <- seedTournament(ctx)
+        ready <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-2/ready", ""))
+        readyBody <- ready.body.asString
+        afterReady <- ZIO.fromEither(readyBody.fromJson[TournamentResponse])
+        matchDef = afterReady.bracket
+          .flatMap(_.matches.find(_.id == "wb-1-2"))
+          .get
+        start <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-2/start", ""))
+        _ <- cleanup(root)
+      } yield assertTrue(
+        seed.status == Status.Ok,
+        ready.status == Status.Ok,
+        matchDef.handicapSuggested.contains(0),
+        matchDef.handicapApplied.contains(0),
+        start.status == Status.Ok
+      )
+    },
+    test(
+      "POST /api/matches/{id}/handicap rejects non-zero when player is unrated"
+    ) {
+      val playersJson =
+        (1 to 7)
+          .map(i => s"""{"name":"P$i"}""")
+          .mkString("[", ",", """,{"name":"Guest"}]""")
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-unrated-handicap")
+        )
+        dataDir = root / "data"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dataDir / "eight-player-seed.liga")
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/create",
+              """{"name":"Spring Open"}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/players",
+              s"""{"players":$playersJson}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/tournament/lock", "{}"))
+        _ <- seedTournament(ctx)
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/matches/wb-1-2/ready", ""))
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/matches/wb-1-2/handicap",
+              """{"handicap":3}"""
+            )
+          )
+        body <- response.body.asString
+        _ <- cleanup(root)
+      } yield assertTrue(
+        response.status == Status.BadRequest,
+        body.contains("unrated")
+      )
+    },
     test("POST /api/matches/{id}/result rejects invalid scores with 400") {
       for {
         (ctx, root) <- withTempTournament(seeded = false)

@@ -28,18 +28,18 @@ object MatchForfeitSpec extends ZIOSpecDefault {
       seeded: List[TournamentEvent],
       afterSeed: TournamentState
   ): (List[TournamentEvent], TournamentState) = {
-    val ready =
+    val readyEvents =
       Tournament.ready(afterSeed, "wb-1-1", seq = 13, at).toOption.get
-    val afterReady = Replay.replay(seeded :+ ready).toOption.get
+    val afterReady = Replay.replay(seeded ++ readyEvents).toOption.get
     val handicap = Tournament
       .applyHandicap(afterReady, "wb-1-1", handicap = 2, seq = 14, at)
       .toOption
       .get
     val afterHandicap =
-      Replay.replay(seeded :+ ready :+ handicap).toOption.get
+      Replay.replay(seeded ++ readyEvents :+ handicap).toOption.get
     val started =
       Tournament.start(afterHandicap, "wb-1-1", seq = 15, at).toOption.get
-    val events = seeded :+ ready :+ handicap :+ started
+    val events = seeded ++ readyEvents :+ handicap :+ started
     val afterStart = Replay.replay(events).toOption.get
     (events, afterStart)
   }

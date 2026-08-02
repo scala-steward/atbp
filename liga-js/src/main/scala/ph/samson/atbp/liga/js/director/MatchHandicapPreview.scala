@@ -33,7 +33,20 @@ object MatchHandicapPreview {
     } yield {
       val sharedA = PlayerRatingConversions.toShared(a)
       val sharedB = PlayerRatingConversions.toShared(b)
-      val suggestion = Handicap.suggest(sharedA, sharedB, raceTo)
+      val suggestion =
+        if (Handicap.requiresZeroHandicap(sharedA, sharedB)) {
+          val weakerPlayer =
+            if (sharedA.rating == sharedB.rating) {
+              List(sharedA, sharedB).minBy(_.player.name).player
+            } else if (sharedA.rating < sharedB.rating) {
+              sharedA.player
+            } else {
+              sharedB.player
+            }
+          shared.HandicapSuggestion(weakerPlayer, handicap = 0, raceTo)
+        } else {
+          Handicap.suggest(sharedA, sharedB, raceTo)
+        }
       val (weaker, stronger) =
         if (suggestion.weakerPlayer == sharedA.player) (sharedA, sharedB)
         else (sharedB, sharedA)

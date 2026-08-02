@@ -5,13 +5,11 @@ import ph.samson.atbp.liga.bracket.TournamentBounds
 import ph.samson.atbp.liga.handicap.HandicapCap
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
+import ph.samson.atbp.liga.js.api.Models.PlayerRating
 import ph.samson.atbp.liga.js.api.Models.TournamentResponse
 
 /** Director-facing copy for match setup and API error translation. */
 object DirectorGuidance {
-
-  val matchWorkflowOverview: String =
-    "Each match: Ready (compute spot) → Apply handicap → Start → Record result."
 
   def scoreboardScoreHint(raceTo: Int): String = {
     val exampleLoser = math.max(0, raceTo - 2)
@@ -73,9 +71,14 @@ object DirectorGuidance {
     "Seeding freezes each player's rating from the period leaderboard. " +
       "Guests receive default ratings."
 
+  val matchWorkflowOverview: String =
+    "Each match: Ready (compute spot), then Apply handicap when both players " +
+      "are rated, then Start → Record result."
+
   def matchStepHint(
       matchDef: BracketMatch,
-      resolvedRaceTo: Option[Int]
+      resolvedRaceTo: Option[Int],
+      frozenRatings: List[PlayerRating]
   ): String = {
     val needsRaceTo =
       matchDef.state == BracketMatchState.Ready ||
@@ -83,25 +86,40 @@ object DirectorGuidance {
     if (needsRaceTo && resolvedRaceTo.isEmpty) {
       missingRaceToHint(matchDef.id)
     } else {
-      matchStepHintByState(matchDef)
+      matchStepHintByState(matchDef, frozenRatings)
     }
   }
 
-  private def matchStepHintByState(matchDef: BracketMatch): String =
+  private def matchStepHintByState(
+      matchDef: BracketMatch,
+      frozenRatings: List[PlayerRating]
+  ): String = {
+    val unratedPath =
+      ReadyHandicapPolicy.requiresZeroHandicap(matchDef, frozenRatings)
+    val zeroLocked = unratedPath && matchDef.handicapSuggested.isDefined
     matchDef.state match {
       case BracketMatchState.Pending =>
         "Waiting for both players to be assigned from earlier results."
       case BracketMatchState.Ready if matchDef.handicapSuggested.isEmpty =>
-        "Step 1 of 4: click Ready to compute a handicap spot from frozen ratings."
+        if (unratedPath) {
+          "Step 1 of 3: click Ready — unrated players play without a handicap."
+        } else {
+          "Step 1 of 4: click Ready to compute a handicap spot from frozen ratings."
+        }
+      case BracketMatchState.Ready if zeroLocked =>
+        "Step 2 of 3: Start match — unrated players play without a handicap."
       case BracketMatchState.Ready if matchDef.handicapApplied.isEmpty =>
         "Step 2 of 4: adjust the spot if needed, then Apply handicap."
       case BracketMatchState.Ready =>
         "Step 3 of 4: Start match once the spot is agreed."
+      case BracketMatchState.Started if unratedPath =>
+        "Step 3 of 3: enter scoreboard totals and record the result."
       case BracketMatchState.Started =>
         "Step 4 of 4: enter scoreboard totals and record the result."
       case BracketMatchState.Completed =>
         "Match finished."
     }
+  }
 
   def handicapCap(raceTo: Int): Int =
     HandicapCap.capFor(raceTo)
@@ -146,6 +164,8 @@ object DirectorGuidance {
       handicapCapError(raw, raceTo)
     } else if (lower.contains("handicap must be non-negative")) {
       "Handicap cannot be negative."
+    } else if (lower.contains("unrated")) {
+      "Handicap must stay at 0 when either player is unrated."
     } else if (lower.contains("winner score must be")) {
       winnerScoreError(raw, raceTo)
     } else if (lower.contains("loser score must be less than")) {

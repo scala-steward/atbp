@@ -195,7 +195,7 @@ object DirectorRoutes {
 
   private def handleReady(ctx: ServeContext, matchId: String): Task[Response] =
     for {
-      state <- ctx.applyMatchCommand { (current, seq, at) =>
+      state <- ctx.applyMatchCommands { (current, seq, at) =>
         Tournament.ready(current, matchId, seq, at)
       }
       response <- jsonState(ctx, state)

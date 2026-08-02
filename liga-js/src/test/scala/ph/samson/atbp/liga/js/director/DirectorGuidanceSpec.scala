@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.director
 
 import ph.samson.atbp.liga.bracket.TournamentBounds
+import ph.samson.atbp.liga.glicko.Tuning
 import ph.samson.atbp.liga.js.api.Models.*
 import zio.test.*
 
@@ -77,7 +78,11 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
         playerB = Some(Player("P2")),
         state = BracketMatchState.Ready
       )
-      val hint = DirectorGuidance.matchStepHint(matchDef, resolvedRaceTo = None)
+      val hint = DirectorGuidance.matchStepHint(
+        matchDef,
+        resolvedRaceTo = None,
+        frozenRatings = Nil
+      )
       assertTrue(
         !hint.contains("click Ready"),
         !hint.contains("Step 1"),
@@ -101,7 +106,11 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
       )
       assertTrue(
         DirectorGuidance
-          .matchStepHint(matchDef, resolvedRaceTo = Some(7))
+          .matchStepHint(
+            matchDef,
+            resolvedRaceTo = Some(7),
+            frozenRatings = Nil
+          )
           .contains("Step 1")
       )
     },
@@ -204,6 +213,83 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
         !loser.contains("Race to 5"),
         handicap.contains("Race to 9"),
         !handicap.contains("Race to 5")
+      )
+    },
+    test("matchStepHint uses 3 steps for unrated matches") {
+      val tuning = Tuning.Default
+      val guest = Player("Guest")
+      val bob = Player("Bob")
+      val frozen = List(
+        PlayerRating(
+          guest,
+          tuning.initRating,
+          tuning.maxDeviation,
+          wins = 0,
+          losses = 0
+        ),
+        PlayerRating(bob, 1450, 90, wins = 0, losses = 0)
+      )
+      val beforeReady = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(guest),
+        playerB = Some(bob),
+        state = BracketMatchState.Ready
+      )
+      val afterReady = beforeReady.copy(
+        handicapSuggested = Some(0),
+        handicapApplied = Some(0)
+      )
+      val started = afterReady.copy(state = BracketMatchState.Started)
+      val beforeHint =
+        DirectorGuidance.matchStepHint(beforeReady, Some(7), frozen)
+      val afterHint =
+        DirectorGuidance.matchStepHint(afterReady, Some(7), frozen)
+      val startedHint =
+        DirectorGuidance.matchStepHint(started, Some(7), frozen)
+      assertTrue(
+        beforeHint.contains("Step 1 of 3"),
+        afterHint.contains("Step 2 of 3"),
+        afterHint.contains("Start match"),
+        afterHint.contains("unrated"),
+        !afterHint.contains("Apply handicap"),
+        !afterHint.contains("of 4"),
+        startedHint.contains("Step 3 of 3"),
+        !startedHint.contains("of 4")
+      )
+    },
+    test("matchStepHint still requires Apply for rated ready matches") {
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("Alice")),
+        playerB = Some(Player("Bob")),
+        state = BracketMatchState.Ready,
+        handicapSuggested = Some(2)
+      )
+      val frozen = List(
+        PlayerRating(Player("Alice"), 1700, 80, wins = 0, losses = 0),
+        PlayerRating(Player("Bob"), 1450, 90, wins = 0, losses = 0)
+      )
+      val hint =
+        DirectorGuidance.matchStepHint(matchDef, Some(7), frozen)
+      assertTrue(hint.contains("Apply handicap"))
+    },
+    test("friendlyApiError translates unrated non-zero handicap rejection") {
+      assertTrue(
+        DirectorGuidance
+          .friendlyApiError(
+            "handicap must be 0 when either player is unrated"
+          )
+          .contains("stay at 0")
+      )
+    },
+    test("matchWorkflowOverview does not require Apply for every match") {
+      assertTrue(
+        DirectorGuidance.matchWorkflowOverview.contains(
+          "when both players are rated"
+        ),
+        !DirectorGuidance.matchWorkflowOverview.startsWith(
+          "Each match: Ready (compute spot) → Apply handicap →"
+        )
       )
     }
   )

@@ -11,6 +11,10 @@ import ph.samson.atbp.liga.model.*
   */
 object Handicap {
 
+  def requiresZeroHandicap(a: PlayerRating, b: PlayerRating): Boolean =
+    PlayerRatingLabel.fromFrozen(a) == PlayerRatingLabel.Unrated ||
+      PlayerRatingLabel.fromFrozen(b) == PlayerRatingLabel.Unrated
+
   def suggest(
       a: PlayerRating,
       b: PlayerRating,

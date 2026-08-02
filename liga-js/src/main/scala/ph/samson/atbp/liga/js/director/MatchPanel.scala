@@ -70,7 +70,11 @@ object MatchPanel {
       raceToDisplay(matchDef, tournament.raceToByScope),
       p(
         cls := "guidance",
-        DirectorGuidance.matchStepHint(matchDef, resolvedRaceTo)
+        DirectorGuidance.matchStepHint(
+          matchDef,
+          resolvedRaceTo,
+          tournament.frozenRatings
+        )
       ),
       matchControls(
         matchDef,
@@ -254,7 +258,11 @@ object MatchPanel {
       onStart: Observer[Unit]
   ): Div = {
     val preview = MatchHandicapPreview.fromMatch(tournament, matchDef, raceTo)
-    ReadyHandicapPolicy.surface(matchDef, preview) match {
+    ReadyHandicapPolicy.surface(
+      matchDef,
+      tournament.frozenRatings,
+      preview
+    ) match {
       case ReadyHandicapPolicy.Surface.Preview(handicapPreview) =>
         div(
           probabilityNeighborhood(
@@ -272,6 +280,41 @@ object MatchPanel {
         )
       case ReadyHandicapPolicy.Surface.PreviewWaiting =>
         div(p(ReadyHandicapPolicy.previewWaitingMessage))
+      case ReadyHandicapPolicy.Surface.ZeroLocked(suggested, maybePreview) =>
+        div(
+          maybePreview match {
+            case Some(handicapPreview) =>
+              probabilityNeighborhood(
+                handicapPreview.weaker,
+                handicapPreview.stronger,
+                raceTo,
+                suggested
+              )
+            case None =>
+              p(ReadyHandicapPolicy.previewWaitingMessage)
+          },
+          p(cls := "guidance", ReadyHandicapPolicy.zeroLockedEncouragement),
+          div(
+            label(
+              "Handicap (games spotted to weaker player): ",
+              input(
+                typ := "number",
+                value := "0",
+                disabled := true
+              )
+            ),
+            div(
+              cls := "actions",
+              button(disabled := true, "No handicap"),
+              button(
+                cls := "primary",
+                disabled <-- busy,
+                onClick.mapTo(()) --> onStart,
+                "Start match"
+              )
+            )
+          )
+        )
       case ReadyHandicapPolicy.Surface.Adjust(suggested, maybePreview) =>
         div(
           maybePreview match {

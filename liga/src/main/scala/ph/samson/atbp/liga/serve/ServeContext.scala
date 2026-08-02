@@ -164,6 +164,25 @@ final case class ServeContext(
       updated <- appendWizardEvents(events)
     } yield updated
 
+  def applyMatchCommands(
+      command: (
+          TournamentState,
+          Int,
+          Instant
+      ) => Either[Tournament.Error, List[TournamentEvent]]
+  ): Task[TournamentState] =
+    for {
+      state <- loadTournament
+      seq <- nextSeq
+      at = Instant.now()
+      events <- ZIO.fromEither(
+        command(state, seq, at).left.map(err =>
+          ServeContext.CommandError(err.message)
+        )
+      )
+      updated <- appendWizardEvents(events)
+    } yield updated
+
   def applyMatchCommand[A <: TournamentEvent](
       command: (TournamentState, Int, Instant) => Either[Tournament.Error, A]
   ): Task[TournamentState] =

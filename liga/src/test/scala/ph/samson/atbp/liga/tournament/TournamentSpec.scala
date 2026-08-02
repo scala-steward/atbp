@@ -13,10 +13,78 @@ object TournamentSpec extends ZIOSpecDefault {
       test("MatchReady computes handicap suggestion from frozen ratings") {
         val state = seededState()
         val result = Tournament.ready(state, "wb-1-1", seq = 3, at)
+        val ready = result.toOption.get.collectFirst {
+          case event: TournamentEvent.MatchReady => event
+        }.get
         assertTrue(
           result.isRight,
-          result.toOption.get.payload.matchId == "wb-1-1",
-          result.toOption.get.payload.handicapSuggested >= 0
+          result.toOption.get.length == 1,
+          ready.payload.matchId == "wb-1-1",
+          ready.payload.handicapSuggested >= 0
+        )
+      },
+      test("ready with one unrated participant suggests 0 and auto-applies") {
+        val state = withUnratedFrozenRating(
+          seededState(),
+          matchOf(seededState(), "wb-1-1").playerA.get
+        )
+        val result = Tournament.ready(state, "wb-1-1", seq = 13, at)
+        val events = result.toOption.get
+        val ready = events.collectFirst {
+          case event: TournamentEvent.MatchReady => event
+        }.get
+        val applied = events.collectFirst {
+          case event: TournamentEvent.HandicapApplied => event
+        }.get
+        val afterReady =
+          Replay.replay(seededEvents(state) ++ events).toOption.get
+        val matchDef = matchOf(afterReady, "wb-1-1")
+        assertTrue(
+          result.isRight,
+          events.length == 2,
+          ready.payload.handicapSuggested == 0,
+          applied.payload.handicapApplied == 0,
+          matchDef.handicapSuggested.contains(0),
+          matchDef.handicapApplied.contains(0)
+        )
+      },
+      test("ready with both unrated participants suggests 0 and auto-applies") {
+        val base = seededState()
+        val matchDef = matchOf(base, "wb-1-1")
+        val state = withUnratedFrozenRating(
+          withUnratedFrozenRating(base, matchDef.playerA.get),
+          matchDef.playerB.get
+        )
+        val result = Tournament.ready(state, "wb-1-1", seq = 13, at)
+        val events = result.toOption.get
+        val ready = events.collectFirst {
+          case event: TournamentEvent.MatchReady => event
+        }.get
+        val applied = events.collectFirst {
+          case event: TournamentEvent.HandicapApplied => event
+        }.get
+        assertTrue(
+          result.isRight,
+          events.length == 2,
+          ready.payload.handicapSuggested == 0,
+          applied.payload.handicapApplied == 0
+        )
+      },
+      test("start succeeds after unrated ready without separate apply") {
+        val state = withUnratedFrozenRating(
+          seededState(),
+          matchOf(seededState(), "wb-1-1").playerA.get
+        )
+        val seeded = seededEvents(state)
+        val readyEvents =
+          Tournament.ready(state, "wb-1-1", seq = 13, at).toOption.get
+        val afterReady = Replay.replay(seeded ++ readyEvents).toOption.get
+        val started =
+          Tournament.start(afterReady, "wb-1-1", seq = 15, at).toOption.get
+        val finalState =
+          Replay.replay(seeded ++ readyEvents :+ started).toOption.get
+        assertTrue(
+          matchOf(finalState, "wb-1-1").state == BracketMatchState.Started
         )
       },
       test("ready rejects pending matches without both players") {
@@ -105,6 +173,40 @@ object TournamentSpec extends ZIOSpecDefault {
           Tournament
             .applyHandicap(state, "wb-1-1", handicap = 3, seq = 4, at)
             .isLeft
+        )
+      },
+      test("handicap rejects non-zero when either player is unrated") {
+        val state = withUnratedFrozenRating(
+          withMatch(seededState(), "wb-1-1") {
+            _.copy(
+              state = BracketMatchState.Ready,
+              handicapSuggested = Some(0)
+            )
+          },
+          matchOf(seededState(), "wb-1-1").playerA.get
+        )
+        val result =
+          Tournament.applyHandicap(state, "wb-1-1", handicap = 2, seq = 4, at)
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message.contains("unrated")
+        )
+      },
+      test("handicap allows zero when either player is unrated") {
+        val state = withUnratedFrozenRating(
+          withMatch(seededState(), "wb-1-1") {
+            _.copy(
+              state = BracketMatchState.Ready,
+              handicapSuggested = Some(0)
+            )
+          },
+          matchOf(seededState(), "wb-1-1").playerA.get
+        )
+        val result =
+          Tournament.applyHandicap(state, "wb-1-1", handicap = 0, seq = 4, at)
+        assertTrue(
+          result.isRight,
+          result.toOption.get.payload.handicapApplied == 0
         )
       }
     ),
@@ -243,19 +345,23 @@ object TournamentSpec extends ZIOSpecDefault {
       test("ready → handicap → start → result replays cleanly") {
         val state = seededState()
         val seeded = seededEvents(state)
-        val ready = Tournament.ready(state, "wb-1-1", seq = 13, at).toOption.get
-        val afterReady = Replay.replay(seeded :+ ready).toOption.get
+        val readyEvents =
+          Tournament.ready(state, "wb-1-1", seq = 13, at).toOption.get
+        val afterReady = Replay.replay(seeded ++ readyEvents).toOption.get
         val handicap =
           Tournament
             .applyHandicap(afterReady, "wb-1-1", handicap = 3, seq = 14, at)
             .toOption
             .get
         val afterHandicap =
-          Replay.replay(seeded :+ ready :+ handicap).toOption.get
+          Replay.replay(seeded ++ readyEvents :+ handicap).toOption.get
         val started =
           Tournament.start(afterHandicap, "wb-1-1", seq = 15, at).toOption.get
         val afterStart =
-          Replay.replay(seeded :+ ready :+ handicap :+ started).toOption.get
+          Replay
+            .replay(seeded ++ readyEvents :+ handicap :+ started)
+            .toOption
+            .get
         val result = Tournament
           .recordResult(
             afterStart,
@@ -269,13 +375,18 @@ object TournamentSpec extends ZIOSpecDefault {
           .get
         val finalState =
           Replay
-            .replay(seeded :+ ready :+ handicap :+ started :+ result)
+            .replay(seeded ++ readyEvents :+ handicap :+ started :+ result)
             .toOption
             .get
+        val readyEvent = readyEvents.collectFirst {
+          case event: TournamentEvent.MatchReady => event
+        }.get
         val matchDef = matchOf(finalState, "wb-1-1")
         assertTrue(
           matchDef.state == BracketMatchState.Completed,
-          matchDef.handicapSuggested.contains(ready.payload.handicapSuggested),
+          matchDef.handicapSuggested.contains(
+            readyEvent.payload.handicapSuggested
+          ),
           matchDef.handicapApplied.contains(3),
           matchDef.result.contains(MatchResult(7, 4))
         )

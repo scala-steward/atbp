@@ -165,22 +165,47 @@ object Tournament {
       matchId: String,
       seq: Int,
       at: Instant
-  ): Either[Error, TournamentEvent.MatchReady] =
+  ): Either[Error, List[TournamentEvent]] =
     for {
       matchDef <- MatchLifecycle.findMatch(state, matchId)
       _ <- MatchLifecycle.validateReady(state, matchDef)
       raceTo <- MatchLifecycle.resolveRaceTo(state, matchId)
       ratingA <- frozenRating(state, matchDef.playerA.get)
       ratingB <- frozenRating(state, matchDef.playerB.get)
-      suggestion = Handicap.suggest(ratingA, ratingB, raceTo)
-    } yield TournamentEvent.MatchReady(
-      seq = seq,
-      at = at,
-      payload = MatchReadyPayload(
-        matchId = matchId,
-        handicapSuggested = suggestion.handicap
-      )
-    )
+    } yield {
+      if (Handicap.requiresZeroHandicap(ratingA, ratingB)) {
+        List(
+          TournamentEvent.MatchReady(
+            seq = seq,
+            at = at,
+            payload = MatchReadyPayload(
+              matchId = matchId,
+              handicapSuggested = 0
+            )
+          ),
+          TournamentEvent.HandicapApplied(
+            seq = seq + 1,
+            at = at,
+            payload = HandicapAppliedPayload(
+              matchId = matchId,
+              handicapApplied = 0
+            )
+          )
+        )
+      } else {
+        val suggestion = Handicap.suggest(ratingA, ratingB, raceTo)
+        List(
+          TournamentEvent.MatchReady(
+            seq = seq,
+            at = at,
+            payload = MatchReadyPayload(
+              matchId = matchId,
+              handicapSuggested = suggestion.handicap
+            )
+          )
+        )
+      }
+    }
 
   def applyHandicap(
       state: TournamentState,

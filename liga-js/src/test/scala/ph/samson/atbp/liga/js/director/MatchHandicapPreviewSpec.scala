@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.glicko.Tuning
 import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.js.api.Models.*
 import ph.samson.atbp.liga.model as shared
@@ -111,6 +112,30 @@ object MatchHandicapPreviewSpec extends ZIOSpecDefault {
         MatchHandicapPreview
           .forMatch(handicapContext(frozen), matchDef)
           .exists(_.weakerName == "Bob")
+      )
+    },
+    test("fromMatch suggests zero when either player is unrated") {
+      val tuning = Tuning.Default
+      val guest = Player("Guest")
+      val frozen = List(
+        jsRating(
+          guest,
+          tuning.initRating,
+          tuning.maxDeviation
+        ),
+        jsRating(bob, 1450, 90)
+      )
+      val matchDef = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(guest),
+        playerB = Some(bob),
+        state = BracketMatchState.Ready
+      )
+      val preview =
+        MatchHandicapPreview.fromMatch(tournament(frozen), matchDef, 7)
+      assertTrue(
+        preview.isDefined,
+        preview.exists(_.suggestedHandicap == 0)
       )
     }
   )

@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.bracket.TournamentBounds
+import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.handicap.HandicapCap
 import ph.samson.atbp.liga.model.*
 
@@ -52,6 +53,14 @@ object TournamentValidation {
       _ <- MatchLifecycle.requireActive(state).left.map(_.message)
       matchDef <- MatchLifecycle.findMatch(state, matchId).left.map(_.message)
       _ <- MatchLifecycle.validateHandicap(matchDef).left.map(_.message)
+      ratingA <- frozenRating(state, matchDef.playerA.get)
+      ratingB <- frozenRating(state, matchDef.playerB.get)
+      _ <-
+        if (Handicap.requiresZeroHandicap(ratingA, ratingB) && handicap != 0) {
+          Left("handicap must be 0 when either player is unrated")
+        } else {
+          Right(())
+        }
       raceTo <- MatchLifecycle.resolveRaceTo(state, matchId).left.map(_.message)
       cap = HandicapCap.capFor(raceTo)
       _ <-
@@ -63,6 +72,14 @@ object TournamentValidation {
           Right(())
         }
     } yield ()
+
+  private def frozenRating(
+      state: TournamentState,
+      player: Player
+  ): Either[String, PlayerRating] =
+    state.frozenRatings
+      .get(player)
+      .toRight(s"no frozen rating for ${player.name}")
 
   def validateMatchResult(
       state: TournamentState,
