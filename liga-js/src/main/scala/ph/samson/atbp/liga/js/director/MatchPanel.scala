@@ -33,12 +33,19 @@ object MatchPanel {
         }
         .getOrElse("0")
     )
-    val scoreAInput = Var(
-      matchDef.result.map(_.scoreA.toString).getOrElse("0")
+    val appliedHandicapDisplay = AppliedHandicapLabels.forMatch(
+      BracketHandicapContext.fromTournament(tournament),
+      matchDef
     )
-    val scoreBInput = Var(
-      matchDef.result.map(_.scoreB.toString).getOrElse("0")
-    )
+    val scoreFloors =
+      ScoreEntryDefaults.floorsFromDisplay(appliedHandicapDisplay)
+    val (initialScoreA, initialScoreB) =
+      ScoreEntryDefaults.initialScoreStrings(
+        appliedHandicapDisplay,
+        matchDef.result
+      )
+    val scoreAInput = Var(initialScoreA)
+    val scoreBInput = Var(initialScoreB)
     val forfeitingSide = Var("A")
     val forfeitReason = Var("")
     val validationError = Var("")
@@ -72,6 +79,7 @@ object MatchPanel {
         handicapInput,
         scoreAInput,
         scoreBInput,
+        scoreFloors,
         forfeitingSide,
         forfeitReason,
         validationError,
@@ -132,6 +140,7 @@ object MatchPanel {
       handicapInput: Var[String],
       scoreAInput: Var[String],
       scoreBInput: Var[String],
+      scoreFloors: ScoreEntryDefaults.ScoreFloors,
       forfeitingSide: Var[String],
       forfeitReason: Var[String],
       validationError: Var[String],
@@ -191,6 +200,7 @@ object MatchPanel {
                 raceTo,
                 scoreAInput,
                 scoreBInput,
+                scoreFloors,
                 validationError,
                 busy,
                 onResult
@@ -328,12 +338,23 @@ object MatchPanel {
     }
   }
 
+  private def clampScoreOnBlur(
+      scoreInput: Var[String],
+      floor: Int
+  ): Observer[Unit] =
+    Observer[Unit] { _ =>
+      scoreInput.set(
+        ScoreEntryDefaults.clampOnBlur(scoreInput.now(), floor)
+      )
+    }
+
   private def startedControls(
       tournament: TournamentResponse,
       matchDef: BracketMatch,
       raceTo: Int,
       scoreAInput: Var[String],
       scoreBInput: Var[String],
+      scoreFloors: ScoreEntryDefaults.ScoreFloors,
       validationError: Var[String],
       busy: Signal[Boolean],
       onResult: Observer[(Int, Int)]
@@ -351,7 +372,11 @@ object MatchPanel {
           input(
             typ := "number",
             value <-- scoreAInput,
-            onInput.mapToValue --> scoreAInput
+            onInput.mapToValue --> scoreAInput,
+            onBlur.mapTo(()) --> clampScoreOnBlur(
+              scoreAInput,
+              scoreFloors.scoreA
+            )
           )
         ),
         label(
@@ -359,7 +384,11 @@ object MatchPanel {
           input(
             typ := "number",
             value <-- scoreBInput,
-            onInput.mapToValue --> scoreBInput
+            onInput.mapToValue --> scoreBInput,
+            onBlur.mapTo(()) --> clampScoreOnBlur(
+              scoreBInput,
+              scoreFloors.scoreB
+            )
           )
         )
       ),
@@ -371,8 +400,15 @@ object MatchPanel {
         cls := "primary",
         disabled <-- busy,
         onClick.mapTo(()) --> Observer[Unit] { _ =>
-          val scoreA = scoreAInput.now().toIntOption
-          val scoreB = scoreBInput.now().toIntOption
+          val (clampedA, clampedB) = ScoreEntryDefaults.clampPair(
+            scoreAInput.now(),
+            scoreBInput.now(),
+            scoreFloors
+          )
+          scoreAInput.set(clampedA)
+          scoreBInput.set(clampedB)
+          val scoreA = clampedA.toIntOption
+          val scoreB = clampedB.toIntOption
           (scoreA, scoreB) match {
             case (Some(a), Some(b)) if a == b =>
               validationError.set(
