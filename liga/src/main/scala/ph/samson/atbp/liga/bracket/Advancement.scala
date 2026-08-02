@@ -13,8 +13,20 @@ object Advancement {
   def advance(
       bracket: Bracket,
       matchId: String,
+      winner: Player
+  ): Either[String, AdvanceResult] =
+    advance(
+      bracket,
+      matchId,
+      winner,
+      recordPlaceholderResult = true
+    )
+
+  def advance(
+      bracket: Bracket,
+      matchId: String,
       winner: Player,
-      recordPlaceholderResult: Boolean = true
+      recordPlaceholderResult: Boolean
   ): Either[String, AdvanceResult] = {
     val topology = BracketTopology(bracket.size)
     for {
@@ -23,6 +35,7 @@ object Advancement {
         matchId,
         winner,
         topology,
+        isBye = false,
         recordPlaceholderResult = recordPlaceholderResult
       )
       propagated <- BracketByes.propagateStructuralByesE(placed, topology)
@@ -37,8 +50,8 @@ object Advancement {
       matchId: String,
       winner: Player,
       topology: BracketTopology.Topology,
-      isBye: Boolean = false,
-      recordPlaceholderResult: Boolean = true
+      isBye: Boolean,
+      recordPlaceholderResult: Boolean
   ): Either[String, Bracket] =
     for {
       matchDef <- findMatch(bracket, matchId)

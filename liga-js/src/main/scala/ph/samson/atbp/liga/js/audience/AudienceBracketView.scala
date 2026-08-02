@@ -6,6 +6,7 @@ import ph.samson.atbp.liga.js.director.AppliedHandicapLabels
 import ph.samson.atbp.liga.js.director.AppliedHandicapView
 import ph.samson.atbp.liga.js.director.BracketHandicapContext
 import ph.samson.atbp.liga.js.director.BracketLayout
+import ph.samson.atbp.liga.js.director.BracketResultsContext
 import ph.samson.atbp.liga.js.director.MatchScoreView
 import ph.samson.atbp.liga.js.director.RaceToLabels
 
@@ -14,7 +15,8 @@ object AudienceBracketView {
 
   def apply(
       bracket: Bracket,
-      handicapContext: BracketHandicapContext
+      handicapContext: BracketHandicapContext,
+      resultsContext: BracketResultsContext
   ): Div = {
     val raceToByScope = handicapContext.raceToByScope
     val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
@@ -39,7 +41,7 @@ object AudienceBracketView {
           ),
           div(
             cls := "round-matches",
-            group.matches.map(matchRow(handicapContext, _))
+            group.matches.map(matchRow(handicapContext, resultsContext, _))
           )
         )
       }
@@ -48,6 +50,7 @@ object AudienceBracketView {
 
   private def matchRow(
       handicapContext: BracketHandicapContext,
+      resultsContext: BracketResultsContext,
       matchDef: BracketMatch
   ): Div = {
     val isLive = matchDef.state == BracketMatchState.Started
@@ -64,6 +67,7 @@ object AudienceBracketView {
         AppliedHandicapView.playersWithAppliedHandicap(
           matchDef,
           handicapContext,
+          resultsContext,
           AppliedHandicapLabels.forMatch(handicapContext, matchDef),
           BracketLayout.winnerSide(matchDef)
         )

@@ -17,7 +17,20 @@ object AudienceIdlePolicy {
   }
 
   def needsLatestRatings(phase: TournamentPhase): Boolean =
-    phase == TournamentPhase.None
+    phase == TournamentPhase.None || phase == TournamentPhase.Completed
+
+  /** Whether a poll should hit `GET /api/latest-ratings`.
+    *
+    * Completed brackets join an immutable post-period feed — once cached, skip
+    * refetch on every audience poll. Idle still refreshes so a remote Complete
+    * can update the table.
+    */
+  def shouldFetchLatestRatingsOnRefresh(
+      phase: TournamentPhase,
+      cached: Option[LatestRatingsResponse]
+  ): Boolean =
+    needsLatestRatings(phase) &&
+      (phase != TournamentPhase.Completed || cached.isEmpty)
 
   /** Map a latest-ratings attempt into a committed feed so idle can reach
     * Ready.
@@ -43,8 +56,12 @@ object AudienceIdlePolicy {
         val phase = TournamentPhase.fromApi(tournament.phase)
         if (needsLatestRatings(phase)) {
           maybeLatestRatings match {
-            case None     => View.LoadingLatestRatings
-            case Some(lr) => View.Idle(lr)
+            case None =>
+              View.LoadingLatestRatings
+            case Some(lr) if phase == TournamentPhase.None =>
+              View.Idle(lr)
+            case Some(_) =>
+              View.Bracket(tournament)
           }
         } else {
           phase match {

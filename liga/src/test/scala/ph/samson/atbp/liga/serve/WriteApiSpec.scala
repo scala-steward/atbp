@@ -719,6 +719,71 @@ object WriteApiSpec extends ZIOSpecDefault {
         again.status == Status.BadRequest
       )
     },
+    test(
+      "complete keeps serving completed bracket when tournamentDir was unpinned"
+    ) {
+      for {
+        root <- ZIO.attemptBlocking(
+          File.newTemporaryDirectory("liga-complete-stay")
+        )
+        dataDir = root / "data"
+        _ <- ZIO.attemptBlocking {
+          dataDir.createDirectoryIfNotExists()
+          File(getClass.getResource("/periods/eight-player-seed.liga"))
+            .copyTo(dataDir / "eight-player-seed.liga")
+        }
+        ctx = ServeContext(dataDir = dataDir, tournamentDir = None)
+        playersJson = (1 to 8)
+          .map(i => s"""{"name":"P$i"}""")
+          .mkString("[", ",", "]")
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/create",
+              """{"name":"Spring Open"}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(
+            localhostPost(
+              "/api/tournament/players",
+              s"""{"players":$playersJson}"""
+            )
+          )
+        _ <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/tournament/lock", "{}"))
+        seed <- seedTournament(ctx)
+        seedBody <- seed.body.asString
+        seeded <- ZIO.fromEither(seedBody.fromJson[TournamentResponse])
+        _ <- playAllReadyMatches(ctx, seeded)
+        complete <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostPost("/api/tournament/complete", "{}"))
+        completeBody <- complete.body.asString
+        completedState <- ZIO.fromEither(
+          completeBody.fromJson[TournamentResponse]
+        )
+        get <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(localhostGet("/api/tournament"))
+        getBody <- get.body.asString
+        reopened <- ZIO.fromEither(getBody.fromJson[TournamentResponse])
+        _ <- cleanup(root)
+      } yield assertTrue(
+        complete.status == Status.Ok,
+        completedState.completed,
+        completedState.phase == "completed",
+        completedState.bracket.exists(_.matches.nonEmpty),
+        get.status == Status.Ok,
+        reopened.completed,
+        reopened.phase == "completed",
+        reopened.bracket.exists(_.matches.nonEmpty),
+        reopened.name == "Spring Open"
+      )
+    },
     test("director routes map stale event seq to 409") {
       for {
         response <- DirectorRoutes

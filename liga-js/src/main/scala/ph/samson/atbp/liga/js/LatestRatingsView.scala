@@ -32,7 +32,7 @@ object LatestRatingsView {
 
   private[js] def formatDelta(delta: Double): String = {
     val rounded = Math.round(delta)
-    if (rounded == 0L) "0"
+    if (rounded == 0L) "+0"
     else if (rounded > 0) s"+$rounded"
     else rounded.toString
   }

@@ -5,11 +5,11 @@ import zio.test.*
 object LatestRatingsViewSpec extends ZIOSpecDefault {
 
   def spec = suite("LatestRatingsView")(
-    test("formatDelta rounds near-zero values to 0") {
+    test("formatDelta rounds near-zero values to +0") {
       assertTrue(
-        LatestRatingsView.formatDelta(0.0) == "0",
-        LatestRatingsView.formatDelta(0.0001) == "0",
-        LatestRatingsView.formatDelta(-0.0001) == "0"
+        LatestRatingsView.formatDelta(0.0) == "+0",
+        LatestRatingsView.formatDelta(0.0001) == "+0",
+        LatestRatingsView.formatDelta(-0.0001) == "+0"
       )
     },
     test("formatDelta shows signed whole-number deltas") {

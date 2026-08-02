@@ -21,7 +21,20 @@ object DirectorIdlePolicy {
   }
 
   def needsLatestRatings(phase: TournamentPhase): Boolean =
-    phase == TournamentPhase.None
+    phase == TournamentPhase.None || phase == TournamentPhase.Completed
+
+  /** After a tournament write, drop any cached latest-ratings feed.
+    *
+    * Idle loads pre-tournament movement; keeping that `Some` across create /
+    * play / Complete would let `view` skip LoadingLatestRatings and join stale
+    * deltas into a completed bracket. Callers refetch when
+    * `needsLatestRatings(phase)`.
+    */
+  def retainedLatestRatingsAfterWrite(
+      _phase: TournamentPhase,
+      _previous: Option[LatestRatingsResponse]
+  ): Option[LatestRatingsResponse] =
+    None
 
   def needsLeaderboard(phase: TournamentPhase): Boolean =
     phase match {
@@ -45,8 +58,12 @@ object DirectorIdlePolicy {
           View.Wizard(tournament)
         } else if (needsLatestRatings(phase)) {
           maybeLatestRatings match {
-            case None     => View.LoadingLatestRatings
-            case Some(lr) => View.Idle(lr)
+            case None =>
+              View.LoadingLatestRatings
+            case Some(lr) if phase == TournamentPhase.None =>
+              View.Idle(lr)
+            case Some(_) =>
+              View.Live(tournament)
           }
         } else {
           View.Live(tournament)

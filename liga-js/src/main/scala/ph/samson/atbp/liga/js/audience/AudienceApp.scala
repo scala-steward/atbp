@@ -5,6 +5,7 @@ import ph.samson.atbp.liga.js.LatestRatingsView
 import ph.samson.atbp.liga.js.api.ApiClient
 import ph.samson.atbp.liga.js.api.Models.*
 import ph.samson.atbp.liga.js.director.BracketHandicapContext
+import ph.samson.atbp.liga.js.director.BracketResultsContext
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -27,13 +28,21 @@ object AudienceApp {
     def refresh(): Unit = {
       val loaded = client.getTournament.flatMap { t =>
         val phase = TournamentPhase.fromApi(t.phase)
-        if (AudienceIdlePolicy.needsLatestRatings(phase)) {
+        if (
+          AudienceIdlePolicy.shouldFetchLatestRatingsOnRefresh(
+            phase,
+            latestRatings.now()
+          )
+        ) {
           client.getLatestRatings
             .map(lr => AudienceIdlePolicy.idleLatestRatingsFeed(Right(lr)))
             .recover { case err =>
               AudienceIdlePolicy.idleLatestRatingsFeed(Left(err.getMessage))
             }
             .map { case (feed, msg) => (t, Some(feed), msg) }
+        } else if (AudienceIdlePolicy.needsLatestRatings(phase)) {
+          // Completed with a cached post-period feed: keep it across polls.
+          Future.successful((t, latestRatings.now(), Option.empty[String]))
         } else {
           Future.successful((t, None, Option.empty[String]))
         }
@@ -90,6 +99,9 @@ object AudienceApp {
                 p("Tournament setup in progress…")
               )
             case AudienceIdlePolicy.View.Bracket(t) =>
+              val resultsContext = maybeLatestRatings
+                .map(BracketResultsContext.fromTournament(t, _))
+                .getOrElse(BracketResultsContext.inactive(t))
               t.bracket match {
                 case Some(bracket) =>
                   div(
@@ -101,7 +113,8 @@ object AudienceApp {
                     },
                     AudienceBracketView(
                       bracket,
-                      BracketHandicapContext.fromTournament(t)
+                      BracketHandicapContext.fromTournament(t),
+                      resultsContext
                     )
                   )
                 case None =>
@@ -182,6 +195,16 @@ object AudienceApp {
       |  color: #888;
       |  font-variant-numeric: tabular-nums;
       |  line-height: 1.1;
+      |}
+      |.player-rating.rating-up { color: #2e7d32; }
+      |.player-rating.rating-down { color: #c62828; }
+      |.player-rating.rating-new { color: #8d6e00; font-weight: 600; }
+      |.results-last { font-weight: 700; font-size: 1.2em; }
+      |.results-prior { font-weight: 400; color: #888; opacity: 0.75; }
+      |.match-winner.results-prior {
+      |  color: #2e7d32;
+      |  font-weight: 400;
+      |  font-size: 1em;
       |}
       |.match-bye { font-style: italic; opacity: 0.75; }
       |.match-forfeit { font-style: italic; opacity: 0.75; }

@@ -66,13 +66,31 @@ object DirectorApp {
       busy.set(true)
       action.onComplete {
         case Success(value) =>
+          val phase = TournamentPhase.fromApi(value.phase)
+          // Clear before committing tournament so Completed cannot paint with
+          // idle-period latest-ratings still in the Var.
+          latestRatings.set(
+            DirectorIdlePolicy.retainedLatestRatingsAfterWrite(
+              phase,
+              latestRatings.now()
+            )
+          )
           tournament.set(Some(value))
           selectFirstActionable(value)
           busy.set(false)
           statusMessage.set("")
-          client.getLeaderboard.onComplete {
-            case Success(lb) => leaderboard.set(Some(lb))
-            case _           => ()
+          if (DirectorIdlePolicy.needsLeaderboard(phase)) {
+            client.getLeaderboard.onComplete {
+              case Success(lb) => leaderboard.set(Some(lb))
+              case _           => ()
+            }
+          }
+          if (DirectorIdlePolicy.needsLatestRatings(phase)) {
+            client.getLatestRatings.onComplete {
+              case Success(lr) => latestRatings.set(Some(lr))
+              case Failure(_)  =>
+                latestRatings.set(Some(LatestRatingsResponse(Nil)))
+            }
           }
         case Failure(err) =>
           busy.set(false)
@@ -170,6 +188,7 @@ object DirectorApp {
                 completionBar(t, busy.signal, runAction, client),
                 mainLayout(
                   t,
+                  maybeLatestRatings,
                   selectedMatch,
                   busy.signal,
                   selectedMatchId,
@@ -216,19 +235,25 @@ object DirectorApp {
 
   private def mainLayout(
       tournament: TournamentResponse,
+      maybeLatestRatings: Option[LatestRatingsResponse],
       selectedMatch: Signal[Option[BracketMatch]],
       busy: Signal[Boolean],
       selectedMatchId: Var[Option[String]],
       client: ApiClient,
       runAction: (=> Future[TournamentResponse]) => Unit
-  ): Div =
+  ): Div = {
+    val handicapContext = BracketHandicapContext.fromTournament(tournament)
+    val resultsContext = maybeLatestRatings
+      .map(BracketResultsContext.fromTournament(tournament, _))
+      .getOrElse(BracketResultsContext.inactive(tournament))
     div(
       cls := "main-layout",
       div(
         cls := "bracket-column",
         BracketView(
           tournament.bracket.get,
-          BracketHandicapContext.fromTournament(tournament),
+          handicapContext,
+          resultsContext,
           selectedMatchId.signal,
           Observer[String](id => selectedMatchId.set(Some(id)))
         )
@@ -267,4 +292,5 @@ object DirectorApp {
         }
       )
     )
+  }
 }

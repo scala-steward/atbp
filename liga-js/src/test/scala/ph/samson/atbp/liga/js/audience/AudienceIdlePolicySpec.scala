@@ -20,14 +20,18 @@ object AudienceIdlePolicySpec extends ZIOSpecDefault {
     phase = "defining",
     bracket = None
   )
+  private val completedTournament = activeTournament.copy(
+    phase = "completed",
+    completed = true
+  )
   private val emptyLatest = LatestRatingsResponse(Nil)
 
   def spec = suite("AudienceIdlePolicy")(
-    test("requires latest ratings only on none phase") {
+    test("requires latest ratings on none and completed phases") {
       assertTrue(
         AudienceIdlePolicy.needsLatestRatings(TournamentPhase.None),
+        AudienceIdlePolicy.needsLatestRatings(TournamentPhase.Completed),
         !AudienceIdlePolicy.needsLatestRatings(TournamentPhase.Active),
-        !AudienceIdlePolicy.needsLatestRatings(TournamentPhase.Completed),
         !AudienceIdlePolicy.needsLatestRatings(TournamentPhase.Defining)
       )
     },
@@ -85,6 +89,40 @@ object AudienceIdlePolicySpec extends ZIOSpecDefault {
       )
       val (feed, err) = AudienceIdlePolicy.idleLatestRatingsFeed(Right(rows))
       assertTrue(feed == rows, err.isEmpty)
+    },
+    test("completed tournament waits for latest ratings then yields Bracket") {
+      assertTrue(
+        AudienceIdlePolicy.view(
+          maybeTournament = Some(completedTournament),
+          maybeLatestRatings = None
+        ) == AudienceIdlePolicy.View.LoadingLatestRatings,
+        AudienceIdlePolicy.view(
+          maybeTournament = Some(completedTournament),
+          maybeLatestRatings = Some(emptyLatest)
+        ) == AudienceIdlePolicy.View.Bracket(completedTournament)
+      )
+    },
+    test(
+      "completed phase reuses cached latest-ratings; idle and first completed fetch"
+    ) {
+      assertTrue(
+        AudienceIdlePolicy.shouldFetchLatestRatingsOnRefresh(
+          TournamentPhase.None,
+          cached = Some(emptyLatest)
+        ),
+        AudienceIdlePolicy.shouldFetchLatestRatingsOnRefresh(
+          TournamentPhase.Completed,
+          cached = None
+        ),
+        !AudienceIdlePolicy.shouldFetchLatestRatingsOnRefresh(
+          TournamentPhase.Completed,
+          cached = Some(emptyLatest)
+        ),
+        !AudienceIdlePolicy.shouldFetchLatestRatingsOnRefresh(
+          TournamentPhase.Active,
+          cached = None
+        )
+      )
     }
   )
 }

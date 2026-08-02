@@ -30,7 +30,14 @@ object BracketByes {
             loop(completeGhostBye(current, matchDef.id), topology)
           case Some(winner) =>
             Advancement
-              .advanceCore(current, matchDef.id, winner, topology, isBye = true)
+              .advanceCore(
+                current,
+                matchDef.id,
+                winner,
+                topology,
+                isBye = true,
+                recordPlaceholderResult = true
+              )
               .flatMap(placed => loop(placed, topology))
         }
     }

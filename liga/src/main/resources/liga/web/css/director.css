@@ -133,3 +133,13 @@ button.forfeit-open:hover:not(:disabled) {
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
+.player-rating.rating-up { color: #2e7d32; }
+.player-rating.rating-down { color: #c62828; }
+.player-rating.rating-new { color: #8d6e00; font-weight: 600; }
+.results-last { font-weight: 700; font-size: 1.2em; }
+.results-prior { font-weight: 400; color: #888; opacity: 0.75; }
+.match-winner.results-prior {
+  color: #2e7d32;
+  font-weight: 400;
+  font-size: 1em;
+}

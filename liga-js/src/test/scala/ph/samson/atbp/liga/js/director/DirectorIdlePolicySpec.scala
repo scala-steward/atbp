@@ -17,12 +17,17 @@ object DirectorIdlePolicySpec extends ZIOSpecDefault {
 
   private val idleTournament = activeTournament.copy(phase = "none")
   private val definingTournament = activeTournament.copy(phase = "defining")
+  private val completedTournament = activeTournament.copy(
+    phase = "completed",
+    completed = true
+  )
   private val emptyLatest = LatestRatingsResponse(Nil)
 
   def spec = suite("DirectorIdlePolicy")(
-    test("requires latest ratings only on none phase") {
+    test("requires latest ratings on none and completed phases") {
       assertTrue(
         DirectorIdlePolicy.needsLatestRatings(TournamentPhase.None),
+        DirectorIdlePolicy.needsLatestRatings(TournamentPhase.Completed),
         !DirectorIdlePolicy.needsLatestRatings(TournamentPhase.Active),
         !DirectorIdlePolicy.needsLatestRatings(TournamentPhase.Defining)
       )
@@ -71,6 +76,53 @@ object DirectorIdlePolicySpec extends ZIOSpecDefault {
       assertTrue(
         DirectorIdlePolicy.view(None, None) ==
           DirectorIdlePolicy.View.LoadingTournament
+      )
+    },
+    test("completed tournament waits for latest ratings then yields Live") {
+      assertTrue(
+        DirectorIdlePolicy.view(
+          maybeTournament = Some(completedTournament),
+          maybeLatestRatings = None
+        ) == DirectorIdlePolicy.View.LoadingLatestRatings,
+        DirectorIdlePolicy.view(
+          maybeTournament = Some(completedTournament),
+          maybeLatestRatings = Some(emptyLatest)
+        ) == DirectorIdlePolicy.View.Live(completedTournament)
+      )
+    },
+    test(
+      "tournament writes drop any prior latest-ratings feed so Complete cannot join idle data"
+    ) {
+      val idleFeed = LatestRatingsResponse(
+        List(LatestRating(Player("Alice"), rating = 1500.0, delta = 5.0))
+      )
+      assertTrue(
+        DirectorIdlePolicy
+          .retainedLatestRatingsAfterWrite(
+            TournamentPhase.Completed,
+            Some(idleFeed)
+          )
+          .isEmpty,
+        DirectorIdlePolicy
+          .retainedLatestRatingsAfterWrite(
+            TournamentPhase.Active,
+            Some(idleFeed)
+          )
+          .isEmpty,
+        DirectorIdlePolicy
+          .retainedLatestRatingsAfterWrite(
+            TournamentPhase.Defining,
+            Some(idleFeed)
+          )
+          .isEmpty,
+        DirectorIdlePolicy.view(
+          maybeTournament = Some(completedTournament),
+          maybeLatestRatings =
+            DirectorIdlePolicy.retainedLatestRatingsAfterWrite(
+              TournamentPhase.Completed,
+              Some(idleFeed)
+            )
+        ) == DirectorIdlePolicy.View.LoadingLatestRatings
       )
     }
   )

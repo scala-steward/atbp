@@ -9,6 +9,7 @@ object BracketView {
   def apply(
       bracket: Bracket,
       handicapContext: BracketHandicapContext,
+      resultsContext: BracketResultsContext,
       selectedMatchId: Signal[Option[String]],
       onSelect: Observer[String]
   ): Div = {
@@ -38,6 +39,7 @@ object BracketView {
             group.matches.map { matchDef =>
               matchRow(
                 handicapContext,
+                resultsContext,
                 matchDef,
                 bracket.size,
                 selectedMatchId,
@@ -52,6 +54,7 @@ object BracketView {
 
   private def matchRow(
       handicapContext: BracketHandicapContext,
+      resultsContext: BracketResultsContext,
       matchDef: BracketMatch,
       bracketSize: Int,
       selectedMatchId: Signal[Option[String]],
@@ -81,6 +84,7 @@ object BracketView {
         AppliedHandicapView.playersWithAppliedHandicap(
           matchDef,
           handicapContext,
+          resultsContext,
           AppliedHandicapLabels.forMatch(handicapContext, matchDef),
           BracketLayout.winnerSide(matchDef)
         )

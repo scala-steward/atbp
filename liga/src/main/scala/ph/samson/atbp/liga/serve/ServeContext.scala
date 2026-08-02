@@ -37,6 +37,16 @@ final case class ServeContext(
   private val latestRatingsCache =
     new AtomicReference[Option[List[LatestRating]]](None)
 
+  /** Session pin so create / complete keep serving the same tournament dir even
+    * after Resume.resolve ignores completed directories.
+    *
+    * Lifetime is the serve process only. After restart, Resume still skips
+    * completed dirs — reopen by constructing ServeContext with that
+    * tournamentDir (CLI / bind path), not via auto-resume.
+    */
+  private val pinnedTournamentDir =
+    new AtomicReference[Option[File]](tournamentDir)
+
   def loadTournament: Task[TournamentState] =
     activeDirOption.flatMap {
       case Some(dir) => Replay.replayDir(dir)
@@ -113,6 +123,7 @@ final case class ServeContext(
         dataDir.createDirectoryIfNotExists(createParents = true)
       )
       _ <- EventLog.append(dir, event)
+      _ <- ZIO.succeed(pinnedTournamentDir.set(Some(dir)))
       updated <- Replay.replayDir(dir)
     } yield updated
 
@@ -206,8 +217,12 @@ final case class ServeContext(
     activeDirOption.map(_.isDefined)
 
   private def activeDirOption: Task[Option[File]] =
-    tournamentDir match {
+    pinnedTournamentDir.get() match {
       case Some(dir) => ZIO.succeed(Some(dir))
-      case None      => Resume.resolve(dataDir)
+      case None      =>
+        Resume.resolve(dataDir).map { resolved =>
+          resolved.foreach(dir => pinnedTournamentDir.set(Some(dir)))
+          resolved
+        }
     }
 }
