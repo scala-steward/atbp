@@ -48,10 +48,10 @@ object Routes {
       ),
       Method.GET / "api" / "tournament" -> handler {
         (for {
-          state <- ctx.loadTournament
+          (state, timing) <- ctx.loadTournamentWithTiming
           hasDir <- ctx.hasActiveDir
         } yield Response.json(
-          ApiJson.tournamentFrom(state, hasDir).toJson
+          ApiJson.tournamentFrom(state, hasDir, timing).toJson
         )).catchAll(_ =>
           ZIO.succeed(
             Response

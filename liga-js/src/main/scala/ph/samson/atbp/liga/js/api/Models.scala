@@ -39,7 +39,10 @@ object Models {
       handicapApplied: Option[Int] = None,
       result: Option[MatchResult] = None,
       isBye: Boolean = false,
-      forfeit: Option[MatchForfeitInfo] = None
+      forfeit: Option[MatchForfeitInfo] = None,
+      waitStartedAt: Option[String] = None,
+      completedAt: Option[String] = None,
+      newPlayerRestSince: Option[String] = None
   )
 
   final case class Bracket(

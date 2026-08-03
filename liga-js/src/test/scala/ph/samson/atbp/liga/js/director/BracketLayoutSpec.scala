@@ -573,7 +573,267 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         isBye = true
       )
       assertTrue(BracketLayout.winnerSide(byeMatch) == None)
-    }
+    },
+    suite("directorGroupMatches")(
+      test("places all Ready matches in the strip sorted longest wait first") {
+        val older = "2026-03-15T18:00:00Z"
+        val newer = "2026-03-15T19:00:00Z"
+        val readyLong =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some(older)
+          )
+        val readyShort =
+          readyLong.copy(id = "wb-1-2", waitStartedAt = Some(newer))
+        val pending =
+          readyLong.copy(
+            id = "wb-2-1",
+            state = BracketMatchState.Pending,
+            waitStartedAt = Some(older)
+          )
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(readyShort, readyLong, pending),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.readyStrip.map(_.id) == List("wb-1-1", "wb-1-2"),
+          sections.groups.flatMap(_.matches).exists(_.id == "wb-2-1"),
+          !sections.groups
+            .flatMap(_.matches)
+            .exists(_.state == BracketMatchState.Ready)
+        )
+      },
+      test("lower list matches groupMatches on non-Ready subset") {
+        val ready =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready
+          )
+        val started =
+          ready.copy(id = "wb-1-2", state = BracketMatchState.Started)
+        val all = List(ready, started)
+        val sections = BracketLayout.directorGroupMatches(all, bracketSize = 8)
+        val grouped = BracketLayout.groupMatches(List(started), bracketSize = 8)
+        assertTrue(
+          sections.readyStrip.map(_.id) == List("wb-1-1"),
+          sections.groups == grouped
+        )
+      },
+      test("equal wait orders earlier rounds before later rounds") {
+        val sameWait = "2026-03-15T18:00:00Z"
+        val laterRound =
+          BracketMatch(
+            id = "wb-2-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some(sameWait)
+          )
+        val earlierRound =
+          laterRound.copy(id = "wb-1-2")
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(laterRound, earlierRound),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.readyStrip.map(_.id) == List("wb-1-2", "wb-2-1")
+        )
+      },
+      test("equal wait and round orders by seed index") {
+        val sameWait = "2026-03-15T18:00:00Z"
+        val higherSeed =
+          BracketMatch(
+            id = "wb-1-2",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some(sameWait)
+          )
+        val lowerSeed =
+          higherSeed.copy(id = "wb-1-1")
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(higherSeed, lowerSeed),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.readyStrip.map(_.id) == List("wb-1-1", "wb-1-2")
+        )
+      },
+      test("missing waitStartedAt sorts after known waits") {
+        val knownWait = "2026-03-15T18:00:00Z"
+        val withWait =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some(knownWait)
+          )
+        val missingWait =
+          withWait.copy(id = "wb-1-2", waitStartedAt = None)
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(missingWait, withWait),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.readyStrip.map(_.id) == List("wb-1-1", "wb-1-2")
+        )
+      }
+    ),
+    suite("elapsed formatting")(
+      test("formatElapsedSeconds follows HH:mm floor rules") {
+        assertTrue(
+          BracketLayout.formatElapsedSeconds(0) == "00:00",
+          BracketLayout.formatElapsedSeconds(59) == "00:00",
+          BracketLayout.formatElapsedSeconds(60) == "00:01",
+          BracketLayout.formatElapsedSeconds(3600) == "01:00"
+        )
+      },
+      test(
+        "formatElapsedSince omits malformed ISO and clamps negative elapsed"
+      ) {
+        val now = java.time.Instant.parse("2026-03-15T19:00:00Z")
+        assertTrue(
+          BracketLayout.formatElapsedSince("not-an-instant", now).isEmpty,
+          BracketLayout
+            .formatElapsedSince("2026-03-15T20:00:00Z", now)
+            .contains("00:00")
+        )
+      },
+      test("elapsedChipText omits malformed waitStartedAt") {
+        val now = java.time.Instant.parse("2026-03-15T19:00:00Z")
+        val ready =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some("bogus")
+          )
+        assertTrue(BracketLayout.elapsedChipText(ready, now).isEmpty)
+      },
+      test("malformed waitStartedAt sorts after known waits") {
+        val withWait =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some("2026-03-15T18:00:00Z")
+          )
+        val badWait =
+          withWait.copy(id = "wb-1-2", waitStartedAt = Some("bogus"))
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(badWait, withWait),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.readyStrip.map(_.id) == List("wb-1-1", "wb-1-2")
+        )
+      },
+      test("doneChipText uses toLocaleTimeString like audience updated time") {
+        val instant = "2026-03-15T18:34:00Z"
+        val done =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Completed,
+            completedAt = Some(instant)
+          )
+        assertTrue(
+          BracketLayout.doneChipText(done) ==
+            Some(DirectorTime.formatDoneTime(instant))
+        )
+      },
+      test(
+        "timingChipTexts shows wait and new-player rest for Ready"
+      ) {
+        val now = java.time.Instant.parse("2026-03-15T19:00:00Z")
+        val ready =
+          BracketMatch(
+            id = "wb-2-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some("2026-03-15T18:00:00Z"),
+            newPlayerRestSince = Some("2026-03-15T18:30:00Z")
+          )
+        val chips = BracketLayout.timingChipTexts(ready, now)
+        assertTrue(
+          chips.length == 2,
+          chips.head == "01:00",
+          chips(1) == "00:30"
+        )
+      },
+      test(
+        "elapsedChipText shows wait for Ready and cooling Pending-with-one"
+      ) {
+        val now = java.time.Instant.parse("2026-03-15T19:00:00Z")
+        val ready =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Ready,
+            waitStartedAt = Some("2026-03-15T18:00:00Z")
+          )
+        val cooling =
+          BracketMatch(
+            id = "wb-2-1",
+            playerA = Some(Player("P3")),
+            playerB = None,
+            state = BracketMatchState.Pending,
+            waitStartedAt = Some("2026-03-15T18:30:00Z")
+          )
+        assertTrue(
+          BracketLayout.elapsedChipText(ready, now).contains("01:00"),
+          BracketLayout.elapsedChipText(cooling, now).contains("00:30")
+        )
+      },
+      test("timingChipTexts omits bye Done and missing Instants") {
+        val now = java.time.Instant.parse("2026-03-15T19:00:00Z")
+        val byeDone =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = None,
+            state = BracketMatchState.Completed,
+            isBye = true,
+            completedAt = Some("2026-03-15T18:00:00Z")
+          )
+        val noInstant =
+          BracketMatch(
+            id = "wb-1-2",
+            playerA = Some(Player("P2")),
+            playerB = Some(Player("P3")),
+            state = BracketMatchState.Ready
+          )
+        val done =
+          BracketMatch(
+            id = "wb-1-3",
+            playerA = Some(Player("P4")),
+            playerB = Some(Player("P5")),
+            state = BracketMatchState.Completed,
+            completedAt = Some("2026-03-15T18:34:00Z")
+          )
+        assertTrue(
+          BracketLayout.timingChipTexts(byeDone, now).isEmpty,
+          BracketLayout.timingChipTexts(noInstant, now).isEmpty,
+          BracketLayout.timingChipTexts(done, now).nonEmpty
+        )
+      }
+    )
   )
 
   private def completedMatch(scoreA: Int, scoreB: Int): BracketMatch =

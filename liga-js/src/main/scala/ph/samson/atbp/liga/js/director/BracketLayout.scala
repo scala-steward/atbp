@@ -5,6 +5,9 @@ import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 import ph.samson.atbp.liga.model.MatchSide
 
+import java.time.Duration
+import java.time.Instant
+
 /** Pure bracket layout helpers for the director UI. */
 object BracketLayout {
 
@@ -18,6 +21,11 @@ object BracketLayout {
       section: Section,
       round: Int,
       matches: List[BracketMatch]
+  )
+
+  final case class DirectorBracketSections(
+      readyStrip: List[BracketMatch],
+      groups: List[RoundGroup]
   )
 
   def sectionOf(matchId: String): Section =
@@ -124,6 +132,109 @@ object BracketLayout {
       .map(prepared =>
         RoundGroup(prepared.section, prepared.round, prepared.shownMatches)
       )
+
+  /** Director-only list: Ready strip (longest wait first), then groupMatches.
+    */
+  def directorGroupMatches(
+      matches: List[BracketMatch],
+      bracketSize: Int
+  ): DirectorBracketSections = {
+    val ready =
+      matches
+        .filter(_.state == BracketMatchState.Ready)
+        .sortBy(m =>
+          (
+            waitEpochMs(m),
+            roundOf(m.id, bracketSize),
+            matchSeedIndex(m.id)
+          )
+        )
+    val rest = matches.filterNot(_.state == BracketMatchState.Ready)
+    DirectorBracketSections(
+      readyStrip = ready,
+      groups = groupMatches(rest, bracketSize)
+    )
+  }
+
+  private def waitEpochMs(matchDef: BracketMatch): Long =
+    matchDef.waitStartedAt
+      .flatMap(parseInstantSafe)
+      .map(_.toEpochMilli)
+      .getOrElse(Long.MaxValue)
+
+  def isPendingWithOne(matchDef: BracketMatch): Boolean =
+    matchDef.state == BracketMatchState.Pending &&
+      matchDef.playerA.isDefined != matchDef.playerB.isDefined
+
+  def elapsedInstantSource(matchDef: BracketMatch): Option[String] =
+    if (matchDef.isBye && matchDef.state == BracketMatchState.Completed) {
+      None
+    } else if (
+      matchDef.state == BracketMatchState.Ready || isPendingWithOne(matchDef)
+    ) {
+      matchDef.waitStartedAt
+    } else {
+      None
+    }
+
+  private def parseInstantSafe(isoInstant: String): Option[Instant] =
+    try Some(Instant.parse(isoInstant))
+    catch {
+      case _: Throwable => None
+    }
+
+  private def formatDoneTimeSafe(isoInstant: String): Option[String] =
+    try Some(DirectorTime.formatDoneTime(isoInstant))
+    catch {
+      case _: Throwable => None
+    }
+
+  def doneChipText(matchDef: BracketMatch): Option[String] =
+    if (matchDef.isBye || matchDef.state != BracketMatchState.Completed) {
+      None
+    } else {
+      matchDef.completedAt.flatMap(formatDoneTimeSafe)
+    }
+
+  def newPlayerRestChipText(
+      matchDef: BracketMatch,
+      now: Instant
+  ): Option[String] =
+    if (matchDef.state != BracketMatchState.Ready) {
+      None
+    } else {
+      matchDef.newPlayerRestSince.flatMap(formatElapsedSince(_, now))
+    }
+
+  /** Director timing chips: Done clock, Ready wait + rest, cooling elapsed. */
+  def timingChipTexts(matchDef: BracketMatch, now: Instant): List[String] =
+    matchDef.state match {
+      case BracketMatchState.Completed =>
+        doneChipText(matchDef).toList
+      case BracketMatchState.Ready =>
+        elapsedChipText(matchDef, now).toList ++
+          newPlayerRestChipText(matchDef, now).toList
+      case BracketMatchState.Pending if isPendingWithOne(matchDef) =>
+        elapsedChipText(matchDef, now).toList
+      case _ => Nil
+    }
+
+  def formatElapsedSeconds(totalSeconds: Long): String = {
+    val minutes = totalSeconds / 60
+    val hours = minutes / 60
+    val mins = minutes % 60
+    f"${hours}%02d:${mins}%02d"
+  }
+
+  def formatElapsedSince(isoInstant: String, now: Instant): Option[String] =
+    parseInstantSafe(isoInstant).map { start =>
+      formatElapsedSeconds(
+        math.max(0L, Duration.between(start, now).getSeconds)
+      )
+    }
+
+  def elapsedChipText(matchDef: BracketMatch, now: Instant): Option[String] =
+    elapsedInstantSource(matchDef).flatMap(formatElapsedSince(_, now))
 
   def isActionable(matchDef: BracketMatch): Boolean =
     matchDef.state == BracketMatchState.Ready ||

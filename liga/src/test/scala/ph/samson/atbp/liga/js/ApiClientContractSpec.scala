@@ -90,6 +90,91 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         )
       )
     },
+    test("API timing instants encode as ISO strings for JS models") {
+      val apiMatch =
+        ApiBracketMatch(
+          id = "wb-1-1",
+          playerA = Some(Player("P1")),
+          playerB = Some(Player("P2")),
+          state = BracketMatchState.Completed,
+          result = Some(MatchResult(scoreA = 7, scoreB = 4)),
+          completedAt = Some("2026-03-15T19:00:00Z")
+        )
+      val json = apiMatch.toJson
+      val parsed =
+        json.fromJson[ph.samson.atbp.liga.js.api.Models.BracketMatch]
+      assertTrue(
+        json.contains("\"completedAt\":\"2026-03-15T19:00:00Z\""),
+        parsed.isRight,
+        parsed.exists(_.completedAt == Some("2026-03-15T19:00:00Z"))
+      )
+    },
+    test("newPlayerRestSince round-trips as ISO string for JS models") {
+      val apiMatch =
+        ApiBracketMatch(
+          id = "wb-2-1",
+          playerA = Some(Player("P1")),
+          playerB = Some(Player("P2")),
+          state = BracketMatchState.Ready,
+          waitStartedAt = Some("2026-03-15T18:00:00Z"),
+          newPlayerRestSince = Some("2026-03-15T18:30:00Z")
+        )
+      val json = apiMatch.toJson
+      val parsed =
+        json.fromJson[ph.samson.atbp.liga.js.api.Models.BracketMatch]
+      assertTrue(
+        json.contains("\"newPlayerRestSince\":\"2026-03-15T18:30:00Z\""),
+        parsed.isRight,
+        parsed.exists(_.newPlayerRestSince == Some("2026-03-15T18:30:00Z"))
+      )
+    },
+    test("tournament JSON with timing fields decodes on JS client") {
+      val withTiming =
+        """{
+          |  "name": "Spring Open",
+          |  "players": [{"name": "P1"}, {"name": "P2"}],
+          |  "completed": false,
+          |  "phase": "active",
+          |  "raceToByScope": {"wb-1": 7},
+          |  "bracket": {
+          |    "size": 2,
+          |    "matches": [{
+          |      "id": "wb-1-1",
+          |      "playerA": {"name": "P1"},
+          |      "playerB": {"name": "P2"},
+          |      "state": "Started",
+          |      "raceTo": 7,
+          |      "handicapSuggested": 2,
+          |      "handicapApplied": 3,
+          |      "waitStartedAt": "2026-03-15T18:00:00Z",
+          |      "completedAt": "2026-03-15T19:00:00Z"
+          |    }]
+          |  },
+          |  "frozenRatings": [{
+          |    "player": {"name": "P1"},
+          |    "rating": 1690.0,
+          |    "rd": 100.0,
+          |    "wins": 0,
+          |    "losses": 0
+          |  }]
+          |}""".stripMargin
+      val parsed = withTiming.fromJson[TournamentResponse]
+      assertTrue(
+        parsed.isRight,
+        parsed.exists(
+          _.bracket.exists(
+            _.matches.head.waitStartedAt ==
+              Some("2026-03-15T18:00:00Z")
+          )
+        ),
+        parsed.exists(
+          _.bracket.exists(
+            _.matches.head.completedAt ==
+              Some("2026-03-15T19:00:00Z")
+          )
+        )
+      )
+    },
     test("leaderboard fixture matches JS client JSON schema") {
       val parsed = leaderboardFixture.fromJson[LeaderboardResponse]
       assertTrue(

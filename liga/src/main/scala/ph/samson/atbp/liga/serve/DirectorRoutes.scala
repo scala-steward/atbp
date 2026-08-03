@@ -127,8 +127,8 @@ object DirectorRoutes {
     for {
       body <- req.body.asString
       parsed <- parseJson[CreateRequest](body)
-      state <- ctx.createTournament(parsed.name)
-      response <- jsonState(ctx, state)
+      _ <- ctx.createTournament(parsed.name)
+      response <- jsonState(ctx)
     } yield response
 
   private def handlePlayers(ctx: ServeContext, req: Request): Task[Response] =
@@ -144,8 +144,8 @@ object DirectorRoutes {
           .left
           .map(err => ServeContext.CommandError(err.message))
       )
-      updated <- ctx.appendWizardEvent(event)
-      response <- jsonState(ctx, updated)
+      _ <- ctx.appendWizardEvent(event)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleLock(ctx: ServeContext): Task[Response] =
@@ -159,8 +159,8 @@ object DirectorRoutes {
           .left
           .map(err => ServeContext.CommandError(err.message))
       )
-      updated <- ctx.appendWizardEvent(event)
-      response <- jsonState(ctx, updated)
+      _ <- ctx.appendWizardEvent(event)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleRaceTo(ctx: ServeContext, req: Request): Task[Response] =
@@ -176,8 +176,8 @@ object DirectorRoutes {
           .left
           .map(err => ServeContext.CommandError(err.message))
       )
-      updated <- ctx.appendWizardEvents(events)
-      response <- jsonState(ctx, updated)
+      _ <- ctx.appendWizardEvents(events)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleSeed(ctx: ServeContext, req: Request): Task[Response] =
@@ -189,16 +189,16 @@ object DirectorRoutes {
         } else {
           parseJson[SeedRequest](body)
         }
-      state <- ctx.seedBracket(parsed.raceToByScope)
-      response <- jsonState(ctx, state)
+      _ <- ctx.seedBracket(parsed.raceToByScope)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleReady(ctx: ServeContext, matchId: String): Task[Response] =
     for {
-      state <- ctx.applyMatchCommands { (current, seq, at) =>
+      _ <- ctx.applyMatchCommands { (current, seq, at) =>
         Tournament.ready(current, matchId, seq, at)
       }
-      response <- jsonState(ctx, state)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleHandicap(
@@ -209,18 +209,18 @@ object DirectorRoutes {
     for {
       body <- req.body.asString
       parsed <- parseJson[HandicapRequest](body)
-      state <- ctx.applyMatchCommand { (current, seq, at) =>
+      _ <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.applyHandicap(current, matchId, parsed.handicap, seq, at)
       }
-      response <- jsonState(ctx, state)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleStart(ctx: ServeContext, matchId: String): Task[Response] =
     for {
-      state <- ctx.applyMatchCommand { (current, seq, at) =>
+      _ <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.start(current, matchId, seq, at)
       }
-      response <- jsonState(ctx, state)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleResult(
@@ -231,7 +231,7 @@ object DirectorRoutes {
     for {
       body <- req.body.asString
       parsed <- parseJson[ResultRequest](body)
-      state <- ctx.applyMatchCommand { (current, seq, at) =>
+      _ <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.recordResult(
           current,
           matchId,
@@ -241,7 +241,7 @@ object DirectorRoutes {
           at
         )
       }
-      response <- jsonState(ctx, state)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleForfeit(
@@ -252,7 +252,7 @@ object DirectorRoutes {
     for {
       body <- req.body.asString
       parsed <- parseJson[ForfeitRequest](body)
-      state <- ctx.applyMatchCommand { (current, seq, at) =>
+      _ <- ctx.applyMatchCommand { (current, seq, at) =>
         Tournament.recordForfeit(
           current,
           matchId,
@@ -262,7 +262,7 @@ object DirectorRoutes {
           at
         )
       }
-      response <- jsonState(ctx, state)
+      response <- jsonState(ctx)
     } yield response
 
   private def handleComplete(ctx: ServeContext, req: Request): Task[Response] =
@@ -275,17 +275,17 @@ object DirectorRoutes {
           parseJson[CompleteRequest](body)
         }
       completed = parsed.completed.getOrElse(LocalDate.now())
-      state <- ctx.completeTournament(completed)
-      response <- jsonState(ctx, state)
+      _ <- ctx.completeTournament(completed)
+      response <- jsonState(ctx)
     } yield response
 
-  private def jsonState(
-      ctx: ServeContext,
-      state: TournamentState
-  ): Task[Response] =
-    ctx.hasActiveDir.map { hasDir =>
-      Response.json(ApiJson.tournamentFrom(state, hasDir).toJson)
-    }
+  private def jsonState(ctx: ServeContext): Task[Response] =
+    for {
+      hasDir <- ctx.hasActiveDir
+      (reloaded, timing) <- ctx.loadTournamentWithTiming
+    } yield Response.json(
+      ApiJson.tournamentFrom(reloaded, hasDir, timing).toJson
+    )
 
   private def badRequest(message: String): Response =
     Response.text(message).status(Status.BadRequest)

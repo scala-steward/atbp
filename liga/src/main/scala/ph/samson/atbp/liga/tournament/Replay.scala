@@ -34,7 +34,7 @@ object Replay {
   private val empty: TournamentState =
     TournamentState(name = "", players = Nil)
 
-  private def applyEvent(
+  private[tournament] def applyEvent(
       state: TournamentState,
       event: TournamentEvent
   ): Either[String, TournamentState] =

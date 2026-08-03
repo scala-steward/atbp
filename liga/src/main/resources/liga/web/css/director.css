@@ -41,10 +41,23 @@
 .bracket-section { margin-bottom: 1rem; }
 .round-matches { display: flex; flex-direction: column; gap: 0.35rem; }
 .match-row {
-  display: grid; grid-template-columns: 5rem 1fr auto auto; gap: 0.5rem;
+  display: grid; grid-template-columns: 5rem 1fr auto auto auto; gap: 0.5rem;
   padding: 0.4rem 0.6rem; border: 1px solid #ddd; border-radius: 4px;
   cursor: pointer; background: #fafafa;
 }
+.match-timing-chips {
+  display: flex;
+  gap: 0.25rem;
+}
+.match-elapsed {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  color: #555;
+  background: #eee;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+.ready-strip-header { color: #2e7d32; }
 .match-row.selected { border-color: #1565c0; background: #e3f2fd; }
 .match-row.actionable { border-left: 3px solid #2e7d32; }
 .match-state { text-transform: uppercase; font-size: 0.75rem; color: #666; }

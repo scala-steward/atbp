@@ -6,6 +6,7 @@ import ph.samson.atbp.liga.glicko.LatestRatings
 import ph.samson.atbp.liga.io.PeriodLoader
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.EventLog
+import ph.samson.atbp.liga.tournament.MatchWaitTiming
 import ph.samson.atbp.liga.tournament.PeriodEmission
 import ph.samson.atbp.liga.tournament.Replay
 import ph.samson.atbp.liga.tournament.Resume
@@ -48,9 +49,22 @@ final case class ServeContext(
     new AtomicReference[Option[File]](tournamentDir)
 
   def loadTournament: Task[TournamentState] =
+    loadTournamentWithTiming.map(_._1)
+
+  def loadTournamentWithTiming
+      : Task[(TournamentState, Map[String, MatchWaitTiming.Timing])] =
     activeDirOption.flatMap {
-      case Some(dir) => Replay.replayDir(dir)
-      case None      => ZIO.succeed(ServeContext.emptyState)
+      case Some(dir) =>
+        EventLog.read(dir).flatMap { events =>
+          ZIO.fromEither(
+            MatchWaitTiming
+              .projectWithState(events)
+              .left
+              .map(Replay.ReplayError(_))
+          )
+        }
+      case None =>
+        ZIO.succeed((ServeContext.emptyState, Map.empty))
     }
 
   /** Period-start snapshot: frozen tournament ratings when seeded, otherwise

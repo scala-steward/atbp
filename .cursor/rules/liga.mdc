@@ -1,6 +1,6 @@
 ---
 description: Liga subproject map, stack, commands, and boundaries
-globs: liga/**/*,liga-js/**/*,liga-common/**/*,docs/intent/liga.md,docs/ideas/liga*.md,docs/ideas/section-aware-race-to.md,docs/ideas/bye-bracket-display.md,docs/ideas/grand-final-labels.md,docs/ideas/serve-without-tournament.md,docs/intent/paste-roster.md,docs/intent/serve-without-tournament.md
+globs: liga/**/*,liga-js/**/*,liga-common/**/*,SPEC.md,tasks/**/*,docs/liga/map.md,docs/intent/liga.md,docs/ideas/liga*.md,docs/ideas/section-aware-race-to.md,docs/ideas/bye-bracket-display.md,docs/ideas/grand-final-labels.md,docs/ideas/serve-without-tournament.md,docs/ideas/td-match-wait-indicators.md,docs/intent/paste-roster.md,docs/intent/serve-without-tournament.md,docs/intent/td-match-wait-indicators.md,docs/intent/director-audience-bracket-order.md
 alwaysApply: false
 ---
 
@@ -23,6 +23,8 @@ sbt --client "liga/compile"
 sbt --client "liga/test"
 sbt --client "liga-js/test"
 sbt --client "liga/testOnly *Handicap*"
+sbt --client "liga/testOnly *WaitTiming*"
+sbt --client "liga-js/testOnly *BracketLayout*"
 sbt --client fixup
 sbt run   # no --client — verify serve starts
 ```
@@ -35,6 +37,11 @@ sbt run   # no --client — verify serve starts
 - Handicaps are suggestions until match start, then locked
 - Race-to is per scope (WB/LB/GF rounds), not per match
 - Director and audience are separate URLs/SPAs
+- Wait/Done Instants are API-only projections (`MatchWaitTiming` →
+  `waitStartedAt` / `completedAt`); never extend domain `BracketMatch`, never
+  use `MatchReady.at` as wait start
+- Director Ready strip via `BracketLayout.directorGroupMatches`; audience stays
+  on `groupMatches` (do not parameterize the shared helper for the strip)
 
 ## Boundaries
 
@@ -42,3 +49,5 @@ sbt run   # no --client — verify serve starts
 - No in-period rating drift; no WebSockets (audience polls)
 - Shared domain math lives in `liga-common`, not duplicated in `liga-js`
 - Follow existing Laminar patterns in `liga-js/.../director/`
+- No rest thresholds, colors-as-rules, auto-call, or audience list changes for
+  wait indicators (see `SPEC.md` / `docs/intent/td-match-wait-indicators.md`)

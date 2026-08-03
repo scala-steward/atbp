@@ -3,8 +3,12 @@ package ph.samson.atbp.liga.js.director
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.js.api.Models.*
 
+import java.time.Instant
+
 /** Bracket tree for the director console. */
 object BracketView {
+
+  private val ElapsedTickMs = 15_000
 
   def apply(
       bracket: Bracket,
@@ -14,10 +18,36 @@ object BracketView {
       onSelect: Observer[String]
   ): Div = {
     val raceToByScope = handicapContext.raceToByScope
-    val groups = BracketLayout.groupMatches(bracket.matches, bracket.size)
+    val sections =
+      BracketLayout.directorGroupMatches(bracket.matches, bracket.size)
+    val now = Var(Instant.now())
+    val elapsedTicks = EventStream.periodic(intervalMs = ElapsedTickMs)
     div(
+      elapsedTicks --> Observer(_ => now.set(Instant.now())),
       cls := "bracket",
-      groups.map { group =>
+      if (sections.readyStrip.nonEmpty) {
+        div(
+          cls := "bracket-section ready-strip",
+          h3(cls := "ready-strip-header", "Ready — longest wait first"),
+          div(
+            cls := "round-matches",
+            sections.readyStrip.map { matchDef =>
+              matchRow(
+                handicapContext,
+                resultsContext,
+                matchDef,
+                bracket.size,
+                selectedMatchId,
+                onSelect,
+                now.signal
+              )
+            }
+          )
+        )
+      } else {
+        emptyNode
+      },
+      sections.groups.map { group =>
         div(
           cls := "bracket-section",
           h3(
@@ -43,7 +73,8 @@ object BracketView {
                 matchDef,
                 bracket.size,
                 selectedMatchId,
-                onSelect
+                onSelect,
+                now.signal
               )
             }
           )
@@ -58,10 +89,17 @@ object BracketView {
       matchDef: BracketMatch,
       bracketSize: Int,
       selectedMatchId: Signal[Option[String]],
-      onSelect: Observer[String]
+      onSelect: Observer[String],
+      now: Signal[Instant]
   ): Div = {
     val isSelected = selectedMatchId.map(_.contains(matchDef.id))
     val isActive = BracketLayout.isActionable(matchDef)
+    val timingChips =
+      if (matchDef.state == BracketMatchState.Completed) {
+        Signal.fromValue(BracketLayout.timingChipTexts(matchDef, Instant.EPOCH))
+      } else {
+        now.map(BracketLayout.timingChipTexts(matchDef, _))
+      }
     div(
       cls <-- isSelected.map { selected =>
         val base = List("match-row")
@@ -89,6 +127,16 @@ object BracketView {
           BracketLayout.winnerSide(matchDef)
         )
       ),
+      child <-- timingChips.map { chips =>
+        if (chips.isEmpty) {
+          emptyNode
+        } else {
+          span(
+            cls := "match-timing-chips",
+            chips.map(text => span(cls := "match-elapsed", text))
+          )
+        }
+      },
       span(
         cls := "match-state",
         BracketLayout.stateLabel(matchDef.state)

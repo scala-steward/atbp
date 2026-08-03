@@ -59,6 +59,23 @@ object ReadApiSpec extends ZIOSpecDefault {
         matchDef.handicapApplied.contains(3)
       )
     },
+    test("GET /api/tournament includes wait timing on seeded matches") {
+      val ctx = context(fixturePeriods, "eight-player-seeded")
+      for {
+        response <- LigaRoutes
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/api/tournament"))
+        body <- response.body.asString
+        parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
+        readyMatch = parsed.bracket
+          .flatMap(_.matches.find(_.id == "wb-1-1"))
+          .get
+      } yield assertTrue(
+        response.status == Status.Ok,
+        readyMatch.waitStartedAt.nonEmpty,
+        readyMatch.completedAt.isEmpty
+      )
+    },
     test("GET /api/leaderboard returns period-start frozen ratings") {
       val ctx = context(fixturePeriods, "eight-player-seeded")
       for {
