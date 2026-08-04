@@ -24,6 +24,7 @@ object BracketLayout {
   )
 
   final case class DirectorBracketSections(
+      liveStrip: List[BracketMatch],
       readyStrip: List[BracketMatch],
       groups: List[RoundGroup]
   )
@@ -133,12 +134,17 @@ object BracketLayout {
         RoundGroup(prepared.section, prepared.round, prepared.shownMatches)
       )
 
-  /** Director-only list: Ready strip (longest wait first), then groupMatches.
+  /** Director-only list: Live strip, Ready strip (longest wait first), then
+    * groupMatches.
     */
   def directorGroupMatches(
       matches: List[BracketMatch],
       bracketSize: Int
   ): DirectorBracketSections = {
+    val live =
+      matches
+        .filter(_.state == BracketMatchState.Started)
+        .sortBy(m => (roundOf(m.id, bracketSize), matchSeedIndex(m.id)))
     val ready =
       matches
         .filter(_.state == BracketMatchState.Ready)
@@ -149,8 +155,13 @@ object BracketLayout {
             matchSeedIndex(m.id)
           )
         )
-    val rest = matches.filterNot(_.state == BracketMatchState.Ready)
+    val rest =
+      matches.filterNot(m =>
+        m.state == BracketMatchState.Started ||
+          m.state == BracketMatchState.Ready
+      )
     DirectorBracketSections(
+      liveStrip = live,
       readyStrip = ready,
       groups = groupMatches(rest, bracketSize)
     )
@@ -184,16 +195,22 @@ object BracketLayout {
     }
 
   private def formatDoneTimeSafe(isoInstant: String): Option[String] =
-    try Some(DirectorTime.formatDoneTime(isoInstant))
-    catch {
-      case _: Throwable => None
-    }
+    parseInstantSafe(isoInstant).map(_ =>
+      DirectorTime.formatDoneTime(isoInstant)
+    )
 
   def doneChipText(matchDef: BracketMatch): Option[String] =
     if (matchDef.isBye || matchDef.state != BracketMatchState.Completed) {
       None
     } else {
       matchDef.completedAt.flatMap(formatDoneTimeSafe)
+    }
+
+  def startedChipText(matchDef: BracketMatch): Option[String] =
+    if (matchDef.state != BracketMatchState.Started) {
+      None
+    } else {
+      matchDef.startedAt.flatMap(formatDoneTimeSafe)
     }
 
   def newPlayerRestChipText(
@@ -206,11 +223,15 @@ object BracketLayout {
       matchDef.newPlayerRestSince.flatMap(formatElapsedSince(_, now))
     }
 
-  /** Director timing chips: Done clock, Ready wait + rest, cooling elapsed. */
+  /** Director timing chips: Live started clock, Done clock, Ready wait + rest,
+    * cooling elapsed.
+    */
   def timingChipTexts(matchDef: BracketMatch, now: Instant): List[String] =
     matchDef.state match {
       case BracketMatchState.Completed =>
         doneChipText(matchDef).toList
+      case BracketMatchState.Started =>
+        startedChipText(matchDef).toList
       case BracketMatchState.Ready =>
         elapsedChipText(matchDef, now).toList ++
           newPlayerRestChipText(matchDef, now).toList

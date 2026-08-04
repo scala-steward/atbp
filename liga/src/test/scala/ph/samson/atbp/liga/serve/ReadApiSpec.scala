@@ -56,7 +56,8 @@ object ReadApiSpec extends ZIOSpecDefault {
         parsed.bracket.exists(_.size == 8),
         matchDef.state == BracketMatchState.Started,
         matchDef.handicapSuggested.contains(2),
-        matchDef.handicapApplied.contains(3)
+        matchDef.handicapApplied.contains(3),
+        matchDef.startedAt.contains("2026-03-15T18:00:00Z")
       )
     },
     test("GET /api/tournament includes wait timing on seeded matches") {

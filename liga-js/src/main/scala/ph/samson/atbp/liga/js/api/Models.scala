@@ -41,6 +41,7 @@ object Models {
       isBye: Boolean = false,
       forfeit: Option[MatchForfeitInfo] = None,
       waitStartedAt: Option[String] = None,
+      startedAt: Option[String] = None,
       completedAt: Option[String] = None,
       newPlayerRestSince: Option[String] = None
   )

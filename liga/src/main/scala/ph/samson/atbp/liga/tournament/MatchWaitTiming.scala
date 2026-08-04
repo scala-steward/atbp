@@ -5,13 +5,14 @@ import ph.samson.atbp.liga.tournament.events.TournamentEvent
 
 import java.time.Instant
 
-/** API-only wait / Done Instants derived from the tournament event log. */
+/** API-only timing Instants (wait, started, done, rest) from the event log. */
 object MatchWaitTiming {
 
   final case class Timing(
       waitStartedAt: Option[Instant],
       completedAt: Option[Instant],
-      newPlayerRestSince: Option[Instant] = None
+      newPlayerRestSince: Option[Instant] = None,
+      startedAt: Option[Instant] = None
   )
 
   private final case class SideArrivals(
@@ -23,7 +24,8 @@ object MatchWaitTiming {
       state: TournamentState,
       arrivals: Map[String, SideArrivals],
       completedAt: Map[String, Instant],
-      playerCompletedAt: Map[String, Instant]
+      playerCompletedAt: Map[String, Instant],
+      startedAt: Map[String, Instant]
   )
 
   def project(
@@ -44,7 +46,8 @@ object MatchWaitTiming {
               state = TournamentState(name = "", players = Nil),
               arrivals = Map.empty,
               completedAt = Map.empty,
-              playerCompletedAt = Map.empty
+              playerCompletedAt = Map.empty,
+              startedAt = Map.empty
             )
           ): Either[String, Accumulator]
         ) { (acc, event) =>
@@ -63,7 +66,8 @@ object MatchWaitTiming {
                   event,
                   newState,
                   prior.playerCompletedAt
-                )
+                ),
+                startedAt = recordStartedAt(event, prior.startedAt)
               )
             }
           }
@@ -73,7 +77,8 @@ object MatchWaitTiming {
             finalAcc.state,
             finalAcc.arrivals,
             finalAcc.completedAt,
-            finalAcc.playerCompletedAt
+            finalAcc.playerCompletedAt,
+            finalAcc.startedAt
           )
           (finalAcc.state, timing)
         }
@@ -110,6 +115,16 @@ object MatchWaitTiming {
       }
     }
   }
+
+  private def recordStartedAt(
+      event: TournamentEvent,
+      startedAt: Map[String, Instant]
+  ): Map[String, Instant] =
+    event match {
+      case TournamentEvent.MatchStarted(_, at, payload) =>
+        startedAt.updated(payload.matchId, at)
+      case _ => startedAt
+    }
 
   private def recordCompletedAt(
       event: TournamentEvent,
@@ -199,7 +214,8 @@ object MatchWaitTiming {
       state: TournamentState,
       arrivals: Map[String, SideArrivals],
       completedAt: Map[String, Instant],
-      playerCompletedAt: Map[String, Instant]
+      playerCompletedAt: Map[String, Instant],
+      startedAt: Map[String, Instant]
   ): Map[String, Timing] =
     bracketMatches(state).map { matchDef =>
       val side = arrivals.getOrElse(matchDef.id, SideArrivals())
@@ -215,7 +231,8 @@ object MatchWaitTiming {
       matchDef.id -> Timing(
         waitStartedAt = wait,
         completedAt = done,
-        newPlayerRestSince = rest
+        newPlayerRestSince = rest,
+        startedAt = startedAt.get(matchDef.id)
       )
     }.toMap
 }

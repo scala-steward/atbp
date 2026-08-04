@@ -26,6 +26,7 @@ object ApiJson {
       isBye: Boolean = false,
       forfeit: Option[MatchForfeitInfo] = None,
       waitStartedAt: Option[String] = None,
+      startedAt: Option[String] = None,
       completedAt: Option[String] = None,
       newPlayerRestSince: Option[String] = None
   )
@@ -84,6 +85,7 @@ object ApiJson {
       isBye = matchDef.isBye,
       forfeit = matchDef.forfeit,
       waitStartedAt = timing.flatMap(_.waitStartedAt.map(instantToIso)),
+      startedAt = timing.flatMap(_.startedAt.map(instantToIso)),
       completedAt = timing.flatMap(_.completedAt.map(instantToIso)),
       newPlayerRestSince =
         timing.flatMap(_.newPlayerRestSince.map(instantToIso))

@@ -64,10 +64,12 @@ rounds above earlier; within a round Ready → Pending → Started → Completed
 `match.id`. Empty Pending slots with neither player are hidden. Intent:
 `docs/intent/director-audience-bracket-order.md`.
 
-Director list (`BracketLayout.directorGroupMatches`): Ready strip at top sorted
-longest-wait first (equal wait → earlier rounds, then seed index); lower list =
-`groupMatches` on non-Ready. Elapsed `HH:mm` chip from `waitStartedAt` (Ready +
-Pending-with-one) or `completedAt` (Done; none on bye). Spec: `SPEC.md` /
+Director list (`BracketLayout.directorGroupMatches`): Live strip at top
+(`Started`, round then seed index) with static started-time chip from
+`startedAt`; Ready strip below sorted longest-wait first (equal wait → earlier
+rounds, then seed index); lower list = `groupMatches` on non-Live ∩ non-Ready.
+Elapsed `HH:mm` chip from `waitStartedAt` (Ready + Pending-with-one) or
+`completedAt` (Done; none on bye). Spec: `SPEC.md` /
 `docs/intent/td-match-wait-indicators.md`.
 
 

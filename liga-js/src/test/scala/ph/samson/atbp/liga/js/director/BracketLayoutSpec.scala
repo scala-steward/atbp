@@ -600,6 +600,7 @@ object BracketLayoutSpec extends ZIOSpecDefault {
             bracketSize = 8
           )
         assertTrue(
+          sections.liveStrip.isEmpty,
           sections.readyStrip.map(_.id) == List("wb-1-1", "wb-1-2"),
           sections.groups.flatMap(_.matches).exists(_.id == "wb-2-1"),
           !sections.groups
@@ -607,7 +608,7 @@ object BracketLayoutSpec extends ZIOSpecDefault {
             .exists(_.state == BracketMatchState.Ready)
         )
       },
-      test("lower list matches groupMatches on non-Ready subset") {
+      test("lower list matches groupMatches on non-Live non-Ready subset") {
         val ready =
           BracketMatch(
             id = "wb-1-1",
@@ -617,12 +618,51 @@ object BracketLayoutSpec extends ZIOSpecDefault {
           )
         val started =
           ready.copy(id = "wb-1-2", state = BracketMatchState.Started)
-        val all = List(ready, started)
+        val pending =
+          ready.copy(id = "wb-2-1", state = BracketMatchState.Pending)
+        val all = List(ready, started, pending)
         val sections = BracketLayout.directorGroupMatches(all, bracketSize = 8)
-        val grouped = BracketLayout.groupMatches(List(started), bracketSize = 8)
+        val grouped =
+          BracketLayout.groupMatches(List(pending), bracketSize = 8)
         assertTrue(
+          sections.liveStrip.map(_.id) == List("wb-1-2"),
           sections.readyStrip.map(_.id) == List("wb-1-1"),
-          sections.groups == grouped
+          sections.groups == grouped,
+          !sections.groups
+            .flatMap(_.matches)
+            .exists(m =>
+              m.state == BracketMatchState.Started ||
+                m.state == BracketMatchState.Ready
+            )
+        )
+      },
+      test(
+        "places all Started matches in live strip sorted by round then seed"
+      ) {
+        val laterRound =
+          BracketMatch(
+            id = "wb-2-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Started
+          )
+        val higherSeed =
+          laterRound.copy(id = "wb-1-2")
+        val lowerSeed =
+          laterRound.copy(id = "wb-1-1")
+        val ready =
+          laterRound.copy(id = "wb-1-3", state = BracketMatchState.Ready)
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(laterRound, higherSeed, lowerSeed, ready),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.liveStrip.map(_.id) == List("wb-1-1", "wb-1-2", "wb-2-1"),
+          sections.readyStrip.map(_.id) == List("wb-1-3"),
+          !sections.groups
+            .flatMap(_.matches)
+            .exists(_.state == BracketMatchState.Started)
         )
       },
       test("equal wait orders earlier rounds before later rounds") {
@@ -831,6 +871,43 @@ object BracketLayoutSpec extends ZIOSpecDefault {
           BracketLayout.timingChipTexts(byeDone, now).isEmpty,
           BracketLayout.timingChipTexts(noInstant, now).isEmpty,
           BracketLayout.timingChipTexts(done, now).nonEmpty
+        )
+      },
+      test("startedChipText uses formatDoneTime for Started matches") {
+        val instant = "2026-03-15T18:34:00Z"
+        val started =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Started,
+            startedAt = Some(instant)
+          )
+        assertTrue(
+          BracketLayout.startedChipText(started) ==
+            Some(DirectorTime.formatDoneTime(instant))
+        )
+      },
+      test("timingChipTexts shows started time for Started and omits missing") {
+        val now = java.time.Instant.parse("2026-03-15T19:00:00Z")
+        val instant = "2026-03-15T18:34:00Z"
+        val started =
+          BracketMatch(
+            id = "wb-1-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Started,
+            startedAt = Some(instant)
+          )
+        val missingStartedAt =
+          started.copy(id = "wb-1-2", startedAt = None)
+        val malformedStartedAt =
+          started.copy(id = "wb-1-3", startedAt = Some("bogus"))
+        assertTrue(
+          BracketLayout.timingChipTexts(started, now) ==
+            List(DirectorTime.formatDoneTime(instant)),
+          BracketLayout.timingChipTexts(missingStartedAt, now).isEmpty,
+          BracketLayout.timingChipTexts(malformedStartedAt, now).isEmpty
         )
       }
     )

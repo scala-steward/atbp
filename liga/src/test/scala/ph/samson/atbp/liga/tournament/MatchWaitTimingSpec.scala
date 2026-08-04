@@ -308,6 +308,75 @@ object MatchWaitTimingSpec extends ZIOSpecDefault {
         )
       val timing = timingOf(events, "wb-1-1")
       assertTrue(timing.completedAt.contains(doneAt))
+    },
+    test("MatchStarted sets startedAt to event at") {
+      val base = seededState()
+      val startedAt = at.plusSeconds(4000)
+      val seeded = seededEvents(base)
+      val afterSeed = Replay.replay(seeded).toOption.get
+      val readyEvents =
+        Tournament.ready(afterSeed, "wb-1-1", seq = 13, at).toOption.get
+      val withReady = seeded ++ readyEvents
+      val afterReady = Replay.replay(withReady).toOption.get
+      val nextSeq = 13 + readyEvents.size
+      val withHandicap =
+        if (
+          readyEvents.exists {
+            case _: TournamentEvent.HandicapApplied => true
+            case _                                  => false
+          }
+        ) {
+          withReady
+        } else {
+          val handicap =
+            Tournament
+              .applyHandicap(afterReady, "wb-1-1", handicap = 2, nextSeq, at)
+              .toOption
+              .get
+          withReady :+ handicap
+        }
+      val afterHandicap = Replay.replay(withHandicap).toOption.get
+      val handicapSeq = withHandicap.map(_.seq).max + 1
+      val started =
+        Tournament
+          .start(afterHandicap, "wb-1-1", handicapSeq, startedAt)
+          .toOption
+          .get
+      val events = withHandicap :+ started
+      val timing = timingOf(events, "wb-1-1")
+      assertTrue(timing.startedAt.contains(startedAt))
+    },
+    test("never-started match has no startedAt") {
+      val state = seededState()
+      val events =
+        seededEvents(state) :+
+          TournamentEvent.MatchReady(
+            seq = 13,
+            at = readyAt,
+            payload =
+              MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
+          )
+      val timing = timingOf(events, "wb-1-1")
+      assertTrue(timing.startedAt.isEmpty)
+    },
+    test("completed match retains startedAt from MatchStarted") {
+      val base = seededState()
+      val doneAt = at.plusSeconds(9000)
+      val events =
+        resultOnMatch(
+          base,
+          "wb-1-1",
+          resultSeq = 13,
+          resultAt = doneAt,
+          scoreA = 7,
+          scoreB = 4
+        )
+      val timing = timingOf(events, "wb-1-1")
+      assertTrue(
+        timing.startedAt.contains(at),
+        timing.completedAt.contains(doneAt),
+        timing.waitStartedAt.contains(seedAt)
+      )
     }
   )
 

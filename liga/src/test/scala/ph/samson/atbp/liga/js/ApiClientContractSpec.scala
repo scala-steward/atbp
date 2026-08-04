@@ -109,6 +109,25 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         parsed.exists(_.completedAt == Some("2026-03-15T19:00:00Z"))
       )
     },
+    test("startedAt round-trips as ISO string for JS models") {
+      val apiMatch =
+        ApiBracketMatch(
+          id = "wb-1-1",
+          playerA = Some(Player("P1")),
+          playerB = Some(Player("P2")),
+          state = BracketMatchState.Started,
+          handicapApplied = Some(3),
+          startedAt = Some("2026-03-15T18:00:00Z")
+        )
+      val json = apiMatch.toJson
+      val parsed =
+        json.fromJson[ph.samson.atbp.liga.js.api.Models.BracketMatch]
+      assertTrue(
+        json.contains("\"startedAt\":\"2026-03-15T18:00:00Z\""),
+        parsed.isRight,
+        parsed.exists(_.startedAt == Some("2026-03-15T18:00:00Z"))
+      )
+    },
     test("newPlayerRestSince round-trips as ISO string for JS models") {
       val apiMatch =
         ApiBracketMatch(

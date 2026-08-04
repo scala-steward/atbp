@@ -25,6 +25,28 @@ object BracketView {
     div(
       elapsedTicks --> Observer(_ => now.set(Instant.now())),
       cls := "bracket",
+      if (sections.liveStrip.nonEmpty) {
+        div(
+          cls := "bracket-section live-strip",
+          h3(cls := "live-strip-header", "Live"),
+          div(
+            cls := "round-matches",
+            sections.liveStrip.map { matchDef =>
+              matchRow(
+                handicapContext,
+                resultsContext,
+                matchDef,
+                bracket.size,
+                selectedMatchId,
+                onSelect,
+                now.signal
+              )
+            }
+          )
+        )
+      } else {
+        emptyNode
+      },
       if (sections.readyStrip.nonEmpty) {
         div(
           cls := "bracket-section ready-strip",
@@ -95,7 +117,10 @@ object BracketView {
     val isSelected = selectedMatchId.map(_.contains(matchDef.id))
     val isActive = BracketLayout.isActionable(matchDef)
     val timingChips =
-      if (matchDef.state == BracketMatchState.Completed) {
+      if (
+        matchDef.state == BracketMatchState.Completed ||
+        matchDef.state == BracketMatchState.Started
+      ) {
         Signal.fromValue(BracketLayout.timingChipTexts(matchDef, Instant.EPOCH))
       } else {
         now.map(BracketLayout.timingChipTexts(matchDef, _))

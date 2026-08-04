@@ -37,11 +37,12 @@ sbt run   # no --client — verify serve starts
 - Handicaps are suggestions until match start, then locked
 - Race-to is per scope (WB/LB/GF rounds), not per match
 - Director and audience are separate URLs/SPAs
-- Wait/Done Instants are API-only projections (`MatchWaitTiming` →
-  `waitStartedAt` / `completedAt`); never extend domain `BracketMatch`, never
-  use `MatchReady.at` as wait start
-- Director Ready strip via `BracketLayout.directorGroupMatches`; audience stays
-  on `groupMatches` (do not parameterize the shared helper for the strip)
+- Timing Instants are API-only projections (`MatchWaitTiming` →
+  `waitStartedAt` / `startedAt` / `completedAt`); never extend domain
+  `BracketMatch`, never use `MatchReady.at` as wait start
+- Director Live + Ready strips via `BracketLayout.directorGroupMatches`;
+  audience stays on `groupMatches` (do not parameterize the shared helper
+  for strips)
 
 ## Boundaries
 
