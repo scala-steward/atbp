@@ -1,6 +1,6 @@
 ---
 description: Liga subproject map, stack, commands, and boundaries
-globs: liga/**/*,liga-js/**/*,liga-common/**/*,SPEC.md,tasks/**/*,docs/liga/map.md,docs/intent/liga.md,docs/ideas/liga*.md,docs/ideas/section-aware-race-to.md,docs/ideas/bye-bracket-display.md,docs/ideas/grand-final-labels.md,docs/ideas/serve-without-tournament.md,docs/ideas/td-match-wait-indicators.md,docs/intent/paste-roster.md,docs/intent/serve-without-tournament.md,docs/intent/td-match-wait-indicators.md,docs/intent/director-audience-bracket-order.md
+globs: liga/**/*,liga-js/**/*,liga-common/**/*,docs/liga/map.md,docs/intent/liga*.md,docs/intent/director-*.md,docs/intent/paste-roster.md,docs/intent/serve-without-tournament.md,docs/intent/td-match-wait-indicators.md,docs/intent/player-ratings-in-bracket.md,docs/intent/race-to-display-and-hints.md,docs/ideas/liga*.md,docs/ideas/section-aware-race-to.md,docs/ideas/bye-bracket-display.md,docs/ideas/grand-final-labels.md,docs/ideas/serve-without-tournament.md,docs/ideas/td-match-wait-indicators.md,docs/ideas/director-handicap-probability-hints.md,docs/ideas/race-to-display-and-hints.md
 alwaysApply: false
 ---
 
@@ -12,7 +12,7 @@ Billiards club ratings + handicapped double-elim tournaments. Intent:
 ## Stack
 
 - JVM: ZIO HTTP (`liga`), Glicko2, append-only tournament JSON replay
-- Shared: `liga-common` (cross JVM/JS) — handicap, race-to scopes, types
+- Shared: `liga-common` (cross JVM/JS) — handicap, race-to scopes, roster, types
 - UI: Laminar Scala.js (`liga-js`) — director + audience SPAs
 - CLI: `atbp liga` (leaderboard / handicap / serve)
 
@@ -22,6 +22,7 @@ Billiards club ratings + handicapped double-elim tournaments. Intent:
 sbt --client "liga/compile"
 sbt --client "liga/test"
 sbt --client "liga-js/test"
+sbt --client "ligaCommonJVM/test"
 sbt --client "liga/testOnly *Handicap*"
 sbt --client "liga/testOnly *WaitTiming*"
 sbt --client "liga-js/testOnly *BracketLayout*"
@@ -37,12 +38,16 @@ sbt run   # no --client — verify serve starts
 - Handicaps are suggestions until match start, then locked
 - Race-to is per scope (WB/LB/GF rounds), not per match
 - Director and audience are separate URLs/SPAs
+- Serve may be idle (no tournament): Latest Ratings on `/` and `/audience`
+- Forfeit advances opponent with no period scores (not a played result)
 - Timing Instants are API-only projections (`MatchWaitTiming` →
   `waitStartedAt` / `startedAt` / `completedAt`); never extend domain
   `BracketMatch`, never use `MatchReady.at` as wait start
 - Director Live + Ready strips via `BracketLayout.directorGroupMatches`;
   audience stays on `groupMatches` (do not parameterize the shared helper
   for strips)
+- Guest/unrated in bracket: synthetic seed profile
+  (`rd == Tuning.Default.maxDeviation`, 0–0), label `unrated` — not `1500`
 
 ## Boundaries
 
@@ -51,4 +56,4 @@ sbt run   # no --client — verify serve starts
 - Shared domain math lives in `liga-common`, not duplicated in `liga-js`
 - Follow existing Laminar patterns in `liga-js/.../director/`
 - No rest thresholds, colors-as-rules, auto-call, or audience list changes for
-  wait indicators (see `SPEC.md` / `docs/intent/td-match-wait-indicators.md`)
+  wait indicators (see `docs/intent/td-match-wait-indicators.md`)

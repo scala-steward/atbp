@@ -7,7 +7,7 @@ Load only the section you need for the current task.
 | Module | Path | Owns |
 |--------|------|------|
 | `liga` | `liga/` | CLI renderers, Glicko2 engine, tournament lifecycle, HTTP serve, persistence |
-| `liga-common` | `liga-common/` | Cross-compiled types, handicap math, race-to scopes/wizard, bounds |
+| `liga-common` | `liga-common/` | Cross-compiled types, handicap math, race-to scopes/wizard, bounds, roster paste/order, Glicko tuning |
 | `liga-js` | `liga-js/` | Laminar director + audience SPAs, API client models |
 
 `liga` depends on `liga-common.jvm` and embeds `liga-js` fastLinkJS output under web resources.
@@ -17,22 +17,32 @@ Load only the section you need for the current task.
 ### Ratings / periods
 - `liga/.../glicko/` — Glicko2, leaderboard
 - `liga/.../io/` — period load/write, data layout, codecs
+- `liga-common/.../glicko/Tuning.scala` — shared defaults (e.g. guest RD)
 - Batch period rules: `docs/ideas/liga-batch-period-ratings.md`
 
 ### Handicap
-- `liga-common/.../handicap/` — suggestion + win probability (shared with JS preview)
+- `liga-common/.../handicap/` — suggestion + win probability + cap (shared with JS preview)
 - CLI: `liga/.../cli/HandicapRenderer.scala`
+- Director hints: `docs/intent/director-handicap-probability-hints.md`
+
+### Roster
+- `liga-common/.../roster/` — paste parsing, rating order
+- Soft-remove before lock: `docs/intent/liga-roll-call-roster-remove.md`
+- Paste on define: `docs/intent/paste-roster.md`
 
 ### Bracket topology
 - `liga/.../bracket/` — gen, seeding, advancement, byes
 - `liga-common/.../bracket/` — `RaceToScopes`, `RaceToWizard`, `TournamentBounds`
 - Section race-to: `docs/ideas/section-aware-race-to.md`
+- Race-to display: `docs/intent/race-to-display-and-hints.md`
 
 ### Tournament lifecycle
 - `liga/.../tournament/` — phases, events, replay/resume, validation, period emission
-- Match flow: ready → apply handicap → start → record result
+- Match flow: ready → apply handicap → start → record result (or forfeit)
+- Forfeit: no period scores; opponent advances as loss path — `docs/intent/liga-match-forfeit.md`
 - `liga/.../tournament/MatchWaitTiming.scala` — API-only wait/Done Instant
   projection from the event log (not on domain `BracketMatch`)
+- Completed bracket results (W–L + rating Δ on last round): `docs/intent/liga-bracket-results.md`
 
 ## Serve / HTTP
 
@@ -41,6 +51,7 @@ Load only the section you need for the current task.
 - Persistence: append-only JSON under tournament data dir
 - Tournament JSON bracket matches may include optional `waitStartedAt` /
   `completedAt` (ISO Instants) from `MatchWaitTiming`; domain model unchanged
+- Idle serve (no active tournament → Latest Ratings): `docs/intent/serve-without-tournament.md`
 
 ## Director UI (`liga-js`)
 
@@ -49,12 +60,19 @@ Active-phase layout (`DirectorApp.mainLayout`): CSS grid — bracket column + ma
 | File | Role |
 |------|------|
 | `director/DirectorApp.scala` | Root app, phase routing, selection, actions |
+| `director/IdleDirectorView.scala` | Idle / Latest Ratings when no tournament |
 | `director/BracketView.scala` | Match list by section/round; ~15s elapsed chip tick |
 | `director/BracketLayout.scala` | Grouping/order, director Ready strip, elapsed chip helpers |
-| `director/AppliedHandicapView.scala` | Player names + handicap markers on bracket rows |
+| `director/AppliedHandicapView.scala` | Names + handicap markers + rating subline |
 | `director/MatchScoreView.scala` | Shared score/bye rendering for director + audience brackets |
-| `director/MatchPanel.scala` | Ready / handicap / start / score controls |
+| `director/MatchPanel.scala` | Ready / handicap / start / score / forfeit controls |
 | `director/WizardView.scala` | Pre-seed setup (roster, race-to, seed) |
+| `director/RosterSoftRemove.scala` | Roll-call soft-remove before Save/Lock |
+| `director/RaceToLabels.scala` | `"Race to N"` from resolved scope |
+| `director/HandicapProbabilityHints.scala` | CLI-parity win-% neighborhood in MatchPanel |
+| `director/ForfeitSubmitPolicy.scala` | Forfeit submit gating |
+| `director/BracketResults.scala` | Post-complete W–L / rating Δ labels |
+| `director/BracketResultsContext.scala` | Results context from completed tournament |
 | `director/DirectorGuidance.scala` | Copy / error hints |
 | `api/Client.scala` + `Models.scala` | HTTP client + DTOs (incl. optional wait fields) |
 
@@ -69,13 +87,15 @@ Director list (`BracketLayout.directorGroupMatches`): Live strip at top
 `startedAt`; Ready strip below sorted longest-wait first (equal wait → earlier
 rounds, then seed index); lower list = `groupMatches` on non-Live ∩ non-Ready.
 Elapsed `HH:mm` chip from `waitStartedAt` (Ready + Pending-with-one) or
-`completedAt` (Done; none on bye). Spec: `SPEC.md` /
+`completedAt` (Done; none on bye). Intent:
 `docs/intent/td-match-wait-indicators.md`.
 
+Player rating subline (director + audience via `AppliedHandicapView`):
+`docs/intent/player-ratings-in-bracket.md`.
 
 ## Audience UI
 
-- `audience/AudienceApp.scala`, `AudienceBracketView.scala`
+- `audience/AudienceApp.scala`, `AudienceBracketView.scala`, `AudienceIdlePolicy.scala`
 - Separate entry (`MainAudience`); poll-based; read-only
 
 ## Docs index
@@ -89,12 +109,19 @@ Elapsed `HH:mm` chip from `waitStartedAt` (Ready + Pending-with-one) or
 | `docs/ideas/bye-bracket-display.md` | Bye display |
 | `docs/ideas/grand-final-labels.md` | GF labeling |
 | `docs/intent/paste-roster.md` | Roster paste |
+| `docs/intent/liga-roll-call-roster-remove.md` | Soft-remove before lock |
 | `docs/intent/serve-without-tournament.md` | Serve without active tournament |
 | `docs/intent/director-audience-bracket-order.md` | Director + audience list visibility/order |
-| `docs/intent/td-match-wait-indicators.md` | TD wait / Done elapsed + Ready strip intent |
+| `docs/intent/td-match-wait-indicators.md` | TD wait / Done elapsed + Ready strip |
 | `docs/ideas/td-match-wait-indicators.md` | Wait-indicator direction / MVP in-out |
-| `SPEC.md` | Wait-indicator acceptance + timing rule table |
-| `tasks/plan.md` / `tasks/todo.md` | Wait-indicator task breakdown + checklist |
+| `docs/intent/race-to-display-and-hints.md` | Race-to labels + validation numbers |
+| `docs/intent/director-handicap-probability-hints.md` | MatchPanel win-% hints |
+| `docs/intent/player-ratings-in-bracket.md` | Rating subline / unrated guests |
+| `docs/intent/liga-match-forfeit.md` | Forfeit (no period scores) |
+| `docs/intent/liga-bracket-results.md` | Post-complete bracket results |
+| `docs/ideas/liga-match-forfeit.md` | Forfeit direction |
+| `docs/ideas/liga-bracket-results.md` | Bracket results direction |
+| `docs/ideas/liga-roll-call-roster-remove.md` | Roll-call remove direction |
 
 ## Known UX pressure (Active phase)
 
