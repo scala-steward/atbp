@@ -9,8 +9,12 @@ final case class BracketResultsContext(
     bracketSize: Int,
     matches: List[BracketMatch],
     latestRatingsByPlayer: Map[String, LatestRating],
-    indexes: BracketResults.PlayerIndexes
+    indexes: BracketResults.PlayerIndexes,
+    earnedIndex: BracketEarnedRacks.EarnedIndex
 ) {
+
+  def earnedFor(playerName: String, matchId: String): Option[(Int, Int)] =
+    earnedIndex.earnedFor(playerName, matchId)
 
   def cellDisplay(
       playerName: String,
@@ -58,7 +62,12 @@ object BracketResultsContext {
       matches = matches,
       latestRatingsByPlayer =
         latestRatings.ratings.map(row => row.player.name -> row).toMap,
-      indexes = BracketResults.playerIndexes(matches, bracketSize)
+      indexes = BracketResults.playerIndexes(matches, bracketSize),
+      earnedIndex = BracketEarnedRacks.earnedIndex(
+        matches,
+        bracketSize,
+        tournament.frozenRatings
+      )
     )
   }
 

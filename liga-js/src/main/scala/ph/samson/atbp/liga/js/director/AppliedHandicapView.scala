@@ -124,31 +124,39 @@ object AppliedHandicapView {
     resultsContext.cellDisplay(name, matchId, frozenLabel) match {
       case ResultsCellDisplay.Annotate(wins, losses, movement) =>
         val nameWithRecord = s"$name ($wins-$losses)"
+        val earned = resultsContext.earnedFor(name, matchId)
         span(
           cls := "player-cell",
           if (nameCls.nonEmpty) span(cls := nameCls, nameWithRecord)
           else span(nameWithRecord),
-          ratingMovementElement(movement)
+          ratingMovementElement(movement, earned)
         )
       case ResultsCellDisplay.Skip =>
         span(
           cls := "player-cell",
           if (nameCls.nonEmpty) span(cls := nameCls, name) else span(name),
-          frozenLabel.map(liveRatingElement)
+          frozenLabel.map(label =>
+            liveRatingElement(
+              label,
+              resultsContext.earnedFor(name, matchId)
+            )
+          )
         )
     }
   }
 
-  private def liveRatingElement(label: PlayerRatingLabel): HtmlElement =
-    label match {
-      case PlayerRatingLabel.Rated(r) =>
-        span(cls := "player-rating", f"${r}%.0f")
-      case PlayerRatingLabel.Unrated =>
-        span(cls := "player-rating", "unrated")
-    }
+  private def liveRatingElement(
+      label: PlayerRatingLabel,
+      earned: Option[(Int, Int)]
+  ): HtmlElement =
+    span(
+      cls := "player-rating",
+      BracketEarnedRacks.formatLiveRatingLine(label, earned)
+    )
 
   private def ratingMovementElement(
-      movement: RatingMovementDisplay
+      movement: RatingMovementDisplay,
+      earned: Option[(Int, Int)]
   ): HtmlElement =
     movement match {
       case RatingMovementDisplay.RatedDelta(frozen, delta) =>
@@ -157,12 +165,18 @@ object AppliedHandicapView {
             "player-rating",
             BracketResults.ratedDeltaCssClasses(delta).mkString(" ")
           ).filter(_.nonEmpty).mkString(" "),
-          BracketResults.formatRatedDeltaLine(frozen, delta)
+          BracketEarnedRacks.appendEarnedToMovementLine(
+            BracketResults.formatRatedDeltaLine(frozen, delta),
+            earned
+          )
         )
       case RatingMovementDisplay.NewRating(post) =>
         span(
           cls := "player-rating rating-new",
-          BracketResults.formatNewRatingLine(post)
+          BracketEarnedRacks.appendEarnedToMovementLine(
+            BracketResults.formatNewRatingLine(post),
+            earned
+          )
         )
     }
 }

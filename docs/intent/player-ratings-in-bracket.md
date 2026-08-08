@@ -30,4 +30,7 @@ muted, tabular-nums. Rules live in `director.css` and are mirrored in
 
 - Frozen ratings only — not live ledger values.
 - No backend or API changes for v1.
-- No RD, delta, or W-L in bracket rows unless revisited deliberately.
+- No RD or delta in bracket rows unless revisited deliberately.
+- Earned rack `(W-L)` on the `.player-rating` subline (cumulative tournament
+  earned racks, not career W–L). Completed bracket **match** `(W-L)` stays on
+  the name line only.

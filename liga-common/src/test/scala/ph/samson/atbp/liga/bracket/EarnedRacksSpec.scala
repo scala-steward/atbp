@@ -44,7 +44,49 @@ object EarnedRacksSpec extends ZIOSpecDefault {
       assertTrue(
         EarnedRacks.earnedScores(bye) == ((0, 0)),
         EarnedRacks.earnedScores(forfeit) == ((0, 0)),
+        EarnedRacks.earnedRecord(List(bye), alice) == ((0, 0)),
         EarnedRacks.rackDifferential(List(bye), alice) == 0
+      )
+    },
+    test("earnedRecord sums earned wins and losses across matches") {
+      val played = List(
+        EarnedRacks.PlayedMatch(
+          playerA = alice,
+          playerB = bob,
+          scoreA = 7,
+          scoreB = 4,
+          handicapApplied = 0,
+          weaker = None,
+          kind = EarnedRacks.MatchKind.Played
+        ),
+        EarnedRacks.PlayedMatch(
+          playerA = carol,
+          playerB = alice,
+          scoreA = 5,
+          scoreB = 7,
+          handicapApplied = 0,
+          weaker = None,
+          kind = EarnedRacks.MatchKind.Played
+        )
+      )
+      assertTrue(
+        EarnedRacks.earnedRecord(played, alice) == ((14, 9)),
+        EarnedRacks.earnedRecord(played, bob) == ((4, 7))
+      )
+    },
+    test("earnedRecord strips handicap spots on the weaker side") {
+      val handicapped = EarnedRacks.PlayedMatch(
+        playerA = bob,
+        playerB = alice,
+        scoreA = 5,
+        scoreB = 7,
+        handicapApplied = 2,
+        weaker = Some(bob),
+        kind = EarnedRacks.MatchKind.Played
+      )
+      assertTrue(
+        EarnedRacks.earnedRecord(List(handicapped), bob) == ((3, 7)),
+        EarnedRacks.earnedRecord(List(handicapped), alice) == ((7, 3))
       )
     },
     test(

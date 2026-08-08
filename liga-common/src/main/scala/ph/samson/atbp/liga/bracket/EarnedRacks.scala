@@ -40,21 +40,26 @@ object EarnedRacks {
         (0, 0)
     }
 
+  def earnedRecord(
+      matches: List[PlayedMatch],
+      player: Player
+  ): (Int, Int) =
+    matches.foldLeft((0, 0)) { case ((wonTotal, lostTotal), played) =>
+      val (scoreA, scoreB) = earnedScores(played)
+      if (played.playerA == player) {
+        (wonTotal + scoreA, lostTotal + scoreB)
+      } else if (played.playerB == player) {
+        (wonTotal + scoreB, lostTotal + scoreA)
+      } else {
+        (wonTotal, lostTotal)
+      }
+    }
+
   def rackDifferential(
       matches: List[PlayedMatch],
       player: Player
   ): Int = {
-    val (won, lost) = matches.foldLeft((0, 0)) {
-      case ((wonTotal, lostTotal), played) =>
-        val (scoreA, scoreB) = earnedScores(played)
-        if (played.playerA == player) {
-          (wonTotal + scoreA, lostTotal + scoreB)
-        } else if (played.playerB == player) {
-          (wonTotal + scoreB, lostTotal + scoreA)
-        } else {
-          (wonTotal, lostTotal)
-        }
-    }
+    val (won, lost) = earnedRecord(matches, player)
     won - lost
   }
 
