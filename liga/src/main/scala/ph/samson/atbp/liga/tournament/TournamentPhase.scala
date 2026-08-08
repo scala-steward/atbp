@@ -28,7 +28,7 @@ object TournamentPhase {
     }
 
   def raceToComplete(state: TournamentState): Boolean = {
-    val required = RaceToScopes.requiredKeys(state.players.size)
+    val required = RaceToScopes.requiredKeys(state.players.size, state.topN)
     required.forall(scope => state.raceToByScope.contains(scope))
   }
 }

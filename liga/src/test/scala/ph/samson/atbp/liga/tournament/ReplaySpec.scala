@@ -31,16 +31,10 @@ object ReplaySpec extends ZIOSpecDefault {
     ZIO.foreachDiscard(events)(event => EventLog.append(dir, event))
 
   private def seededSeqAfterLockedRoster(startSeq: Int): Int =
-    startSeq + 2 + RaceToTestSupport.uniformRaceTo(8).size
+    startSeq + 3
 
   private def lockedRosterEvents(startSeq: Int): List[TournamentEvent] = {
     val players = (1 to 8).map(i => Player(s"P$i")).toList
-    val raceToEvents =
-      RaceToTestSupport.raceToSetEvents(
-        playerCount = 8,
-        startSeq = startSeq + 2,
-        at = at
-      )
     List(
       TournamentEvent.PlayersSet(
         seq = startSeq,
@@ -51,8 +45,13 @@ object ReplaySpec extends ZIOSpecDefault {
         seq = startSeq + 1,
         at = at,
         payload = PlayersLockedPayload()
+      ),
+      RaceToTestSupport.formatSetEvent(
+        playerCount = 8,
+        startSeq = startSeq + 2,
+        at = at
       )
-    ) ++ raceToEvents
+    )
   }
 
   def spec = suite("Replay")(
@@ -367,10 +366,12 @@ object ReplaySpec extends ZIOSpecDefault {
           at = at,
           payload = PlayersLockedPayload()
         )
-      ) ++ RaceToTestSupport.raceToSetEvents(
-        playerCount = 8,
-        startSeq = 4,
-        at = at
+      ) ++ List(
+        RaceToTestSupport.formatSetEvent(
+          playerCount = 8,
+          startSeq = 4,
+          at = at
+        )
       )
       for {
         state <- ZIO.fromEither(Replay.replay(events))
@@ -536,16 +537,31 @@ object ReplaySpec extends ZIOSpecDefault {
     },
     test("replay rejects invalid race-to from disk") {
       withTempDir { dir =>
+        val players = (1 to 8).map(i => Player(s"P$i")).toList
         val events = List(
           TournamentEvent.Created(
             seq = 1,
             at = at,
             payload = TournamentCreatedPayload("Open", Nil)
           ),
-          TournamentEvent.RaceToSet(
+          TournamentEvent.PlayersSet(
             seq = 2,
             at = at,
-            payload = RaceToSetPayload(scope = "wb-1", raceTo = 1)
+            payload = PlayersSetPayload(players = players)
+          ),
+          TournamentEvent.PlayersLocked(
+            seq = 3,
+            at = at,
+            payload = PlayersLockedPayload()
+          ),
+          TournamentEvent.FormatSet(
+            seq = 4,
+            at = at,
+            payload = FormatSetPayload(
+              topN = 2,
+              raceToByScope =
+                RaceToTestSupport.uniformRaceTo(8).updated("wb-1", 1)
+            )
           )
         )
         for {

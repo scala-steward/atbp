@@ -124,7 +124,9 @@ lazy val ligaCommon = crossProject(JSPlatform, JVMPlatform)
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
   .jsSettings(
-    scalaJSUseMainModuleInitializer := false
+    scalaJSUseMainModuleInitializer := false,
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / scalaJSUseTestModuleInitializer := true
   )
 
 lazy val liga = atbpModule("liga")

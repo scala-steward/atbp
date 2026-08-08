@@ -73,6 +73,7 @@ object Models {
       players: List[Player],
       completed: Boolean,
       phase: String,
+      topN: Int,
       raceToByScope: Map[String, Int],
       bracket: Option[Bracket],
       frozenRatings: List[PlayerRating]
@@ -102,7 +103,7 @@ object Models {
 
   final case class PlayersRequest(players: List[Player])
 
-  final case class RaceToRequest(raceToByScope: Map[String, Int])
+  final case class RaceToRequest(topN: Int, raceToByScope: Map[String, Int])
 
   final case class HandicapRequest(handicap: Int)
 

@@ -53,6 +53,7 @@ object MatchHandicapPreviewSpec extends ZIOSpecDefault {
       players = List(alice, bob),
       completed = false,
       phase = "active",
+      topN = 2,
       raceToByScope = Map("wb-1" -> 7),
       bracket = None,
       frozenRatings = frozenRatings

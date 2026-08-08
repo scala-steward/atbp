@@ -27,8 +27,25 @@ object Advancement {
       matchId: String,
       winner: Player,
       recordPlaceholderResult: Boolean
+  ): Either[String, AdvanceResult] =
+    advance(
+      bracket,
+      matchId,
+      winner,
+      recordPlaceholderResult,
+      None,
+      None
+    )
+
+  def advance(
+      bracket: Bracket,
+      matchId: String,
+      winner: Player,
+      recordPlaceholderResult: Boolean,
+      completedResult: Option[MatchResult],
+      reseedContext: Option[CutReseed.Context]
   ): Either[String, AdvanceResult] = {
-    val topology = BracketTopology(bracket.size)
+    val topology = BracketTopology(bracket.size, bracket.topN)
     for {
       placed <- advanceCore(
         bracket,
@@ -36,10 +53,22 @@ object Advancement {
         winner,
         topology,
         isBye = false,
-        recordPlaceholderResult = recordPlaceholderResult
+        recordPlaceholderResult = recordPlaceholderResult,
+        completedResult = completedResult
       )
       propagated <- BracketByes.propagateStructuralByesE(placed, topology)
-    } yield readyNewMatches(propagated, topology, matchId)
+      (formatted, extraReady) <- FormatAdvancement.afterCore(
+        propagated,
+        matchId,
+        winner,
+        reseedContext
+      )
+    } yield readyNewMatches(
+      formatted,
+      topology,
+      matchId,
+      extraReady = extraReady
+    )
   }
 
   /** Complete a match and place winner/loser without structural-bye
@@ -51,7 +80,8 @@ object Advancement {
       winner: Player,
       topology: BracketTopology.Topology,
       isBye: Boolean,
-      recordPlaceholderResult: Boolean
+      recordPlaceholderResult: Boolean,
+      completedResult: Option[MatchResult]
   ): Either[String, Bracket] =
     for {
       matchDef <- findMatch(bracket, matchId)
@@ -62,7 +92,8 @@ object Advancement {
         matchId,
         winner,
         isBye,
-        recordPlaceholderResult
+        recordPlaceholderResult,
+        completedResult
       )
       placed <- placePlayers(updated, topology, matchId, winner, loser)
     } yield placed
@@ -105,19 +136,22 @@ object Advancement {
       matchId: String,
       winner: Player,
       isBye: Boolean,
-      recordPlaceholderResult: Boolean
+      recordPlaceholderResult: Boolean,
+      completedResult: Option[MatchResult]
   ): Either[String, Bracket] = {
     val updatedMatches = bracket.matches.map { matchDef =>
       if (matchDef.id == matchId) {
         val result =
-          if (recordPlaceholderResult) {
-            val scoreA =
-              if (matchDef.playerA.contains(winner)) 1 else 0
-            val scoreB =
-              if (matchDef.playerB.contains(winner)) 1 else 0
-            Some(MatchResult(scoreA, scoreB))
-          } else {
-            None
+          completedResult.orElse {
+            if (recordPlaceholderResult) {
+              val scoreA =
+                if (matchDef.playerA.contains(winner)) 1 else 0
+              val scoreB =
+                if (matchDef.playerB.contains(winner)) 1 else 0
+              Some(MatchResult(scoreA, scoreB))
+            } else {
+              None
+            }
           }
         matchDef.copy(
           state = BracketMatchState.Completed,
@@ -179,7 +213,8 @@ object Advancement {
   private def readyNewMatches(
       bracket: Bracket,
       topology: BracketTopology.Topology,
-      completedMatchId: String
+      completedMatchId: String,
+      extraReady: List[String]
   ): AdvanceResult = {
     val affectedTargets =
       List(
@@ -188,11 +223,11 @@ object Advancement {
       ).flatten.map(_._1).distinct
 
     val newlyReady =
-      affectedTargets.filter { targetId =>
+      (extraReady ++ affectedTargets.filter { targetId =>
         bracket.matches
           .find(_.id == targetId)
           .exists(_.state == BracketMatchState.Ready)
-      }
+      }).distinct
 
     AdvanceResult(bracket, newlyReady)
   }

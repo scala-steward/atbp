@@ -15,7 +15,13 @@ object BracketLayout {
     case Winners extends Section("Winners")
     case Losers extends Section("Losers")
     case GrandFinal extends Section("Grand Final")
+    case SingleElimination extends Section("Single Elimination")
   }
+
+  /** Layout round for `gf-2` (reset grand final); distinct from `gf-1`
+    * grouping.
+    */
+  val GrandFinalResetRound: Int = 0
 
   final case class RoundGroup(
       section: Section,
@@ -33,11 +39,14 @@ object BracketLayout {
     matchId match {
       case s if s.startsWith("wb-") => Section.Winners
       case s if s.startsWith("lb-") => Section.Losers
+      case s if s.startsWith("se-") => Section.SingleElimination
       case _                        => Section.GrandFinal
     }
 
   def groupLabel(section: Section, round: Int): String =
     section match {
+      case Section.GrandFinal if round == GrandFinalResetRound =>
+        s"${section.label} — reset"
       case Section.GrandFinal => section.label
       case _                  => s"${section.label} — round $round"
     }
@@ -53,7 +62,9 @@ object BracketLayout {
     matchId match {
       case s"wb-$round-$_" => round.toIntOption
       case s"lb-$round-$_" => round.toIntOption
+      case s"se-$round-$_" => round.toIntOption
       case "gf-1"          => Some(log2(bracketSize))
+      case "gf-2"          => Some(GrandFinalResetRound)
       case _               => None
     }
 
@@ -61,8 +72,15 @@ object BracketLayout {
     bracketRound(matchId, bracketSize).getOrElse(0)
 
   private def showInList(m: BracketMatch): Boolean =
-    m.state != BracketMatchState.Pending ||
+    if (
+      m.state == BracketMatchState.Completed && m.isBye &&
+      m.playerA.isEmpty && m.playerB.isEmpty
+    ) {
+      false
+    } else {
+      m.state != BracketMatchState.Pending ||
       m.playerA.isDefined || m.playerB.isDefined
+    }
 
   private def statusSortKey(m: BracketMatch): Int =
     m.state match {
@@ -76,7 +94,9 @@ object BracketLayout {
     matchId match {
       case s"wb-$_-$index" => index.toIntOption.getOrElse(0)
       case s"lb-$_-$index" => index.toIntOption.getOrElse(0)
+      case s"se-$_-$index" => index.toIntOption.getOrElse(0)
       case "gf-1"          => 1
+      case "gf-2"          => 2
       case _               => 0
     }
 
@@ -85,9 +105,10 @@ object BracketLayout {
 
   private def listSectionOrder(section: Section): Int =
     section match {
-      case Section.GrandFinal => 0
-      case Section.Losers     => 1
-      case Section.Winners    => 2
+      case Section.GrandFinal        => 0
+      case Section.SingleElimination => 1
+      case Section.Losers            => 2
+      case Section.Winners           => 3
     }
 
   private def roundFullyCompleted(matches: List[BracketMatch]): Boolean =
@@ -285,8 +306,10 @@ object BracketLayout {
 
   def scopeKey(section: Section, round: Int): String =
     section match {
-      case Section.Winners    => RaceToScopes.keyForWinnersRound(round)
-      case Section.Losers     => RaceToScopes.keyForLosersRound(round)
+      case Section.Winners           => RaceToScopes.keyForWinnersRound(round)
+      case Section.Losers            => RaceToScopes.keyForLosersRound(round)
+      case Section.SingleElimination =>
+        RaceToScopes.keyForSingleElimRound(round)
       case Section.GrandFinal => RaceToScopes.grandFinalScopeKey
     }
 

@@ -178,8 +178,10 @@ object DirectorApp {
                       .flatMap(_ => client.lockPlayers())
                   )
                 },
-                Observer[Map[String, Int]](raceToByScope =>
-                  runAction(client.setRaceTo(raceToByScope))
+                Observer[RaceToRequest](request =>
+                  runAction(
+                    client.setRaceTo(request.topN, request.raceToByScope)
+                  )
                 ),
                 Observer[Unit](_ => runAction(client.seed()))
               )

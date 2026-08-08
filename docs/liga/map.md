@@ -43,6 +43,7 @@ Load only the section you need for the current task.
 - `liga/.../tournament/MatchWaitTiming.scala` — API-only wait/Done Instant
   projection from the event log (not on domain `BracketMatch`)
 - Completed bracket results (W–L + rating Δ on last round): `docs/intent/liga-bracket-results.md`
+- Elimination cut (last 1 true DE / last \(2^k\) DE→SE): `docs/intent/liga-elimination-cut.md`
 
 ## Serve / HTTP
 
@@ -119,6 +120,7 @@ Player rating subline (director + audience via `AppliedHandicapView`):
 | `docs/intent/player-ratings-in-bracket.md` | Rating subline / unrated guests |
 | `docs/intent/liga-match-forfeit.md` | Forfeit (no period scores) |
 | `docs/intent/liga-bracket-results.md` | Post-complete bracket results |
+| `docs/intent/liga-elimination-cut.md` | DE→SE cut / true DE (last N) |
 | `docs/ideas/liga-match-forfeit.md` | Forfeit direction |
 | `docs/ideas/liga-bracket-results.md` | Bracket results direction |
 | `docs/ideas/liga-roll-call-roster-remove.md` | Roll-call remove direction |

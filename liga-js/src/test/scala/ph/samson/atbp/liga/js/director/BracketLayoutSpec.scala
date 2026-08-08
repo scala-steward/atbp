@@ -76,6 +76,33 @@ object BracketLayoutSpec extends ZIOSpecDefault {
       )
     },
     test(
+      "groupMatches omits abandoned cut byes but keeps opening byes with a player"
+    ) {
+      val abandoned = BracketMatch(
+        id = "wb-3-1",
+        playerA = None,
+        playerB = None,
+        state = BracketMatchState.Completed,
+        isBye = true
+      )
+      val openingBye = BracketMatch(
+        id = "wb-1-1",
+        playerA = Some(Player("P1")),
+        playerB = None,
+        state = BracketMatchState.Completed,
+        isBye = true
+      )
+      val groups =
+        BracketLayout.groupMatches(
+          matches = List(abandoned, openingBye),
+          bracketSize = 8
+        )
+      assertTrue(
+        groups.length == 1,
+        groups.head.matches.map(_.id) == List("wb-1-1")
+      )
+    },
+    test(
       "groupMatches sorts matches Ready then Pending then Started then Completed"
     ) {
       val player = Some(Player("P1"))

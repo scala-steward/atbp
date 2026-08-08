@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.tournament
 
 import ph.samson.atbp.liga.bracket.RaceToScopes
+import ph.samson.atbp.liga.bracket.TopN
 import ph.samson.atbp.liga.bracket.TournamentBounds
 import ph.samson.atbp.liga.handicap.Handicap
 import ph.samson.atbp.liga.model.*
@@ -51,6 +52,12 @@ object Tournament {
 
   final case class InvalidRaceToError(raceTo: Int) extends WizardError {
     val message: String = s"race-to must be at least 2: $raceTo"
+  }
+
+  final case class InvalidTopNError(topN: Int, playerCount: Int)
+      extends WizardError {
+    val message: String =
+      s"topN must be legal for roster size $playerCount: $topN"
   }
 
   final case class RaceToIncompleteError() extends WizardError {
@@ -124,38 +131,43 @@ object Tournament {
         )
     }
 
-  def setRaceToByScope(
+  def setFormat(
       state: TournamentState,
+      topN: Int,
       raceToByScope: Map[String, Int],
-      startSeq: Int,
+      seq: Int,
       at: Instant
-  ): Either[WizardError, List[TournamentEvent.RaceToSet]] =
+  ): Either[WizardError, TournamentEvent.FormatSet] =
     if (state.bracket.nonEmpty) {
       Left(AlreadySeededError())
+    } else if (!TopN.legalTopNs(state.players.size).contains(topN)) {
+      Left(InvalidTopNError(topN, state.players.size))
     } else {
-      val required = RaceToScopes.requiredKeys(state.players.size)
+      val required = RaceToScopes.requiredKeys(state.players.size, topN)
       val missing = required.filterNot(raceToByScope.contains)
       if (missing.nonEmpty) {
         Left(RaceToIncompleteError())
       } else {
-        required.zipWithIndex
-          .foldLeft(
-            Right(Nil): Either[WizardError, List[TournamentEvent.RaceToSet]]
-          ) { case (acc, (scope, index)) =>
-            acc.flatMap { events =>
+        required
+          .foldLeft(Right(()): Either[WizardError, Unit]) {
+            case (Right(_), scope) =>
               val raceTo = raceToByScope(scope)
               TournamentValidation
                 .validateRaceTo(raceTo)
                 .left
                 .map(_ => InvalidRaceToError(raceTo))
-                .map(_ =>
-                  events :+ TournamentEvent.RaceToSet(
-                    seq = startSeq + index,
-                    at = at,
-                    payload = RaceToSetPayload(scope = scope, raceTo = raceTo)
-                  )
-                )
-            }
+            case (left, _) => left
+          }
+          .map { _ =>
+            TournamentEvent.FormatSet(
+              seq = seq,
+              at = at,
+              payload = FormatSetPayload(
+                topN = topN,
+                raceToByScope =
+                  required.map(scope => scope -> raceToByScope(scope)).toMap
+              )
+            )
           }
       }
     }

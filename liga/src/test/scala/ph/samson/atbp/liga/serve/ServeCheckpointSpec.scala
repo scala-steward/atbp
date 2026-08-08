@@ -64,10 +64,16 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
 
   private val tournamentDirName = "tournament-20260315-spring-open"
 
-  private def writeCreatedTournament(dataDir: File): File = {
+  private def writeCreatedTournament(dataDir: File): File =
+    writeCreatedTournament(dataDir, playerCount = 8)
+
+  private def writeCreatedTournament(
+      dataDir: File,
+      playerCount: Int
+  ): File = {
     val tournamentDir = dataDir / tournamentDirName
     tournamentDir.createDirectoryIfNotExists()
-    val players = (1 to 8).map(i => Player(s"P$i")).toList
+    val players = (1 to playerCount).map(i => Player(s"P$i")).toList
     val events = List(
       TournamentEvent.Created(
         seq = 1,
@@ -131,12 +137,6 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
 
   private def playMatch(
       ctx: ServeContext,
-      matchId: String
-  ): ZIO[Scope, Throwable, TournamentResponse] =
-    playMatch(ctx, matchId, winnerIsA = true)
-
-  private def playMatch(
-      ctx: ServeContext,
       matchId: String,
       winnerIsA: Boolean
   ): ZIO[Scope, Throwable, TournamentResponse] =
@@ -160,26 +160,43 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
       )
     } yield afterResult
 
-  private def playAllReadyMatches(
-      ctx: ServeContext
+  private def matchState(
+      state: TournamentResponse,
+      matchId: String
+  ): Option[BracketMatchState] =
+    state.bracket.flatMap(_.matches.find(_.id == matchId).map(_.state))
+
+  private val pickWinnerA: String => Boolean = _ => true
+  private val neverStop: TournamentResponse => Boolean = _ => false
+
+  private def playMatches(
+      ctx: ServeContext,
+      pickWinnerIsA: String => Boolean,
+      stopWhen: TournamentResponse => Boolean
   ): ZIO[Scope, Throwable, TournamentResponse] = {
     def loop(
         state: TournamentResponse
     ): ZIO[Scope, Throwable, TournamentResponse] = {
-      val readyIds =
-        state.bracket.toList
-          .flatMap(_.matches)
-          .filter(_.state == BracketMatchState.Ready)
-          .map(_.id)
-      if (readyIds.isEmpty) {
+      if (stopWhen(state)) {
         ZIO.succeed(state)
       } else {
-        for {
-          afterRound <- ZIO.foldLeft(readyIds)(state) { (_, matchId) =>
-            playMatch(ctx, matchId)
-          }
-          next <- loop(afterRound)
-        } yield next
+        val readyIds =
+          state.bracket.toList
+            .flatMap(_.matches)
+            .filter(_.state == BracketMatchState.Ready)
+            .map(_.id)
+        if (readyIds.isEmpty) {
+          ZIO.succeed(state)
+        } else {
+          for {
+            afterPlay <- playMatch(
+              ctx,
+              readyIds.head,
+              pickWinnerIsA(readyIds.head)
+            )
+            next <- loop(afterPlay)
+          } yield next
+        }
       }
     }
 
@@ -192,19 +209,36 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
     } yield finalState
   }
 
-  private val raceToBody =
-    """{"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"wb-4":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"lb-5":7,"lb-6":7,"gf":7}}"""
+  private def playAllReadyMatches(
+      ctx: ServeContext
+  ): ZIO[Scope, Throwable, TournamentResponse] =
+    playMatches(ctx, pickWinnerA, neverStop)
+
+  private def raceToBody(playerCount: Int, topN: Int): String = {
+    val scopes = ph.samson.atbp.liga.bracket.RaceToScopes
+      .requiredKeys(playerCount, topN)
+    val raceTo = scopes.map(scope => s""""$scope":7""").mkString(",")
+    s"""{"topN":$topN,"raceToByScope":{$raceTo}}"""
+  }
 
   private def configureRaceTo(
-      ctx: ServeContext
+      ctx: ServeContext,
+      playerCount: Int,
+      topN: Int
   ): ZIO[Scope, Throwable, TournamentResponse] =
-    postTournament(ctx, "/api/tournament/race-to", raceToBody)
+    postTournament(
+      ctx,
+      "/api/tournament/race-to",
+      raceToBody(playerCount, topN)
+    )
 
   private def seedTournament(
-      ctx: ServeContext
+      ctx: ServeContext,
+      playerCount: Int,
+      topN: Int
   ): ZIO[Scope, Throwable, TournamentResponse] =
     for {
-      _ <- configureRaceTo(ctx)
+      _ <- configureRaceTo(ctx, playerCount, topN)
       seeded <- postTournament(ctx, "/api/tournament/seed", "{}")
     } yield seeded
 
@@ -247,7 +281,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
           resolved <- Resume.resolve(dataDir)
           ctx = freshContext(dataDir, resolved.get)
-          _ <- seedTournament(ctx)
+          _ <- seedTournament(ctx, playerCount = 8, topN = 2)
           finalState <- playAllReadyMatches(ctx)
         } yield assertTrue(
           resolved == Some(tournamentDir),
@@ -290,7 +324,7 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           _ <- ZIO.attemptBlocking(seedPeriodFile(dataDir))
           tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
           firstCtx = freshContext(dataDir, tournamentDir)
-          seeded <- seedTournament(firstCtx)
+          seeded <- seedTournament(firstCtx, playerCount = 8, topN = 2)
           _ <- Resume.resolve(dataDir)
           restartedCtx = freshContext(dataDir, tournamentDir)
           afterRestart <- routes(restartedCtx)
@@ -301,7 +335,53 @@ object ServeCheckpointSpec extends ZIOSpecDefault {
           seeded.bracket.exists(_.size == 8),
           afterRestart.bracket.exists(_.size == 8),
           afterRestart.frozenRatings.size == 8,
-          eventCount >= 8
+          eventCount >= 5
+        )
+      }
+    },
+    test("twelve-player topN=8 cut completes via HTTP API") {
+      withTempDataDir { (dataDir, _) =>
+        for {
+          _ <- ZIO.attemptBlocking(seedPeriodFile(dataDir))
+          tournamentDir <- ZIO.attemptBlocking(
+            writeCreatedTournament(dataDir, playerCount = 12)
+          )
+          resolved <- Resume.resolve(dataDir)
+          ctx = freshContext(dataDir, resolved.get)
+          seeded <- seedTournament(ctx, playerCount = 12, topN = 8)
+          finalState <- playAllReadyMatches(ctx)
+        } yield assertTrue(
+          resolved.contains(tournamentDir),
+          seeded.topN == 8,
+          seeded.bracket.exists(_.size == 16),
+          seeded.bracket.exists(!_.matches.exists(_.id == "gf-1")),
+          matchState(finalState, "se-3-1")
+            .contains(BracketMatchState.Completed),
+          allMatchesCompleted(finalState)
+        )
+      }
+    },
+    test("eight-player topN=1 reset GF completes when LB wins GF1") {
+      withTempDataDir { (dataDir, _) =>
+        val gf1Ready: TournamentResponse => Boolean =
+          matchState(_, "gf-1").contains(BracketMatchState.Ready)
+        for {
+          _ <- ZIO.attemptBlocking(seedPeriodFile(dataDir))
+          tournamentDir <- ZIO.attemptBlocking(writeCreatedTournament(dataDir))
+          resolved <- Resume.resolve(dataDir)
+          ctx = freshContext(dataDir, resolved.get)
+          seeded <- seedTournament(ctx, playerCount = 8, topN = 1)
+          _ <- playMatches(ctx, pickWinnerA, gf1Ready)
+          _ <- playMatch(ctx, "gf-1", winnerIsA = false)
+          finalState <- playAllReadyMatches(ctx)
+        } yield assertTrue(
+          resolved.contains(tournamentDir),
+          seeded.topN == 1,
+          matchState(finalState, "gf-1")
+            .contains(BracketMatchState.Completed),
+          matchState(finalState, "gf-2")
+            .contains(BracketMatchState.Completed),
+          allMatchesCompleted(finalState)
         )
       }
     }

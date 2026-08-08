@@ -23,6 +23,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       |  "players": [{"name": "P1"}, {"name": "P2"}],
       |  "completed": false,
       |  "phase": "active",
+      |  "topN": 2,
       |  "raceToByScope": {"wb-1": 7},
       |  "bracket": {
       |    "size": 2,
@@ -82,6 +83,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
         parsed.isRight,
         parsed.exists(_.name == "Spring Open"),
         parsed.exists(_.raceToByScope == Map("wb-1" -> 7)),
+        parsed.exists(_.topN == 2),
         parsed.exists(
           _.bracket.exists(_.matches.head.state == BracketMatchState.Started)
         ),
@@ -154,6 +156,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
           |  "players": [{"name": "P1"}, {"name": "P2"}],
           |  "completed": false,
           |  "phase": "active",
+          |  "topN": 2,
           |  "raceToByScope": {"wb-1": 7},
           |  "bracket": {
           |    "size": 2,
@@ -235,6 +238,7 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       } yield assertTrue(
         response.status == Status.Ok,
         parsed.name == "Spring Open",
+        parsed.topN == 2,
         parsed.bracket.exists(_.matches.nonEmpty)
       )
     },
@@ -260,12 +264,13 @@ object ApiClientContractSpec extends ZIOSpecDefault {
       val ok =
         decodeResponse[TournamentResponse](
           200,
-          """{"name":"T","players":[],"completed":false,"phase":"none","raceToByScope":{},"bracket":null,"frozenRatings":[]}"""
+          """{"name":"T","players":[],"completed":false,"phase":"none","topN":2,"raceToByScope":{},"bracket":null,"frozenRatings":[]}"""
         )
       val httpErr = decodeResponse[TournamentResponse](403, "forbidden")
       val jsonErr = decodeResponse[TournamentResponse](200, "not json")
       assertTrue(
         ok.exists(_.name == "T"),
+        ok.exists(_.topN == 2),
         httpErr == Left("HTTP 403: forbidden"),
         jsonErr.isLeft
       )
@@ -277,7 +282,9 @@ object ApiClientContractSpec extends ZIOSpecDefault {
           .contains("\"raceToByScope\""),
         CreateRequest("Spring Open").toJson.contains("\"name\""),
         PlayersRequest(List(Player("Alice"))).toJson.contains("\"players\""),
-        RaceToRequest(Map("wb-1" -> 7)).toJson.contains("\"raceToByScope\""),
+        RaceToRequest(topN = 2, Map("wb-1" -> 7)).toJson
+          .contains("\"raceToByScope\""),
+        RaceToRequest(topN = 2, Map("wb-1" -> 7)).toJson.contains("\"topN\""),
         HandicapRequest(3).toJson == """{"handicap":3}""",
         ResultRequest(7, 4).toJson == """{"scoreA":7,"scoreB":4}""",
         ForfeitRequest("A", "no-show").toJson ==

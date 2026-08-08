@@ -50,6 +50,7 @@ object ReadApiSpec extends ZIOSpecDefault {
           .header(Header.ContentType)
           .exists(_.mediaType == MediaType.application.json),
         parsed.name == "Spring Open",
+        parsed.topN == 2,
         parsed.phase == "active",
         parsed.players.size == 8,
         !parsed.completed,
@@ -249,6 +250,7 @@ object ReadApiSpec extends ZIOSpecDefault {
         players = List(Player("Alice"), Player("Bob")),
         completed = false,
         phase = "defining",
+        topN = 2,
         raceToByScope = Map("wb-1" -> 7),
         bracket = None,
         frozenRatings = List(
@@ -257,7 +259,11 @@ object ReadApiSpec extends ZIOSpecDefault {
       )
       val json = sample.toJson
       val parsed = json.fromJson[TournamentResponse]
-      assertTrue(parsed == Right(sample), json.contains("\"raceToByScope\""))
+      assertTrue(
+        parsed == Right(sample),
+        json.contains("\"raceToByScope\""),
+        json.contains("\"topN\"")
+      )
     }
   )
 }

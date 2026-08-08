@@ -8,16 +8,26 @@ import java.time.Instant
 
 object RaceToTestSupport {
 
-  def uniformRaceTo(playerCount: Int, raceTo: Int): Map[String, Int] =
-    RaceToScopes.requiredKeys(playerCount).map(_ -> raceTo).toMap
-
   def uniformRaceTo(playerCount: Int): Map[String, Int] =
-    uniformRaceTo(playerCount, raceTo = 7)
+    uniformRaceTo(playerCount, topN = 2, raceTo = 7)
+
+  def uniformRaceTo(
+      playerCount: Int,
+      topN: Int,
+      raceTo: Int
+  ): Map[String, Int] =
+    RaceToScopes.requiredKeys(playerCount, topN).map(_ -> raceTo).toMap
 
   /** Winners 7, losers 5, grand final 9 — exercises per-section resolution. */
   def differentiatedRaceTo(playerCount: Int): Map[String, Int] =
+    differentiatedRaceTo(playerCount, topN = 2)
+
+  def differentiatedRaceTo(
+      playerCount: Int,
+      topN: Int
+  ): Map[String, Int] =
     RaceToScopes
-      .requiredKeys(playerCount)
+      .requiredKeys(playerCount, topN)
       .map {
         case scope if scope.startsWith("lb-") => scope -> 5
         case scope if scope == "gf"           => scope -> 9
@@ -25,25 +35,34 @@ object RaceToTestSupport {
       }
       .toMap
 
-  def raceToSetEvents(
-      playerCount: Int,
-      startSeq: Int,
-      at: Instant,
-      raceTo: Int
-  ): List[TournamentEvent.RaceToSet] =
-    RaceToScopes.requiredKeys(playerCount).zipWithIndex.map {
-      case (scope, index) =>
-        TournamentEvent.RaceToSet(
-          seq = startSeq + index,
-          at = at,
-          payload = RaceToSetPayload(scope = scope, raceTo = raceTo)
-        )
-    }
-
-  def raceToSetEvents(
+  def formatSetEvent(
       playerCount: Int,
       startSeq: Int,
       at: Instant
-  ): List[TournamentEvent.RaceToSet] =
-    raceToSetEvents(playerCount, startSeq, at, raceTo = 7)
+  ): TournamentEvent.FormatSet =
+    formatSetEvent(playerCount, startSeq, at, topN = 2, raceTo = 7)
+
+  def formatSetEvent(
+      playerCount: Int,
+      startSeq: Int,
+      at: Instant,
+      topN: Int
+  ): TournamentEvent.FormatSet =
+    formatSetEvent(playerCount, startSeq, at, topN, raceTo = 7)
+
+  def formatSetEvent(
+      playerCount: Int,
+      startSeq: Int,
+      at: Instant,
+      topN: Int,
+      raceTo: Int
+  ): TournamentEvent.FormatSet =
+    TournamentEvent.FormatSet(
+      seq = startSeq,
+      at = at,
+      payload = FormatSetPayload(
+        topN = topN,
+        raceToByScope = uniformRaceTo(playerCount, topN, raceTo)
+      )
+    )
 }

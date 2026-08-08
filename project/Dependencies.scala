@@ -247,8 +247,8 @@ object Dependencies {
   val ligaCommon = libraryDependencies ++= Seq(
     glicko2.value,
     zioJson.value,
-    TestLibs.zioTest,
-    TestLibs.zioTestSbt
+    zioTestJs.value,
+    zioTestSbtJs.value
   )
 
   val ligaJs = libraryDependencies ++= Seq(

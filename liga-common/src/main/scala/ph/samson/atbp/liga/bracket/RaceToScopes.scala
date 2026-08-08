@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.bracket
 
-/** Scope keys for section-aware race-to configuration (`wb-3`, `lb-4`, `gf`).
+/** Scope keys for section-aware race-to configuration (`wb-3`, `lb-4`, `gf`,
+  * `se-2`).
   */
 object RaceToScopes {
 
@@ -8,6 +9,7 @@ object RaceToScopes {
     case Winners extends Section("Winners Bracket", 0)
     case Losers extends Section("Losers Bracket", 1)
     case GrandFinal extends Section("Grand Final", 2)
+    case SingleElimination extends Section("Single Elimination", 3)
   }
 
   final case class ScopeLabel(section: Section, roundLabel: String)
@@ -16,7 +18,8 @@ object RaceToScopes {
     matchId match {
       case s"wb-$round-$_" => round.toIntOption.map(keyForWinnersRound)
       case s"lb-$round-$_" => round.toIntOption.map(keyForLosersRound)
-      case "gf-1"          => Some(grandFinalScopeKey)
+      case s"se-$round-$_" => round.toIntOption.map(keyForSingleElimRound)
+      case "gf-1" | "gf-2" => Some(grandFinalScopeKey)
       case _               => None
     }
 
@@ -26,14 +29,30 @@ object RaceToScopes {
   def keyForLosersRound(round: Int): String =
     s"lb-$round"
 
+  def keyForSingleElimRound(round: Int): String =
+    s"se-$round"
+
   def grandFinalScopeKey: String =
     "gf"
 
-  def requiredKeys(playerCount: Int): List[String] = {
-    val size = TournamentBounds.bracketSize(playerCount)
-    val wb = (1 to winnersRounds(size)).map(keyForWinnersRound)
-    val lb = (1 to losersRounds(size)).map(keyForLosersRound)
-    wb.toList ++ lb.toList :+ grandFinalScopeKey
+  def requiredKeys(playerCount: Int): List[String] =
+    requiredKeys(playerCount, 2)
+
+  def requiredKeys(playerCount: Int, topN: Int): List[String] = {
+    val shape = BracketFormat.forRoster(playerCount, topN)
+    shape.kind match {
+      case BracketFormat.Kind.FullSingleElimination =>
+        (1 to shape.seRounds).map(keyForSingleElimRound).toList
+      case BracketFormat.Kind.ClassicDoubleElimination =>
+        val wb = (1 to shape.winnersRounds).map(keyForWinnersRound)
+        val lb = (1 to shape.losersRounds).map(keyForLosersRound)
+        wb.toList ++ lb.toList :+ grandFinalScopeKey
+      case BracketFormat.Kind.CutDoubleElimination =>
+        val wb = (1 to shape.winnersRounds).map(keyForWinnersRound)
+        val lb = (1 to shape.losersRounds).map(keyForLosersRound)
+        val se = (1 to shape.seRounds).map(keyForSingleElimRound)
+        wb.toList ++ lb.toList ++ se.toList
+    }
   }
 
   def scopeLabel(scope: String): ScopeLabel =
@@ -42,18 +61,11 @@ object RaceToScopes {
         ScopeLabel(Section.Winners, s"Round $round")
       case s"lb-$round" =>
         ScopeLabel(Section.Losers, s"Round $round")
+      case s"se-$round" =>
+        ScopeLabel(Section.SingleElimination, s"Round $round")
       case "gf" =>
         ScopeLabel(Section.GrandFinal, "Grand Final")
       case _ =>
         ScopeLabel(Section.Winners, scope)
     }
-
-  private def winnersRounds(bracketSize: Int): Int =
-    log2(bracketSize)
-
-  private def losersRounds(bracketSize: Int): Int =
-    (winnersRounds(bracketSize) - 1) * 2
-
-  private def log2(n: Int): Int =
-    (math.log(n) / math.log(2)).toInt
 }

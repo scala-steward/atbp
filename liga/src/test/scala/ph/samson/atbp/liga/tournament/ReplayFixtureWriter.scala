@@ -14,6 +14,7 @@ import java.time.LocalDate
 object ReplayFixtureWriter {
 
   private val at = Instant.parse("2026-03-15T18:00:00Z")
+  private val topN = 2
 
   private def rating(name: String, r: Double): PlayerRating =
     PlayerRating(Player(name), r, rd = 100, wins = 0, losses = 0)
@@ -24,7 +25,7 @@ object ReplayFixtureWriter {
   private def writeFixtures(root: File): Unit = {
     val players = eightPlayerRatings
     val playerList = players.map(_.player)
-    val bracket = BracketGen.generate(players)
+    val bracket = BracketGen.generate(players, topN)
     val created = TournamentEvent.Created(
       seq = 1,
       at = at,
@@ -43,10 +44,16 @@ object ReplayFixtureWriter {
       at = at,
       payload = PlayersLockedPayload()
     )
-    val raceToEvents =
-      RaceToTestSupport.raceToSetEvents(playerCount = 8, startSeq = 4, at = at)
+    val formatSet =
+      RaceToTestSupport.formatSetEvent(
+        playerCount = 8,
+        startSeq = 4,
+        at = at,
+        topN = topN,
+        raceTo = 7
+      )
     val seeded = TournamentEvent.BracketSeeded(
-      seq = 12,
+      seq = 5,
       at = at,
       payload = BracketSeededPayload(
         frozenRatings = players,
@@ -55,30 +62,30 @@ object ReplayFixtureWriter {
     )
     val lifecycle = List(
       TournamentEvent.MatchReady(
-        seq = 13,
+        seq = 6,
         at = at,
         payload = MatchReadyPayload(matchId = "wb-1-1", handicapSuggested = 2)
       ),
       TournamentEvent.HandicapApplied(
-        seq = 14,
+        seq = 7,
         at = at,
         payload =
           HandicapAppliedPayload(matchId = "wb-1-1", handicapApplied = 3)
       ),
       TournamentEvent.MatchStarted(
-        seq = 15,
+        seq = 8,
         at = at,
         payload = MatchStartedPayload(matchId = "wb-1-1")
       )
     )
     val completed = TournamentEvent.TournamentCompleted(
-      seq = 16,
+      seq = 9,
       at = at,
       payload =
         TournamentCompletedPayload(completed = LocalDate.parse("2026-03-15"))
     )
 
-    val wizard = List(created, playersSet, locked) ++ raceToEvents :+ seeded
+    val wizard = List(created, playersSet, locked, formatSet, seeded)
     writeDir(root / "eight-player-seeded", wizard)
     writeDir(root / "eight-player-partial", wizard ++ lifecycle)
     writeDir(

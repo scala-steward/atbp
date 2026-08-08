@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.bracket.BracketPreview
 import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.bracket.RaceToWizard
 import ph.samson.atbp.liga.bracket.TournamentBounds
@@ -19,7 +20,7 @@ object WizardView {
       busy: Signal[Boolean],
       onSetPlayers: Observer[List[Player]],
       onSaveAndLock: Observer[List[Player]],
-      onSetRaceTo: Observer[Map[String, Int]],
+      onSetRaceTo: Observer[RaceToRequest],
       onSeed: Observer[Unit]
   ): Div = {
     val phase = TournamentPhase.fromApi(tournament.phase)
@@ -222,82 +223,137 @@ object WizardView {
   private def raceToStep(
       tournament: TournamentResponse,
       busy: Signal[Boolean],
-      onSetRaceTo: Observer[Map[String, Int]]
+      onSetRaceTo: Observer[RaceToRequest]
   ): Div = {
     val playerCount = tournament.players.size
-    val scopes = RaceToScopes.requiredKeys(playerCount)
-    val initialWizard =
-      if (tournament.raceToByScope.nonEmpty) {
-        RaceToWizard.loadState(tournament.raceToByScope, playerCount)
-      } else {
-        RaceToWizard.initialState(playerCount)
-      }
-    val wizardState = Var(initialWizard)
+    val legalTopNs = RaceToWizardStep.legalTopNOptions(playerCount)
+    val wizardState = Var(RaceToWizardStep.initialState(tournament))
 
-    def scopesFor(section: RaceToScopes.Section): List[String] =
-      scopes.filter(scope => RaceToScopes.scopeLabel(scope).section == section)
+    def scopesFor(topN: Int, section: RaceToScopes.Section): List[String] =
+      RaceToWizardStep
+        .requiredScopes(playerCount, topN)
+        .filter(scope => RaceToScopes.scopeLabel(scope).section == section)
 
-    def renderSection(section: RaceToScopes.Section): Div =
+    def renderPreview(topN: Int): Div = {
+      val preview = RaceToWizardStep.preview(playerCount, topN)
       div(
-        cls := "race-to-section",
-        h3(section.label),
+        cls := "bracket-preview",
+        h3("Bracket preview"),
+        p(
+          cls := "hint",
+          s"${preview.playerCount} players · ${preview.bracketSize}-slot bracket"
+        ),
+        preview.sections.map(renderPreviewSection)
+      )
+    }
+
+    def renderPreviewSection(
+        sectionPreview: BracketPreview.SectionPreview
+    ): Div =
+      div(
+        cls := "preview-section",
+        h4(sectionPreview.section.label),
         ul(
-          cls := "race-to-inputs",
-          scopesFor(section).map { scope =>
-            val scopeLabel = RaceToScopes.scopeLabel(scope)
-            li(
-              label(
-                scopeLabel.roundLabel,
-                input(
-                  typ := "number",
-                  controlled(
-                    value <-- wizardState.signal.map(
-                      _.raceToByScope.getOrElse(scope, 7).toString
-                    ),
-                    onInput.mapToValue --> Observer[String] { raw =>
-                      raw.toIntOption.foreach { value =>
-                        wizardState.update { state =>
-                          RaceToWizard.applyEdit(
-                            state,
-                            scope,
-                            value,
-                            playerCount
-                          )
+          cls := "preview-rounds",
+          sectionPreview.rounds.map { round =>
+            li(RaceToWizardStep.formatRoundSummary(round))
+          }
+        ),
+        RaceToWizardStep.resetGrandFinalHint(sectionPreview) match {
+          case Some(hint) => p(cls := "hint", hint)
+          case None       => emptyNode
+        }
+      )
+
+    def renderSection(topN: Int, section: RaceToScopes.Section): Node = {
+      val scopes = scopesFor(topN, section)
+      if (scopes.isEmpty) {
+        emptyNode
+      } else {
+        div(
+          cls := "race-to-section",
+          h3(section.label),
+          ul(
+            cls := "race-to-inputs",
+            scopes.map { scope =>
+              val scopeLabel = RaceToScopes.scopeLabel(scope)
+              li(
+                label(
+                  scopeLabel.roundLabel,
+                  input(
+                    typ := "number",
+                    controlled(
+                      value <-- wizardState.signal.map(
+                        _.raceToByScope.getOrElse(scope, 7).toString
+                      ),
+                      onInput.mapToValue --> Observer[String] { raw =>
+                        raw.toIntOption.foreach { value =>
+                          wizardState.update { state =>
+                            RaceToWizard.applyEdit(
+                              state,
+                              scope,
+                              value,
+                              playerCount
+                            )
+                          }
                         }
                       }
-                    }
-                  )
-                ),
-                if (scope == "gf") {
-                  p(
-                    cls := "hint",
-                    "usually longer than finals — set explicitly."
-                  )
-                } else {
-                  emptyNode
-                }
+                    )
+                  ),
+                  if (scope == "gf") {
+                    p(
+                      cls := "hint",
+                      "usually longer than finals — set explicitly."
+                    )
+                  } else {
+                    emptyNode
+                  }
+                )
               )
-            )
-          }
+            }
+          )
         )
-      )
+      }
+    }
 
     div(
       cls := "wizard-panel",
       h2("Race-to by bracket section"),
+      div(
+        cls := "top-n-control",
+        label(
+          "Double elimination until Top N",
+          select(
+            value <-- wizardState.signal.map(_.topN.toString),
+            onChange.mapToValue --> Observer[String] { raw =>
+              raw.toIntOption.foreach { newTopN =>
+                wizardState.update { state =>
+                  RaceToWizardStep.changeTopN(state, newTopN, playerCount)
+                }
+              }
+            },
+            legalTopNs.map { n =>
+              option(value := n.toString, s"Top $n")
+            }
+          )
+        )
+      ),
+      child <-- wizardState.signal.map(state => renderPreview(state.topN)),
       p(
-        "Set race-to for winners, losers, and Grand Final. " +
+        "Set race-to for each bracket section. " +
           "Editing a round cascades through later rounds in that section."
       ),
-      renderSection(RaceToScopes.Section.Winners),
-      renderSection(RaceToScopes.Section.Losers),
-      renderSection(RaceToScopes.Section.GrandFinal),
+      children <-- wizardState.signal.map { state =>
+        RaceToWizardStep
+          .visibleSections(playerCount, state.topN)
+          .map(section => renderSection(state.topN, section))
+      },
       button(
         cls := "primary",
         disabled <-- busy,
-        onClick.mapTo(()) --> Observer[Unit](_ =>
-          onSetRaceTo.onNext(wizardState.now().raceToByScope)
-        ),
+        onClick.mapTo(()) --> Observer[Unit](_ => {
+          onSetRaceTo.onNext(RaceToWizardStep.saveRequest(wizardState.now()))
+        }),
         "Save race-to"
       )
     )

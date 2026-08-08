@@ -10,6 +10,7 @@ object DirectorIdlePolicySpec extends ZIOSpecDefault {
     players = Nil,
     completed = false,
     phase = "active",
+    topN = 2,
     raceToByScope = Map.empty,
     bracket = Some(Bracket(size = 2, matches = Nil)),
     frozenRatings = Nil

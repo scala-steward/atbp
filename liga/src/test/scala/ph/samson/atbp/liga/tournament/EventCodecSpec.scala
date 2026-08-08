@@ -35,15 +35,18 @@ object EventCodecSpec extends ZIOSpecDefault {
         EventCodec.encode(event).contains("\"type\":\"TournamentCreated\"")
       )
     },
-    test("RaceToSet round-trips through JSON") {
-      val event = TournamentEvent.RaceToSet(
+    test("FormatSet round-trips through JSON") {
+      val event = TournamentEvent.FormatSet(
         seq = 2,
         at = at,
-        payload = RaceToSetPayload(scope = "wb-1", raceTo = 7)
+        payload = FormatSetPayload(
+          topN = 2,
+          raceToByScope = Map("wb-1" -> 7, "gf" -> 9)
+        )
       )
       assertTrue(
         roundTrip(event),
-        EventCodec.encode(event).contains("\"type\":\"RaceToSet\"")
+        EventCodec.encode(event).contains("\"type\":\"FormatSet\"")
       )
     },
     test("BracketSeeded round-trips through JSON") {
@@ -166,13 +169,16 @@ object EventCodecSpec extends ZIOSpecDefault {
         EventCodec.encode(event).contains("\"type\":\"PlayersLocked\"")
       )
     },
-    test("filenameFor RaceToSet") {
-      val raceToSet = TournamentEvent.RaceToSet(
+    test("filenameFor FormatSet") {
+      val formatSet = TournamentEvent.FormatSet(
         seq = 4,
         at = at,
-        payload = RaceToSetPayload(scope = "wb-1", raceTo = 7)
+        payload = FormatSetPayload(
+          topN = 2,
+          raceToByScope = Map("wb-1" -> 7)
+        )
       )
-      assertTrue(EventLog.filenameFor(raceToSet) == "000004-race-to.json")
+      assertTrue(EventLog.filenameFor(formatSet) == "000004-format-set.json")
     },
     test("filenameFor PlayersSet and PlayersLocked") {
       val playersSet = TournamentEvent.PlayersSet(

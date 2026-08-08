@@ -14,6 +14,7 @@ object BracketResultsContextSpec extends ZIOSpecDefault {
     players = List(alice, bob),
     completed = true,
     phase = "completed",
+    topN = 2,
     raceToByScope = Map.empty,
     bracket = Some(
       Bracket(

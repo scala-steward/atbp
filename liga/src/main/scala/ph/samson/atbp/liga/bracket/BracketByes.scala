@@ -36,7 +36,8 @@ object BracketByes {
                 winner,
                 topology,
                 isBye = true,
-                recordPlaceholderResult = true
+                recordPlaceholderResult = true,
+                completedResult = None
               )
               .flatMap(placed => loop(placed, topology))
         }
@@ -67,7 +68,7 @@ object BracketByes {
   private def isWinnersRound1Bye(matchDef: BracketMatch): Boolean = {
     val hasA = matchDef.playerA.nonEmpty
     val hasB = matchDef.playerB.nonEmpty
-    matchDef.id.startsWith("wb-1-") &&
+    (matchDef.id.startsWith("wb-1-") || matchDef.id.startsWith("se-1-")) &&
     matchDef.state != BracketMatchState.Completed &&
     (hasA ^ hasB)
   }

@@ -102,7 +102,7 @@ object BindConfigSpec extends ZIOSpecDefault {
             Request
               .post(
                 "/api/tournament/seed",
-                Body.fromString("""{"raceToByScope":{"wb-1":7}}""")
+                Body.fromString("""{"topN":2,"raceToByScope":{"wb-1":7}}""")
               )
               .copy(remoteAddress = remote)
           )

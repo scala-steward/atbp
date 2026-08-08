@@ -127,6 +127,26 @@ object SeedSpec extends ZIOSpecDefault {
         )
       assertTrue(result == Left(Seed.InvalidPlayerCountError(2)))
     },
+    test("seed rejected when format conflicts with saved state") {
+      val state = lockedState(eightPlayers).copy(
+        topN = 2,
+        raceToByScope = RaceToTestSupport.uniformRaceTo(8)
+      )
+      val conflicting =
+        RaceToTestSupport.uniformRaceTo(8).updated("wb-1", 5)
+      assertTrue(
+        Seed
+          .buildEvents(
+            state,
+            periodRatings,
+            topN = 2,
+            conflicting,
+            startSeq = 2,
+            at
+          )
+          .isLeft
+      )
+    },
     test("seeds 3-player tournament into size-4 bracket") {
       val players = List(Player("P1"), Player("P2"), Player("P3"))
       val state = lockedState(players).copy(

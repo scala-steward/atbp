@@ -19,7 +19,16 @@ object RaceToScopesSpec extends ZIOSpecDefault {
         )
       },
       test("maps grand final to gf scope key") {
-        assertTrue(RaceToScopes.keyForMatch("gf-1") == Some("gf"))
+        assertTrue(
+          RaceToScopes.keyForMatch("gf-1") == Some("gf"),
+          RaceToScopes.keyForMatch("gf-2") == Some("gf")
+        )
+      },
+      test("maps single elimination match ids to se scope keys") {
+        assertTrue(
+          RaceToScopes.keyForMatch("se-1-1") == Some("se-1"),
+          RaceToScopes.keyForMatch("se-3-2") == Some("se-3")
+        )
       },
       test("returns None for unknown match ids") {
         assertTrue(
@@ -97,6 +106,51 @@ object RaceToScopesSpec extends ZIOSpecDefault {
             (1 to 10).map(n => s"lb-$n").toList :+
             "gf"
         )
+      },
+      test("requiredKeys(playerCount, 2) matches requiredKeys(playerCount)") {
+        assertTrue(
+          (3 to 64).forall { n =>
+            RaceToScopes.requiredKeys(n, 2) == RaceToScopes.requiredKeys(n)
+          }
+        )
+      },
+      test("requiredKeys with topN 1 includes gf for reset grand final") {
+        assertTrue(
+          RaceToScopes.requiredKeys(8, 1).contains("gf"),
+          RaceToScopes.requiredKeys(8, 1) == RaceToScopes.requiredKeys(8, 2)
+        )
+      },
+      test(
+        "requiredKeys for full SE is se-only when roster is a power of two"
+      ) {
+        assertTrue(
+          RaceToScopes.requiredKeys(8, 8) == List("se-1", "se-2", "se-3"),
+          RaceToScopes.requiredKeys(16, 16) ==
+            (1 to 4).map(n => s"se-$n").toList
+        )
+      },
+      test("requiredKeys for Top 4+ includes se scopes and drops gf") {
+        assertTrue(
+          RaceToScopes.requiredKeys(12, 8) ==
+            (1 to 2).map(n => s"wb-$n").toList ++
+            (1 to 2).map(n => s"lb-$n").toList ++
+            (1 to 3).map(n => s"se-$n").toList,
+          !RaceToScopes.requiredKeys(12, 8).contains("gf")
+        )
+      },
+      test(
+        "requiredKeys for Top 4+ truncates DE depth by topN; SE follows topN"
+      ) {
+        assertTrue(
+          RaceToScopes.requiredKeys(12, 4) ==
+            (1 to 3).map(n => s"wb-$n").toList ++
+            (1 to 4).map(n => s"lb-$n").toList ++
+            List("se-1", "se-2"),
+          RaceToScopes.requiredKeys(30, 8) ==
+            (1 to 3).map(n => s"wb-$n").toList ++
+            (1 to 4).map(n => s"lb-$n").toList ++
+            (1 to 3).map(n => s"se-$n").toList
+        )
       }
     ),
     suite("scope keys for rounds")(
@@ -136,6 +190,14 @@ object RaceToScopesSpec extends ZIOSpecDefault {
         assertTrue(
           label.section == RaceToScopes.Section.GrandFinal,
           label.roundLabel == "Grand Final"
+        )
+      },
+      test("labels single elimination scopes") {
+        val label = RaceToScopes.scopeLabel("se-2")
+        assertTrue(
+          label.section == RaceToScopes.Section.SingleElimination,
+          label.section.label == "Single Elimination",
+          label.roundLabel == "Round 2"
         )
       }
     )

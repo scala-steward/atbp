@@ -489,7 +489,7 @@ object TournamentSpec extends ZIOSpecDefault {
         )
         assertTrue(Tournament.lockPlayers(state, seq = 2, at).isRight)
       },
-      test("setRaceToByScope rejects incomplete scope map") {
+      test("setFormat rejects incomplete scope map") {
         val state = TournamentState(
           name = "Open",
           players = (1 to 8).map(i => Player(s"P$i")).toList,
@@ -497,14 +497,33 @@ object TournamentSpec extends ZIOSpecDefault {
         )
         val incomplete = RaceToTestSupport.uniformRaceTo(8) - "gf"
         val result =
-          Tournament.setRaceToByScope(state, incomplete, startSeq = 3, at)
+          Tournament.setFormat(state, topN = 2, incomplete, seq = 3, at)
         assertTrue(
           result.isLeft,
           result.left.toOption.get.message
             .contains("every scope is configured")
         )
       },
-      test("setRaceToByScope rejects race-to below 2") {
+      test("setFormat rejects illegal topN") {
+        val state = TournamentState(
+          name = "Open",
+          players = (1 to 8).map(i => Player(s"P$i")).toList,
+          playersLocked = true
+        )
+        val result =
+          Tournament.setFormat(
+            state,
+            topN = 3,
+            RaceToTestSupport.uniformRaceTo(8),
+            seq = 3,
+            at
+          )
+        assertTrue(
+          result.isLeft,
+          result.left.toOption.get.message.contains("topN must be legal")
+        )
+      },
+      test("setFormat rejects race-to below 2") {
         val state = TournamentState(
           name = "Open",
           players = (1 to 8).map(i => Player(s"P$i")).toList,
@@ -513,42 +532,37 @@ object TournamentSpec extends ZIOSpecDefault {
         val invalid =
           RaceToTestSupport.uniformRaceTo(8).updated("wb-1", 1)
         val result =
-          Tournament.setRaceToByScope(state, invalid, startSeq = 3, at)
+          Tournament.setFormat(state, topN = 2, invalid, seq = 3, at)
         assertTrue(
           result.isLeft,
           result.left.toOption.get.message
             .contains("race-to must be at least 2")
         )
       },
-      test("setRaceToByScope emits one event per scope") {
+      test("setFormat emits one FormatSet event") {
         val state = TournamentState(
           name = "Open",
           players = (1 to 8).map(i => Player(s"P$i")).toList,
           playersLocked = true
         )
+        val raceToByScope =
+          RaceToTestSupport.uniformRaceTo(8).updated("wb-2", 5)
         val result =
-          Tournament.setRaceToByScope(
-            state,
-            RaceToTestSupport.uniformRaceTo(8).updated("wb-2", 5),
-            startSeq = 3,
-            at
-          )
+          Tournament.setFormat(state, topN = 2, raceToByScope, seq = 3, at)
         assertTrue(
           result.isRight,
-          result.toOption.get.size == 8,
-          result.toOption.get.map(_.payload.scope).contains("wb-2"),
-          result.toOption.get
-            .find(_.payload.scope == "wb-2")
-            .exists(_.payload.raceTo == 5)
+          result.toOption.get.payload.topN == 2,
+          result.toOption.get.payload.raceToByScope.get("wb-2").contains(5)
         )
       },
-      test("setRaceToByScope rejects after bracket is seeded") {
+      test("setFormat rejects after bracket is seeded") {
         assertTrue(
           Tournament
-            .setRaceToByScope(
+            .setFormat(
               seededState(),
+              topN = 2,
               RaceToTestSupport.uniformRaceTo(8),
-              startSeq = 3,
+              seq = 3,
               at
             )
             .isLeft

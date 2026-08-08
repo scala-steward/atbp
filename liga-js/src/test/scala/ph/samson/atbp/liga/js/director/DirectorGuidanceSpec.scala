@@ -167,6 +167,7 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
         players = Nil,
         completed = false,
         phase = "active",
+        topN = 2,
         raceToByScope = Map("wb-1" -> 9),
         bracket = Some(Bracket(size = 8, matches = List(matchDef))),
         frozenRatings = Nil

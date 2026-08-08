@@ -94,7 +94,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     ZIO.attemptBlocking(root.delete(swallowIOExceptions = true)).unit.orDie
 
   private val eightRaceToByScopeBody =
-    """{"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"gf":7}}"""
+    """{"topN":2,"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"gf":7}}"""
 
   private def configureRaceTo(
       ctx: ServeContext
@@ -296,7 +296,7 @@ object WriteApiSpec extends ZIOSpecDefault {
           .runZIO(
             localhostPost(
               "/api/tournament/race-to",
-              """{"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"gf":7}}"""
+              """{"topN":2,"raceToByScope":{"wb-1":7,"wb-2":7,"wb-3":7,"lb-1":7,"lb-2":7,"lb-3":7,"lb-4":7,"gf":7}}"""
             )
           )
         seed <- LigaRoutes
@@ -315,7 +315,7 @@ object WriteApiSpec extends ZIOSpecDefault {
     },
     test("3-player seed leaves wb-1-2 ready via HTTP API") {
       val threePlayerRaceTo =
-        """{"raceToByScope":{"wb-1":7,"wb-2":7,"lb-1":7,"lb-2":7,"gf":7}}"""
+        """{"topN":2,"raceToByScope":{"wb-1":7,"wb-2":7,"lb-1":7,"lb-2":7,"gf":7}}"""
       for {
         root <- ZIO.attemptBlocking(
           File.newTemporaryDirectory("liga-three-player-api")
@@ -376,7 +376,7 @@ object WriteApiSpec extends ZIOSpecDefault {
         response <- seedTournament(ctx)
         body <- response.body.asString
         parsed <- ZIO.fromEither(body.fromJson[TournamentResponse])
-        seededFileExists = (ctx.tournamentDir.get / "000012-seeded.json").exists
+        seededFileExists = (ctx.tournamentDir.get / "000005-seeded.json").exists
         _ <- cleanup(root)
       } yield assertTrue(
         response.status == Status.Ok,
@@ -386,6 +386,7 @@ object WriteApiSpec extends ZIOSpecDefault {
           .map(i => s"P$i")
           .toList,
         parsed.raceToByScope == RaceToTestSupport.uniformRaceTo(8),
+        parsed.topN == 2,
         seededFileExists
       )
     },

@@ -37,13 +37,20 @@ object TournamentTestFixtures {
   val eightPlayerRatings: List[PlayerRating] =
     (1 to 8).map(i => rating(s"P$i", 1700 - i * 10)).toList
 
-  def seededState(raceToByScope: Map[String, Int]): TournamentState = {
-    val bracket = BracketGen.generate(eightPlayerRatings)
+  def seededState(raceToByScope: Map[String, Int]): TournamentState =
+    seededState(raceToByScope, topN = 2)
+
+  def seededState(
+      raceToByScope: Map[String, Int],
+      topN: Int
+  ): TournamentState = {
+    val bracket = BracketGen.generate(eightPlayerRatings, topN)
     TournamentState(
       name = "Spring Open",
       players = eightPlayerRatings.map(_.player),
       bracket = Some(bracket),
       frozenRatings = eightPlayerRatings.map(r => r.player -> r).toMap,
+      topN = topN,
       raceToByScope = raceToByScope
     )
   }
@@ -76,8 +83,13 @@ object TournamentTestFixtures {
 
   def seededEvents(state: TournamentState): List[TournamentEvent] = {
     val players = eightPlayerRatings.map(_.player)
-    val raceToEvents =
-      RaceToTestSupport.raceToSetEvents(playerCount = 8, startSeq = 4, at = at)
+    val formatEvent =
+      RaceToTestSupport.formatSetEvent(
+        playerCount = 8,
+        startSeq = 4,
+        at = at,
+        topN = state.topN
+      )
     List(
       TournamentEvent.Created(
         seq = 1,
@@ -96,13 +108,15 @@ object TournamentTestFixtures {
         seq = 3,
         at = at,
         payload = PlayersLockedPayload()
-      )
-    ) ++ raceToEvents :+ TournamentEvent.BracketSeeded(
-      seq = 12,
-      at = at,
-      payload = BracketSeededPayload(
-        frozenRatings = eightPlayerRatings,
-        bracket = state.bracket.get
+      ),
+      formatEvent,
+      TournamentEvent.BracketSeeded(
+        seq = 5,
+        at = at,
+        payload = BracketSeededPayload(
+          frozenRatings = eightPlayerRatings,
+          bracket = state.bracket.get
+        )
       )
     )
   }

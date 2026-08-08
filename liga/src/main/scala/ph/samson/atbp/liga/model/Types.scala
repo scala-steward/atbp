@@ -56,7 +56,8 @@ final case class BracketMatch(
 /** Full bracket tree for a tournament. */
 final case class Bracket(
     size: Int,
-    matches: List[BracketMatch]
+    matches: List[BracketMatch],
+    topN: Int = 2
 )
 
 /** Replay-derived tournament state. */
@@ -65,6 +66,7 @@ final case class TournamentState(
     players: List[Player],
     bracket: Option[Bracket] = None,
     frozenRatings: Map[Player, PlayerRating] = Map.empty,
+    topN: Int = 2,
     raceToByScope: Map[String, Int] = Map.empty,
     playersLocked: Boolean = false,
     completed: Boolean = false
@@ -83,9 +85,9 @@ final case class PlayersSetPayload(
 
 final case class PlayersLockedPayload()
 
-final case class RaceToSetPayload(
-    scope: String,
-    raceTo: Int
+final case class FormatSetPayload(
+    topN: Int,
+    raceToByScope: Map[String, Int]
 )
 
 final case class BracketSeededPayload(

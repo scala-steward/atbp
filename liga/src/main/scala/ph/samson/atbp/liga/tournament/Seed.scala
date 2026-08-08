@@ -49,6 +49,11 @@ object Seed {
     val message: String = s"race-to must be at least 2: $raceTo"
   }
 
+  final case class InconsistentFormatError() extends Error {
+    val message: String =
+      "seed format does not match saved topN and race-to scopes"
+  }
+
   def buildEvents(
       state: TournamentState,
       periodRatings: List[PlayerRating],
@@ -56,39 +61,56 @@ object Seed {
       startSeq: Int,
       at: Instant
   ): Either[Error, List[TournamentEvent]] =
+    buildEvents(state, periodRatings, state.topN, raceToByScope, startSeq, at)
+
+  def buildEvents(
+      state: TournamentState,
+      periodRatings: List[PlayerRating],
+      topN: Int,
+      raceToByScope: Map[String, Int],
+      startSeq: Int,
+      at: Instant
+  ): Either[Error, List[TournamentEvent]] =
     for {
       _ <- validatePlayerCount(state.players.size)
       _ <- validateState(state)
+      formatSaved = TournamentPhase.raceToComplete(state)
+      effectiveTopN = if (formatSaved) state.topN else topN
       effectiveRaceTo =
         if (raceToByScope.isEmpty) {
           state.raceToByScope
         } else {
           raceToByScope
         }
-      _ <- validateRaceToByScope(effectiveRaceTo, state.players.size)
+      _ <- validateFormatConsistency(
+        formatSaved,
+        state,
+        effectiveTopN,
+        effectiveRaceTo
+      )
+      _ <- validateRaceToByScope(
+        effectiveRaceTo,
+        state.players.size,
+        effectiveTopN
+      )
       ratings <- resolveRatings(state.players, periodRatings)
-      bracket = BracketGen.generate(ratings)
-      raceToAlreadySaved =
-        raceToByScope.isEmpty && TournamentPhase.raceToComplete(state)
-      raceToEvents =
-        if (raceToAlreadySaved) {
+      bracket = BracketGen.generate(ratings, effectiveTopN)
+      formatEvent =
+        if (formatSaved) {
           Nil
         } else {
-          RaceToScopes
-            .requiredKeys(state.players.size)
-            .zipWithIndex
-            .map { case (scope, index) =>
-              TournamentEvent.RaceToSet(
-                seq = startSeq + index,
-                at = at,
-                payload = RaceToSetPayload(
-                  scope = scope,
-                  raceTo = effectiveRaceTo(scope)
-                )
+          List(
+            TournamentEvent.FormatSet(
+              seq = startSeq,
+              at = at,
+              payload = FormatSetPayload(
+                topN = effectiveTopN,
+                raceToByScope = effectiveRaceTo
               )
-            }
+            )
+          )
         }
-      seededSeq = startSeq + raceToEvents.size
+      seededSeq = startSeq + formatEvent.size
       seeded = TournamentEvent.BracketSeeded(
         seq = seededSeq,
         at = at,
@@ -97,7 +119,23 @@ object Seed {
           bracket = bracket
         )
       )
-    } yield raceToEvents :+ seeded
+    } yield formatEvent :+ seeded
+
+  private def validateFormatConsistency(
+      formatSaved: Boolean,
+      state: TournamentState,
+      topN: Int,
+      raceToByScope: Map[String, Int]
+  ): Either[Error, Unit] =
+    if (formatSaved && topN != state.topN) {
+      Left(InconsistentFormatError())
+    } else if (
+      formatSaved && raceToByScope.nonEmpty && raceToByScope != state.raceToByScope
+    ) {
+      Left(InconsistentFormatError())
+    } else {
+      Right(())
+    }
 
   private def validateState(
       state: TournamentState
@@ -115,9 +153,10 @@ object Seed {
 
   private def validateRaceToByScope(
       raceToByScope: Map[String, Int],
-      playerCount: Int
+      playerCount: Int,
+      topN: Int
   ): Either[Error, Unit] = {
-    val required = RaceToScopes.requiredKeys(playerCount)
+    val required = RaceToScopes.requiredKeys(playerCount, topN)
     val missing = required.filterNot(raceToByScope.contains)
     if (missing.nonEmpty) {
       Left(RaceToIncompleteError())

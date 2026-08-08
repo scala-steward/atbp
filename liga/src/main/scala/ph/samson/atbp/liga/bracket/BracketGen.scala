@@ -5,17 +5,20 @@ import ph.samson.atbp.liga.model.*
 /** Generate a double-elimination bracket from seeded player ratings. */
 object BracketGen {
 
-  def generate(players: List[PlayerRating]): Bracket = {
+  def generate(players: List[PlayerRating]): Bracket =
+    generate(players, topN = 2)
+
+  def generate(players: List[PlayerRating], topN: Int): Bracket = {
     val size = Seeding.bracketSize(players.size)
     val seeds = Seeding.seedOrder(players)
     val seedSlots = seedSlotsFor(size, seeds)
-    val topology = BracketTopology(size)
+    val topology = BracketTopology(size, topN)
     val matches =
       topology.matches.toList.sortBy(_._1).map { case (id, defn) =>
         val (playerA, playerB) = resolveFeeders(defn, seedSlots, Map.empty)
         emptyMatch(id, playerA, playerB)
       }
-    val bracket = Bracket(size, matches)
+    val bracket = Bracket(size, matches, topN)
     val propagated =
       BracketByes.propagateStructuralByesE(bracket, topology) match {
         case Right(value) => value

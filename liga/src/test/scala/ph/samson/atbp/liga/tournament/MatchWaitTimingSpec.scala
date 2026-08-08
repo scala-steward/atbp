@@ -26,8 +26,8 @@ object MatchWaitTimingSpec extends ZIOSpecDefault {
       bracket: Bracket
   ): List[TournamentEvent] = {
     val players = ratings.map(_.player)
-    val raceToEvents =
-      RaceToTestSupport.raceToSetEvents(players.size, startSeq = 4, at = at)
+    val formatEvent =
+      RaceToTestSupport.formatSetEvent(players.size, startSeq = 4, at = at)
     List(
       TournamentEvent.Created(
         seq = 1,
@@ -43,9 +43,10 @@ object MatchWaitTimingSpec extends ZIOSpecDefault {
         seq = 3,
         at = at,
         payload = PlayersLockedPayload()
-      )
-    ) ++ raceToEvents :+ TournamentEvent.BracketSeeded(
-      seq = 4 + raceToEvents.size,
+      ),
+      formatEvent
+    ) :+ TournamentEvent.BracketSeeded(
+      seq = 5,
       at = seedAt,
       payload = BracketSeededPayload(
         frozenRatings = ratings,

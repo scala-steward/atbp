@@ -2,6 +2,9 @@ package ph.samson.atbp.liga.tournament
 
 import better.files.File
 import ph.samson.atbp.liga.bracket.Advancement
+import ph.samson.atbp.liga.bracket.CutReseed
+import ph.samson.atbp.liga.bracket.RaceToScopes
+import ph.samson.atbp.liga.bracket.TopN
 import ph.samson.atbp.liga.model.*
 import ph.samson.atbp.liga.tournament.events.TournamentEvent
 import zio.Task
@@ -69,12 +72,32 @@ object Replay {
             .map(_ => state.copy(playersLocked = true))
         }
 
-      case TournamentEvent.RaceToSet(_, _, payload) =>
+      case TournamentEvent.FormatSet(_, _, payload) =>
         for {
-          _ <- TournamentValidation.validateRaceTo(payload.raceTo)
+          _ <-
+            if (TopN.legalTopNs(state.players.size).contains(payload.topN)) {
+              Right(())
+            } else {
+              Left(
+                s"topN must be legal for roster size ${state.players.size}: ${payload.topN}"
+              )
+            }
+          required = RaceToScopes.requiredKeys(state.players.size, payload.topN)
+          missing = required.filterNot(payload.raceToByScope.contains)
+          _ <-
+            if (missing.isEmpty) {
+              Right(())
+            } else {
+              Left("cannot save race-to before every scope is configured")
+            }
+          _ <- payload.raceToByScope.values.toList.foldLeft(
+            Right(()): Either[String, Unit]
+          ) { case (acc, raceTo) =>
+            acc.flatMap(_ => TournamentValidation.validateRaceTo(raceTo))
+          }
         } yield state.copy(
-          raceToByScope =
-            state.raceToByScope.updated(payload.scope, payload.raceTo)
+          topN = payload.topN,
+          raceToByScope = payload.raceToByScope
         )
 
       case TournamentEvent.BracketSeeded(_, _, payload) =>
@@ -183,14 +206,15 @@ object Replay {
         .find(_.id == payload.matchId)
         .toRight(s"unknown match: ${payload.matchId}")
       winner <- winnerFromScores(matchDef, payload.scoreA, payload.scoreB)
-      advanced <- Advancement.advance(bracket, payload.matchId, winner)
-      withScores = patchMatch(advanced.bracket, payload.matchId) { current =>
-        current.copy(
-          state = BracketMatchState.Completed,
-          result = Some(MatchResult(payload.scoreA, payload.scoreB))
-        )
-      }
-    } yield state.copy(bracket = Some(withScores))
+      advanced <- Advancement.advance(
+        bracket,
+        payload.matchId,
+        winner,
+        recordPlaceholderResult = false,
+        completedResult = Some(MatchResult(payload.scoreA, payload.scoreB)),
+        reseedContext = reseedContext(state)
+      )
+    } yield state.copy(bracket = Some(advanced.bracket))
 
   private def applyMatchForfeit(
       state: TournamentState,
@@ -202,13 +226,7 @@ object Replay {
         .find(_.id == payload.matchId)
         .toRight(s"unknown match: ${payload.matchId}")
       winner <- winnerFromForfeit(matchDef, payload.forfeitingSide)
-      advanced <- Advancement.advance(
-        bracket,
-        payload.matchId,
-        winner,
-        recordPlaceholderResult = false
-      )
-      withForfeit = patchMatch(advanced.bracket, payload.matchId) { current =>
+      prepared = patchMatch(bracket, payload.matchId) { current =>
         current.copy(
           forfeit = Some(
             MatchForfeitInfo(
@@ -218,7 +236,28 @@ object Replay {
           )
         )
       }
-    } yield state.copy(bracket = Some(withForfeit))
+      advanced <- Advancement.advance(
+        prepared,
+        payload.matchId,
+        winner,
+        recordPlaceholderResult = false,
+        completedResult = None,
+        reseedContext = reseedContext(state)
+      )
+    } yield state.copy(bracket = Some(advanced.bracket))
+
+  private def reseedContext(state: TournamentState): Option[CutReseed.Context] =
+    state.bracket match {
+      case Some(bracket)
+          if CutReseed.isCutFormat(bracket) && state.frozenRatings.nonEmpty =>
+        Some(
+          CutReseed.Context(
+            players = state.players,
+            frozenRatings = state.frozenRatings
+          )
+        )
+      case _ => None
+    }
 
   private def patchMatch(
       bracket: Bracket,

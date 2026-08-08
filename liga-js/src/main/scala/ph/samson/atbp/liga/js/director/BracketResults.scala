@@ -59,9 +59,10 @@ object BracketResults {
 
   private def sectionOrdinal(section: BracketLayout.Section): Int =
     section match {
-      case BracketLayout.Section.Winners    => 0
-      case BracketLayout.Section.Losers     => 1
-      case BracketLayout.Section.GrandFinal => 2
+      case BracketLayout.Section.Winners           => 0
+      case BracketLayout.Section.Losers            => 1
+      case BracketLayout.Section.SingleElimination => 2
+      case BracketLayout.Section.GrandFinal        => 3
     }
 
   private def progressionKey(matchId: String, bracketSize: Int): (Int, Int) =
