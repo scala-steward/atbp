@@ -172,7 +172,13 @@ object BracketLayout {
     val live =
       matches
         .filter(_.state == BracketMatchState.Started)
-        .sortBy(m => (roundOf(m.id, bracketSize), matchSeedIndex(m.id)))
+        .sortBy(m =>
+          (
+            startedEpochMs(m),
+            roundOf(m.id, bracketSize),
+            matchSeedIndex(m.id)
+          )
+        )
     val ready =
       matches
         .filter(_.state == BracketMatchState.Ready)
@@ -197,6 +203,12 @@ object BracketLayout {
 
   private def waitEpochMs(matchDef: BracketMatch): Long =
     matchDef.waitStartedAt
+      .flatMap(parseInstantSafe)
+      .map(_.toEpochMilli)
+      .getOrElse(Long.MaxValue)
+
+  private def startedEpochMs(matchDef: BracketMatch): Long =
+    matchDef.startedAt
       .flatMap(parseInstantSafe)
       .map(_.toEpochMilli)
       .getOrElse(Long.MaxValue)

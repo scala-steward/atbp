@@ -674,32 +674,78 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         )
       },
       test(
-        "places all Started matches in live strip sorted by round then seed"
+        "places all Started matches in live strip sorted oldest started first"
       ) {
+        val older = "2026-03-15T18:00:00Z"
+        val newer = "2026-03-15T19:00:00Z"
+        val startedLong =
+          BracketMatch(
+            id = "wb-2-1",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Started,
+            startedAt = Some(older)
+          )
+        val startedShort =
+          startedLong.copy(id = "wb-1-2", startedAt = Some(newer))
+        val startedMissing =
+          startedLong.copy(id = "wb-1-1", startedAt = None)
+        val ready =
+          startedLong.copy(id = "wb-1-3", state = BracketMatchState.Ready)
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(startedShort, startedLong, startedMissing, ready),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.liveStrip.map(_.id) ==
+            List("wb-2-1", "wb-1-2", "wb-1-1"),
+          sections.readyStrip.map(_.id) == List("wb-1-3"),
+          !sections.groups
+            .flatMap(_.matches)
+            .exists(_.state == BracketMatchState.Started)
+        )
+      },
+      test("equal startedAt orders earlier rounds before later rounds") {
+        val sameStarted = "2026-03-15T18:00:00Z"
         val laterRound =
           BracketMatch(
             id = "wb-2-1",
             playerA = Some(Player("P1")),
             playerB = Some(Player("P2")),
-            state = BracketMatchState.Started
+            state = BracketMatchState.Started,
+            startedAt = Some(sameStarted)
           )
-        val higherSeed =
+        val earlierRound =
           laterRound.copy(id = "wb-1-2")
-        val lowerSeed =
-          laterRound.copy(id = "wb-1-1")
-        val ready =
-          laterRound.copy(id = "wb-1-3", state = BracketMatchState.Ready)
         val sections =
           BracketLayout.directorGroupMatches(
-            matches = List(laterRound, higherSeed, lowerSeed, ready),
+            matches = List(laterRound, earlierRound),
             bracketSize = 8
           )
         assertTrue(
-          sections.liveStrip.map(_.id) == List("wb-1-1", "wb-1-2", "wb-2-1"),
-          sections.readyStrip.map(_.id) == List("wb-1-3"),
-          !sections.groups
-            .flatMap(_.matches)
-            .exists(_.state == BracketMatchState.Started)
+          sections.liveStrip.map(_.id) == List("wb-1-2", "wb-2-1")
+        )
+      },
+      test("equal startedAt and round orders by seed index") {
+        val sameStarted = "2026-03-15T18:00:00Z"
+        val higherSeed =
+          BracketMatch(
+            id = "wb-1-2",
+            playerA = Some(Player("P1")),
+            playerB = Some(Player("P2")),
+            state = BracketMatchState.Started,
+            startedAt = Some(sameStarted)
+          )
+        val lowerSeed =
+          higherSeed.copy(id = "wb-1-1")
+        val sections =
+          BracketLayout.directorGroupMatches(
+            matches = List(higherSeed, lowerSeed),
+            bracketSize = 8
+          )
+        assertTrue(
+          sections.liveStrip.map(_.id) == List("wb-1-1", "wb-1-2")
         )
       },
       test("equal wait orders earlier rounds before later rounds") {
