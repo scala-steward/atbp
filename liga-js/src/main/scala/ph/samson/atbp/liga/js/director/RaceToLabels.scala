@@ -9,9 +9,10 @@ object RaceToLabels {
   def roundHeaderLabel(
       section: Section,
       round: Int,
-      raceToByScope: Map[String, Int]
+      raceToByScope: Map[String, Int],
+      seRounds: Int
   ): String = {
-    val group = BracketLayout.groupLabel(section, round)
+    val group = BracketLayout.groupLabel(section, round, seRounds)
     BracketLayout.roundRaceToScope(section, round, raceToByScope) match {
       case Right(n)    => s"$group · ${BracketLayout.raceToLabel(n)}"
       case Left(scope) =>

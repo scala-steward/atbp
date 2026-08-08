@@ -6,13 +6,25 @@ import zio.test.*
 object RaceToLabelsSpec extends ZIOSpecDefault {
 
   def spec = suite("RaceToLabels")(
+    test("roundHeaderLabel composes SE bare name with Race to N") {
+      val raceToByScope = Map("se-2" -> 5)
+      assertTrue(
+        RaceToLabels.roundHeaderLabel(
+          BracketLayout.Section.SingleElimination,
+          2,
+          raceToByScope,
+          seRounds = 3
+        ) == "Semifinals · Race to 5"
+      )
+    },
     test("roundHeaderLabel composes group label with Race to N") {
       val raceToByScope = Map("wb-2" -> 7)
       assertTrue(
         RaceToLabels.roundHeaderLabel(
           BracketLayout.Section.Winners,
           2,
-          raceToByScope
+          raceToByScope,
+          seRounds = 0
         ) == "Winners — round 2 · Race to 7"
       )
     },
@@ -20,7 +32,8 @@ object RaceToLabelsSpec extends ZIOSpecDefault {
       val label = RaceToLabels.roundHeaderLabel(
         BracketLayout.Section.Losers,
         3,
-        Map.empty
+        Map.empty,
+        seRounds = 0
       )
       assertTrue(
         label.contains("Losers — round 3"),

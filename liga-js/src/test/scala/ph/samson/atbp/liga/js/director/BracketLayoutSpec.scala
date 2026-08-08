@@ -22,18 +22,28 @@ object BracketLayoutSpec extends ZIOSpecDefault {
     },
     test("groupLabel omits round number for grand final") {
       assertTrue(
-        BracketLayout.groupLabel(BracketLayout.Section.GrandFinal, 3) ==
-          "Grand Final",
-        BracketLayout.groupLabel(BracketLayout.Section.Winners, 2) ==
-          "Winners — round 2",
-        BracketLayout.groupLabel(BracketLayout.Section.Losers, 4) ==
-          "Losers — round 4"
+        BracketLayout.groupLabel(
+          BracketLayout.Section.GrandFinal,
+          3,
+          seRounds = 0
+        ) == "Grand Final",
+        BracketLayout.groupLabel(
+          BracketLayout.Section.Winners,
+          2,
+          seRounds = 0
+        ) == "Winners — round 2",
+        BracketLayout.groupLabel(
+          BracketLayout.Section.Losers,
+          4,
+          seRounds = 0
+        ) == "Losers — round 4"
       )
     },
     test("matchLabel delegates to groupLabel") {
       assertTrue(
-        BracketLayout.matchLabel("gf-1", bracketSize = 8) == "Grand Final",
-        BracketLayout.matchLabel("wb-2-1", bracketSize = 8) ==
+        BracketLayout.matchLabel("gf-1", bracketSize = 8, seRounds = 0) ==
+          "Grand Final",
+        BracketLayout.matchLabel("wb-2-1", bracketSize = 8, seRounds = 0) ==
           "Winners — round 2"
       )
     },

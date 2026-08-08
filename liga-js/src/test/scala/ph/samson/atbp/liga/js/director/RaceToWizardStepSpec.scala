@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.bracket.BracketFormat
 import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.bracket.RaceToWizard
 import ph.samson.atbp.liga.bracket.TopN
@@ -99,6 +100,41 @@ object RaceToWizardStepSpec extends ZIOSpecDefault {
         request.raceToByScope.keySet ==
           RaceToScopes.requiredKeys(12, 8).toSet
       )
+    },
+    test("SE preview bullets use conventional round names") {
+      val playerCount = 8
+      val topN = 8
+      val preview = RaceToWizardStep.preview(playerCount, topN)
+      // Same derivation as WizardView.seRoundsFor(topN).
+      val seRounds = BracketFormat.forRoster(playerCount, topN).seRounds
+      val se = preview.sections
+        .find(_.section == RaceToScopes.Section.SingleElimination)
+        .get
+      val summaries = se.rounds.map { round =>
+        RaceToWizardStep.formatRoundSummary(round, se.section, seRounds)
+      }
+      assertTrue(
+        seRounds == 3,
+        summaries == List(
+          "Quarterfinals: 8 players, 4 matches",
+          "Semifinals: 4 players, 2 matches",
+          "Grand Final: 2 players, 1 match"
+        )
+      )
+    },
+    test("WB preview bullets stay Round N") {
+      val playerCount = 8
+      val topN = 2
+      val preview = RaceToWizardStep.preview(playerCount, topN)
+      val seRounds = BracketFormat.forRoster(playerCount, topN).seRounds
+      val wb =
+        preview.sections.find(_.section == RaceToScopes.Section.Winners).get
+      val summary = RaceToWizardStep.formatRoundSummary(
+        wb.rounds.head,
+        wb.section,
+        seRounds
+      )
+      assertTrue(seRounds == 0, summary.startsWith("Round 1:"))
     }
   )
 }

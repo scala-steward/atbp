@@ -11,6 +11,7 @@ object MatchPanel {
   def apply(
       tournament: TournamentResponse,
       matchDef: BracketMatch,
+      seRounds: Int,
       busy: Signal[Boolean],
       onReady: Observer[Unit],
       onApplyHandicap: Observer[Int],
@@ -51,13 +52,12 @@ object MatchPanel {
     val validationError = Var("")
     val forfeitValidationError = Var("")
 
+    val bracketSize = tournament.bracket.map(_.size).getOrElse(8)
+
     div(
       cls := "match-panel",
       h2(
-        BracketLayout.matchLabel(
-          matchDef.id,
-          tournament.bracket.map(_.size).getOrElse(8)
-        )
+        BracketLayout.matchLabel(matchDef.id, bracketSize, seRounds)
       ),
       p(cls := "match-id", matchDef.id),
       p(

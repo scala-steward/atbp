@@ -15,6 +15,7 @@ object AudienceBracketView {
 
   def apply(
       bracket: Bracket,
+      seRounds: Int,
       handicapContext: BracketHandicapContext,
       resultsContext: BracketResultsContext
   ): Div = {
@@ -37,7 +38,12 @@ object AudienceBracketView {
               else ""
             },
             RaceToLabels
-              .roundHeaderLabel(group.section, group.round, raceToByScope)
+              .roundHeaderLabel(
+                group.section,
+                group.round,
+                raceToByScope,
+                seRounds
+              )
           ),
           div(
             cls := "round-matches",

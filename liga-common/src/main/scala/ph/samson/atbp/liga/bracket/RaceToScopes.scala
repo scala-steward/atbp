@@ -55,17 +55,29 @@ object RaceToScopes {
     }
   }
 
-  def scopeLabel(scope: String): ScopeLabel =
+  def scopeLabel(scope: String, seRounds: Int): ScopeLabel =
     scope match {
+      case s"se-$round" if round.toIntOption.isDefined =>
+        ScopeLabel(
+          Section.SingleElimination,
+          SingleElimRoundNames.name(round.toInt, seRounds)
+        )
       case s"wb-$round" =>
         ScopeLabel(Section.Winners, s"Round $round")
       case s"lb-$round" =>
         ScopeLabel(Section.Losers, s"Round $round")
-      case s"se-$round" =>
-        ScopeLabel(Section.SingleElimination, s"Round $round")
       case "gf" =>
         ScopeLabel(Section.GrandFinal, "Grand Final")
       case _ =>
         ScopeLabel(Section.Winners, scope)
+    }
+
+  def sectionOf(scope: String): Section =
+    scope match {
+      case s"wb-$_" => Section.Winners
+      case s"lb-$_" => Section.Losers
+      case s"se-$_" => Section.SingleElimination
+      case "gf"     => Section.GrandFinal
+      case _        => Section.Winners
     }
 }

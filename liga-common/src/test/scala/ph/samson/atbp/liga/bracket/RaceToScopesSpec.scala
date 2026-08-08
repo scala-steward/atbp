@@ -170,34 +170,104 @@ object RaceToScopesSpec extends ZIOSpecDefault {
         assertTrue(RaceToScopes.grandFinalScopeKey == "gf")
       }
     ),
+    suite("sectionOf")(
+      test("maps scope keys to sections") {
+        assertTrue(
+          RaceToScopes.sectionOf("wb-3") == RaceToScopes.Section.Winners,
+          RaceToScopes.sectionOf("lb-4") == RaceToScopes.Section.Losers,
+          RaceToScopes.sectionOf("gf") == RaceToScopes.Section.GrandFinal,
+          RaceToScopes.sectionOf("se-2") ==
+            RaceToScopes.Section.SingleElimination
+        )
+      }
+    ),
     suite("scopeLabel")(
       test("labels winners scopes with round number") {
-        val label = RaceToScopes.scopeLabel("wb-3")
+        val label = RaceToScopes.scopeLabel("wb-3", seRounds = 0)
         assertTrue(
           label.section == RaceToScopes.Section.Winners,
           label.roundLabel == "Round 3"
         )
       },
       test("labels losers scopes with round number") {
-        val label = RaceToScopes.scopeLabel("lb-4")
+        val label = RaceToScopes.scopeLabel("lb-4", seRounds = 0)
         assertTrue(
           label.section == RaceToScopes.Section.Losers,
           label.roundLabel == "Round 4"
         )
       },
       test("labels grand final scope") {
-        val label = RaceToScopes.scopeLabel("gf")
+        val label = RaceToScopes.scopeLabel("gf", seRounds = 0)
         assertTrue(
           label.section == RaceToScopes.Section.GrandFinal,
           label.roundLabel == "Grand Final"
         )
       },
-      test("labels single elimination scopes") {
-        val label = RaceToScopes.scopeLabel("se-2")
+      test("full SE 8 uses conventional round names") {
         assertTrue(
-          label.section == RaceToScopes.Section.SingleElimination,
-          label.section.label == "Single Elimination",
-          label.roundLabel == "Round 2"
+          RaceToScopes
+            .scopeLabel("se-1", seRounds = 3)
+            .roundLabel == "Quarterfinals",
+          RaceToScopes
+            .scopeLabel("se-2", seRounds = 3)
+            .roundLabel == "Semifinals",
+          RaceToScopes
+            .scopeLabel("se-3", seRounds = 3)
+            .roundLabel == "Grand Final"
+        )
+      },
+      test("full SE 16 includes Round of 16 then QF / SF / GF") {
+        assertTrue(
+          RaceToScopes
+            .scopeLabel("se-1", seRounds = 4)
+            .roundLabel == "Round of 16",
+          RaceToScopes
+            .scopeLabel("se-2", seRounds = 4)
+            .roundLabel == "Quarterfinals",
+          RaceToScopes
+            .scopeLabel("se-3", seRounds = 4)
+            .roundLabel == "Semifinals",
+          RaceToScopes
+            .scopeLabel("se-4", seRounds = 4)
+            .roundLabel == "Grand Final"
+        )
+      },
+      test("cut Top 8 on larger roster uses Top 8 SE depth not bracket size") {
+        val seRounds = BracketFormat.forRoster(12, topN = 8).seRounds
+        assertTrue(
+          seRounds == 3,
+          RaceToScopes
+            .scopeLabel("se-1", seRounds)
+            .roundLabel == "Quarterfinals",
+          RaceToScopes.scopeLabel("se-3", seRounds).roundLabel == "Grand Final"
+        )
+      },
+      test("cut Top 4 uses two-round SE tail") {
+        val seRounds = BracketFormat.forRoster(12, topN = 4).seRounds
+        assertTrue(
+          seRounds == 2,
+          RaceToScopes.scopeLabel("se-1", seRounds).roundLabel == "Semifinals",
+          RaceToScopes.scopeLabel("se-2", seRounds).roundLabel == "Grand Final"
+        )
+      },
+      test("cut Top 16 uses four-round SE tail") {
+        val seRounds = BracketFormat.forRoster(30, topN = 16).seRounds
+        assertTrue(
+          seRounds == 4,
+          RaceToScopes.scopeLabel("se-1", seRounds).roundLabel == "Round of 16"
+        )
+      },
+      test("rejects se scope labels when seRounds is not positive") {
+        def rejects(scope: String, seRounds: Int): Boolean =
+          try {
+            val _ = RaceToScopes.scopeLabel(scope, seRounds)
+            false
+          } catch {
+            case _: IllegalArgumentException => true
+          }
+        assertTrue(
+          rejects("se-1", seRounds = 0),
+          rejects("se-1", seRounds = -1)
         )
       }
     )

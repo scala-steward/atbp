@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.audience
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.bracket.BracketFormat
 import ph.samson.atbp.liga.js.LatestRatingsView
 import ph.samson.atbp.liga.js.api.ApiClient
 import ph.samson.atbp.liga.js.api.Models.*
@@ -113,6 +114,7 @@ object AudienceApp {
                     },
                     AudienceBracketView(
                       bracket,
+                      BracketFormat.forBracket(bracket.size, t.topN).seRounds,
                       BracketHandicapContext.fromTournament(t),
                       resultsContext
                     )

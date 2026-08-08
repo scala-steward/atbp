@@ -12,6 +12,7 @@ object BracketView {
 
   def apply(
       bracket: Bracket,
+      seRounds: Int,
       handicapContext: BracketHandicapContext,
       resultsContext: BracketResultsContext,
       selectedMatchId: Signal[Option[String]],
@@ -37,6 +38,7 @@ object BracketView {
                 resultsContext,
                 matchDef,
                 bracket.size,
+                seRounds,
                 selectedMatchId,
                 onSelect,
                 now.signal
@@ -59,6 +61,7 @@ object BracketView {
                 resultsContext,
                 matchDef,
                 bracket.size,
+                seRounds,
                 selectedMatchId,
                 onSelect,
                 now.signal
@@ -84,7 +87,12 @@ object BracketView {
               else ""
             },
             RaceToLabels
-              .roundHeaderLabel(group.section, group.round, raceToByScope)
+              .roundHeaderLabel(
+                group.section,
+                group.round,
+                raceToByScope,
+                seRounds
+              )
           ),
           div(
             cls := "round-matches",
@@ -94,6 +102,7 @@ object BracketView {
                 resultsContext,
                 matchDef,
                 bracket.size,
+                seRounds,
                 selectedMatchId,
                 onSelect,
                 now.signal
@@ -110,6 +119,7 @@ object BracketView {
       resultsContext: BracketResultsContext,
       matchDef: BracketMatch,
       bracketSize: Int,
+      seRounds: Int,
       selectedMatchId: Signal[Option[String]],
       onSelect: Observer[String],
       now: Signal[Instant]
@@ -135,12 +145,12 @@ object BracketView {
       title := (if (isActive) {
                   "Needs director action"
                 } else {
-                  BracketLayout.matchLabel(matchDef.id, bracketSize)
+                  BracketLayout.matchLabel(matchDef.id, bracketSize, seRounds)
                 }),
       onClick.mapTo(matchDef.id) --> onSelect,
       span(
         cls := "match-id",
-        BracketLayout.matchLabel(matchDef.id, bracketSize)
+        BracketLayout.matchLabel(matchDef.id, bracketSize, seRounds)
       ),
       span(
         cls := "match-players",

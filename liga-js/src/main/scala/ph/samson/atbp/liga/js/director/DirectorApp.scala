@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
+import ph.samson.atbp.liga.bracket.BracketFormat
 import ph.samson.atbp.liga.js.api.ApiClient
 import ph.samson.atbp.liga.js.api.Models.*
 
@@ -248,12 +249,16 @@ object DirectorApp {
     val resultsContext = maybeLatestRatings
       .map(BracketResultsContext.fromTournament(tournament, _))
       .getOrElse(BracketResultsContext.inactive(tournament))
+    val bracket = tournament.bracket.get
+    val seRounds =
+      BracketFormat.forBracket(bracket.size, tournament.topN).seRounds
     div(
       cls := "main-layout",
       div(
         cls := "bracket-column",
         BracketView(
-          tournament.bracket.get,
+          bracket,
+          seRounds,
           handicapContext,
           resultsContext,
           selectedMatchId.signal,
@@ -267,6 +272,7 @@ object DirectorApp {
             MatchPanel(
               tournament,
               matchDef,
+              seRounds,
               busy,
               Observer[Unit](_ => runAction(client.ready(matchDef.id))),
               Observer[Int](handicap =>

@@ -3,6 +3,7 @@ package ph.samson.atbp.liga.js.director
 import ph.samson.atbp.liga.bracket.BracketPreview
 import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.bracket.RaceToWizard
+import ph.samson.atbp.liga.bracket.SingleElimRoundNames
 import ph.samson.atbp.liga.bracket.TopN
 import ph.samson.atbp.liga.js.api.Models.*
 
@@ -36,8 +37,7 @@ object RaceToWizardStep {
     val scopes = requiredScopes(playerCount, topN)
     RaceToScopes.Section.values.toList
       .filter(section =>
-        scopes
-          .exists(scope => RaceToScopes.scopeLabel(scope).section == section)
+        scopes.exists(scope => RaceToScopes.sectionOf(scope) == section)
       )
       .sortBy(_.order)
   }
@@ -55,9 +55,20 @@ object RaceToWizardStep {
   def saveRequest(state: RaceToWizard.State): RaceToRequest =
     RaceToRequest(state.topN, state.raceToByScope)
 
-  def formatRoundSummary(round: BracketPreview.RoundCounts): String = {
+  def formatRoundSummary(
+      round: BracketPreview.RoundCounts,
+      section: RaceToScopes.Section,
+      seRounds: Int
+  ): String = {
     val byePart = if (round.byes > 0) s", ${round.byes} byes" else ""
-    s"Round ${round.round}: ${round.players} players, ${round.matches} matches$byePart"
+    val matchWord = if (round.matches == 1) "match" else "matches"
+    val roundName = section match {
+      case RaceToScopes.Section.SingleElimination =>
+        SingleElimRoundNames.name(round.round, seRounds)
+      case _ =>
+        s"Round ${round.round}"
+    }
+    s"$roundName: ${round.players} players, ${round.matches} $matchWord$byePart"
   }
 
   def resetGrandFinalHint(

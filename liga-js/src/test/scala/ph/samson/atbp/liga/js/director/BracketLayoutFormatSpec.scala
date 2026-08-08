@@ -1,5 +1,6 @@
 package ph.samson.atbp.liga.js.director
 
+import ph.samson.atbp.liga.bracket.BracketFormat
 import ph.samson.atbp.liga.js.api.Models.*
 import zio.test.*
 
@@ -7,14 +8,64 @@ import zio.test.*
 object BracketLayoutFormatSpec extends ZIOSpecDefault {
 
   def spec = suite("BracketLayout format")(
-    test("groupLabel labels reset grand final and single elimination rounds") {
+    test("groupLabel uses seRounds=0 for classic DE and GF reset") {
       assertTrue(
         BracketLayout.groupLabel(
           BracketLayout.Section.GrandFinal,
-          BracketLayout.GrandFinalResetRound
+          BracketLayout.GrandFinalResetRound,
+          seRounds = 0
         ) == "Grand Final — reset",
-        BracketLayout.groupLabel(BracketLayout.Section.SingleElimination, 2) ==
-          "Single Elimination — round 2"
+        BracketLayout.groupLabel(
+          BracketLayout.Section.Winners,
+          2,
+          seRounds = 0
+        ) == "Winners — round 2"
+      )
+    },
+    test("groupLabel rejects SE when seRounds is not positive") {
+      def rejects(seRounds: Int): Boolean =
+        try {
+          val _ = BracketLayout.groupLabel(
+            BracketLayout.Section.SingleElimination,
+            1,
+            seRounds
+          )
+          false
+        } catch {
+          case _: IllegalArgumentException => true
+        }
+      assertTrue(rejects(0), rejects(-1))
+    },
+    test("full SE 8 groupLabel and matchLabel are bare conventional names") {
+      val seRounds = 3
+      assertTrue(
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          1,
+          seRounds
+        ) == "Quarterfinals",
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          2,
+          seRounds
+        ) == "Semifinals",
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          3,
+          seRounds
+        ) == "Grand Final",
+        BracketLayout.matchLabel("se-2-1", bracketSize = 8, seRounds) ==
+          "Semifinals"
+      )
+    },
+    test("full SE 16 includes Round of 16") {
+      val seRounds = 4
+      assertTrue(
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          1,
+          seRounds
+        ) == "Round of 16"
       )
     },
     test("sectionOf maps se-* to Single Elimination") {
@@ -34,12 +85,13 @@ object BracketLayoutFormatSpec extends ZIOSpecDefault {
           Some(BracketLayout.GrandFinalResetRound)
       )
     },
-    test("matchLabel labels reset grand final") {
+    test("matchLabel labels reset grand final and SE with seRounds") {
+      val seRounds = 3
       assertTrue(
-        BracketLayout.matchLabel("gf-2", bracketSize = 8) ==
+        BracketLayout.matchLabel("gf-2", bracketSize = 8, seRounds = 0) ==
           "Grand Final — reset",
-        BracketLayout.matchLabel("se-2-1", bracketSize = 8) ==
-          "Single Elimination — round 2"
+        BracketLayout.matchLabel("se-2-1", bracketSize = 8, seRounds) ==
+          "Semifinals"
       )
     },
     test("groupMatches groups se-* under Single Elimination by round") {
@@ -90,8 +142,11 @@ object BracketLayoutFormatSpec extends ZIOSpecDefault {
             (BracketLayout.Section.GrandFinal, 3)
           ),
         groups.head.matches.map(_.id) == List("gf-2"),
-        BracketLayout.groupLabel(groups.head.section, groups.head.round) ==
-          "Grand Final — reset"
+        BracketLayout.groupLabel(
+          groups.head.section,
+          groups.head.round,
+          seRounds = 0
+        ) == "Grand Final — reset"
       )
     },
     test(
@@ -120,6 +175,39 @@ object BracketLayoutFormatSpec extends ZIOSpecDefault {
           BracketLayout.Section.Losers,
           BracketLayout.Section.Winners
         )
+      )
+    },
+    test("cut Top 8 on 16-slot bracket uses Top 8 depth for layout labels") {
+      val seRounds = BracketFormat.forRoster(12, topN = 8).seRounds
+      assertTrue(
+        seRounds == 3,
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          1,
+          seRounds
+        ) == "Quarterfinals",
+        BracketLayout.matchLabel("se-3-1", bracketSize = 16, seRounds) ==
+          "Grand Final"
+      )
+    },
+    test("cut Top 4 on 16-slot bracket uses Top 4 depth for layout labels") {
+      val seRounds = BracketFormat.forRoster(12, topN = 4).seRounds
+      assertTrue(
+        seRounds == 2,
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          1,
+          seRounds
+        ) == "Semifinals",
+        BracketLayout.groupLabel(
+          BracketLayout.Section.SingleElimination,
+          2,
+          seRounds
+        ) == "Grand Final",
+        BracketLayout.matchLabel("se-1-1", bracketSize = 16, seRounds) ==
+          "Semifinals",
+        BracketLayout.matchLabel("se-2-1", bracketSize = 16, seRounds) ==
+          "Grand Final"
       )
     },
     test("resolveRoundRaceTo resolves single elimination scopes") {

@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.director
 
 import ph.samson.atbp.liga.bracket.RaceToScopes
+import ph.samson.atbp.liga.bracket.SingleElimRoundNames
 import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 import ph.samson.atbp.liga.model.MatchSide
@@ -43,16 +44,22 @@ object BracketLayout {
       case _                        => Section.GrandFinal
     }
 
-  def groupLabel(section: Section, round: Int): String =
+  def groupLabel(section: Section, round: Int, seRounds: Int): String =
     section match {
       case Section.GrandFinal if round == GrandFinalResetRound =>
         s"${section.label} — reset"
-      case Section.GrandFinal => section.label
-      case _                  => s"${section.label} — round $round"
+      case Section.GrandFinal        => section.label
+      case Section.SingleElimination =>
+        SingleElimRoundNames.name(round, seRounds)
+      case _ => s"${section.label} — round $round"
     }
 
-  def matchLabel(matchId: String, bracketSize: Int): String =
-    groupLabel(sectionOf(matchId), roundOf(matchId, bracketSize))
+  def matchLabel(
+      matchId: String,
+      bracketSize: Int,
+      seRounds: Int
+  ): String =
+    groupLabel(sectionOf(matchId), roundOf(matchId, bracketSize), seRounds)
 
   private def log2(n: Int): Int =
     (math.log(n) / math.log(2)).toInt
