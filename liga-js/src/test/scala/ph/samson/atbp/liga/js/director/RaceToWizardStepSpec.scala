@@ -135,6 +135,75 @@ object RaceToWizardStepSpec extends ZIOSpecDefault {
         seRounds
       )
       assertTrue(seRounds == 0, summary.startsWith("Round 1:"))
+    },
+    test("inputLabel maps classic DE Top 2 scopes to formatRoundSummary") {
+      val playerCount = 8
+      val topN = 2
+      val preview = RaceToWizardStep.preview(playerCount, topN)
+      val seRounds = BracketFormat.forRoster(playerCount, topN).seRounds
+      val wb =
+        preview.sections.find(_.section == RaceToScopes.Section.Winners).get
+      val lb =
+        preview.sections.find(_.section == RaceToScopes.Section.Losers).get
+      assertTrue(
+        RaceToWizardStep.inputLabel("wb-1", preview, seRounds) ==
+          RaceToWizardStep.formatRoundSummary(
+            wb.rounds.head,
+            wb.section,
+            seRounds
+          ),
+        RaceToWizardStep.inputLabel("lb-1", preview, seRounds) ==
+          RaceToWizardStep.formatRoundSummary(
+            lb.rounds.head,
+            lb.section,
+            seRounds
+          ),
+        RaceToWizardStep.inputLabel("gf", preview, seRounds) == "Grand Final"
+      )
+    },
+    test("inputLabel maps cut DE to SE scopes to formatRoundSummary") {
+      val playerCount = 12
+      val topN = 8
+      val preview = RaceToWizardStep.preview(playerCount, topN)
+      val seRounds = BracketFormat.forRoster(playerCount, topN).seRounds
+      val se = preview.sections
+        .find(_.section == RaceToScopes.Section.SingleElimination)
+        .get
+      assertTrue(
+        seRounds == 3,
+        RaceToWizardStep.inputLabel("se-1", preview, seRounds) ==
+          RaceToWizardStep.formatRoundSummary(
+            se.rounds.head,
+            se.section,
+            seRounds
+          ),
+        RaceToWizardStep.inputLabel("se-3", preview, seRounds) ==
+          RaceToWizardStep.formatRoundSummary(
+            se.rounds.last,
+            se.section,
+            seRounds
+          )
+      )
+    },
+    test("inputLabel maps full SE scopes to conventional round names") {
+      val playerCount = 8
+      val topN = 8
+      val preview = RaceToWizardStep.preview(playerCount, topN)
+      val seRounds = BracketFormat.forRoster(playerCount, topN).seRounds
+      val se = preview.sections
+        .find(_.section == RaceToScopes.Section.SingleElimination)
+        .get
+      val labels = se.rounds.map { round =>
+        val scope = s"se-${round.round}"
+        RaceToWizardStep.inputLabel(scope, preview, seRounds)
+      }
+      assertTrue(
+        labels == List(
+          "Quarterfinals: 8 players, 4 matches",
+          "Semifinals: 4 players, 2 matches",
+          "Grand Final: 2 players, 1 match"
+        )
+      )
     }
   )
 }

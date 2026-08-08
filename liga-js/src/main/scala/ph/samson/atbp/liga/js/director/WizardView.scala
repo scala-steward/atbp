@@ -2,7 +2,6 @@ package ph.samson.atbp.liga.js.director
 
 import com.raquo.laminar.api.L.*
 import ph.samson.atbp.liga.bracket.BracketFormat
-import ph.samson.atbp.liga.bracket.BracketPreview
 import ph.samson.atbp.liga.bracket.RaceToScopes
 import ph.samson.atbp.liga.bracket.RaceToWizard
 import ph.samson.atbp.liga.bracket.TournamentBounds
@@ -238,47 +237,12 @@ object WizardView {
     def seRoundsFor(topN: Int): Int =
       BracketFormat.forRoster(playerCount, topN).seRounds
 
-    def renderPreview(topN: Int): Div = {
-      val preview = RaceToWizardStep.preview(playerCount, topN)
-      val seRounds = seRoundsFor(topN)
-      div(
-        cls := "bracket-preview",
-        h3("Bracket preview"),
-        p(
-          cls := "hint",
-          s"${preview.playerCount} players · ${preview.bracketSize}-slot bracket"
-        ),
-        preview.sections.map(renderPreviewSection(seRounds))
-      )
-    }
-
-    def renderPreviewSection(seRounds: Int)(
-        sectionPreview: BracketPreview.SectionPreview
-    ): Div =
-      div(
-        cls := "preview-section",
-        h4(sectionPreview.section.label),
-        ul(
-          cls := "preview-rounds",
-          sectionPreview.rounds.map { round =>
-            li(
-              RaceToWizardStep.formatRoundSummary(
-                round,
-                sectionPreview.section,
-                seRounds
-              )
-            )
-          }
-        ),
-        RaceToWizardStep.resetGrandFinalHint(sectionPreview) match {
-          case Some(hint) => p(cls := "hint", hint)
-          case None       => emptyNode
-        }
-      )
-
     def renderSection(topN: Int, section: RaceToScopes.Section): Node = {
       val scopes = scopesFor(topN, section)
+      val preview = RaceToWizardStep.preview(playerCount, topN)
       val seRounds = seRoundsFor(topN)
+      val sectionPreview =
+        preview.sections.find(_.section == section)
       if (scopes.isEmpty) {
         emptyNode
       } else {
@@ -288,10 +252,9 @@ object WizardView {
           ul(
             cls := "race-to-inputs",
             scopes.map { scope =>
-              val scopeLabel = RaceToScopes.scopeLabel(scope, seRounds)
               li(
                 label(
-                  scopeLabel.roundLabel,
+                  RaceToWizardStep.inputLabel(scope, preview, seRounds),
                   input(
                     typ := "number",
                     controlled(
@@ -311,19 +274,14 @@ object WizardView {
                         }
                       }
                     )
-                  ),
-                  if (scope == "gf") {
-                    p(
-                      cls := "hint",
-                      "usually longer than finals — set explicitly."
-                    )
-                  } else {
-                    emptyNode
-                  }
+                  )
                 )
               )
             }
-          )
+          ),
+          sectionPreview
+            .flatMap(RaceToWizardStep.resetGrandFinalHint)
+            .fold(emptyNode)(hint => p(cls := "hint", hint))
         )
       }
     }
@@ -350,7 +308,13 @@ object WizardView {
           )
         )
       ),
-      child <-- wizardState.signal.map(state => renderPreview(state.topN)),
+      child <-- wizardState.signal.map { state =>
+        val preview = RaceToWizardStep.preview(playerCount, state.topN)
+        p(
+          cls := "hint",
+          s"${preview.playerCount} players · ${preview.bracketSize}-slot bracket"
+        )
+      },
       p(
         "Set race-to for each bracket section. " +
           "Editing a round cascades through later rounds in that section."

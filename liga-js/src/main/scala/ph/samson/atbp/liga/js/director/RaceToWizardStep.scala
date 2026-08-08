@@ -77,4 +77,23 @@ object RaceToWizardStep {
     Option.when(section.resetGrandFinalPossible)(
       "Grand Final reset possible if losers bracket wins."
     )
+
+  /** Label text for a race-to input: preview round summary, or `Grand Final`
+    * for `gf`.
+    */
+  def inputLabel(
+      scope: String,
+      preview: BracketPreview.Preview,
+      seRounds: Int
+  ): String =
+    if (scope == RaceToScopes.grandFinalScopeKey) {
+      "Grand Final"
+    } else {
+      val section = RaceToScopes.sectionOf(scope)
+      val roundNum = scope.split("-", 2)(1).toInt
+      val sectionPreview =
+        preview.sections.find(_.section == section).get
+      val round = sectionPreview.rounds.find(_.round == roundNum).get
+      formatRoundSummary(round, section, seRounds)
+    }
 }
