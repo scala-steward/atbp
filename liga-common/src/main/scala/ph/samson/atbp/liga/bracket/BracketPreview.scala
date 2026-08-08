@@ -32,13 +32,13 @@ object BracketPreview {
         case BracketFormat.Kind.ClassicDoubleElimination =>
           List(
             winnersSection(shape, playerCount),
-            losersSection(shape),
+            losersSection(shape, playerCount),
             grandFinalSection(shape)
           )
         case BracketFormat.Kind.CutDoubleElimination =>
           List(
             winnersSection(shape, playerCount),
-            losersSection(shape),
+            losersSection(shape, playerCount),
             singleElimSection(shape)
           )
       }
@@ -52,22 +52,59 @@ object BracketPreview {
     val openingByes = shape.bracketSize - playerCount
     val rounds =
       (1 to shape.winnersRounds).map { round =>
-        val matches = shape.bracketSize >> round
+        val slots = shape.bracketSize >> round
         val players =
           if (round == 1) playerCount else shape.bracketSize >> (round - 1)
         val byes = if (round == 1) openingByes else 0
+        val matches = slots - byes
         RoundCounts(round, players, matches, byes)
       }.toList
     SectionPreview(RaceToScopes.Section.Winners, rounds)
   }
 
-  private def losersSection(shape: BracketFormat.Shape): SectionPreview = {
+  /** Opening WB byes reduce WB R1 losers, so early LB rounds can be
+    * under-filled.
+    */
+  private def losersSection(
+      shape: BracketFormat.Shape,
+      playerCount: Int
+  ): SectionPreview = {
+    val openingByes = shape.bracketSize - playerCount
+    val wb1Matches = (shape.bracketSize >> 1) - openingByes
     val rounds =
-      (1 to shape.losersRounds).map { round =>
-        val matches = BracketFormat.losersMatchCount(shape, round)
-        RoundCounts(round, matches * 2, matches, byes = 0)
-      }.toList
+      (1 to shape.losersRounds)
+        .foldLeft((List.empty[RoundCounts], 0)) {
+          case ((acc, previousWinners), round) =>
+            val slots = BracketFormat.losersMatchCount(shape, round)
+            val players =
+              if (round == 1) {
+                wb1Matches
+              } else if (round % 2 == 0) {
+                val wbLosers = shape.bracketSize >> (round / 2 + 1)
+                previousWinners + wbLosers
+              } else {
+                previousWinners
+              }
+            val counts = roundFromPlayers(round, players, slots)
+            (acc :+ counts, counts.players - counts.matches)
+        }
+        ._1
     SectionPreview(RaceToScopes.Section.Losers, rounds)
+  }
+
+  /** Playable matches only. Under-filled rounds: matches = max(0, players -
+    * slots).
+    */
+  private def roundFromPlayers(
+      round: Int,
+      players: Int,
+      slots: Int
+  ): RoundCounts = {
+    val matches =
+      if (players >= slots * 2) slots
+      else math.max(0, players - slots)
+    val byes = slots - matches
+    RoundCounts(round, players, matches, byes)
   }
 
   private def grandFinalSection(shape: BracketFormat.Shape): SectionPreview =

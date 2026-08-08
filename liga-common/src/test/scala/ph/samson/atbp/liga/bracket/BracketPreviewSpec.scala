@@ -23,13 +23,59 @@ object BracketPreviewSpec extends ZIOSpecDefault {
         preview.topN == 2,
         winners.rounds.size == 4,
         losers.rounds.size == 6,
-        winners.rounds.head.matches == 8,
+        winners.rounds.head.matches == 4,
         winners.rounds.head.byes == 4,
         winners.rounds.head.players == 12,
         gf.rounds.size == 1,
         gf.rounds.head.matches == 1,
         gf.resetGrandFinalPossible == false,
         section(preview, RaceToScopes.Section.SingleElimination).isEmpty
+      )
+    },
+    test("30-player classic DE excludes byes from match counts") {
+      val preview = BracketPreview(30, 2)
+      val winners = section(preview, RaceToScopes.Section.Winners).get
+      val losers = section(preview, RaceToScopes.Section.Losers).get
+      val wb1 = winners.rounds.head
+      val lb1 = losers.rounds.head
+
+      assertTrue(
+        preview.bracketSize == 32,
+        wb1.players == 30,
+        wb1.matches == 14,
+        wb1.byes == 2,
+        lb1.players == 14,
+        lb1.matches == 6,
+        lb1.byes == 2,
+        winners.rounds(1) == BracketPreview.RoundCounts(2, 16, 8, 0),
+        losers.rounds(1) == BracketPreview.RoundCounts(2, 16, 8, 0)
+      )
+    },
+    test("12-player classic DE LB1 is all byes from WB opening byes") {
+      val preview = BracketPreview(12, 2)
+      val losers = section(preview, RaceToScopes.Section.Losers).get
+      val lb1 = losers.rounds.head
+      val lb2 = losers.rounds(1)
+
+      assertTrue(
+        lb1.players == 4,
+        lb1.matches == 0,
+        lb1.byes == 4,
+        lb2.players == 8,
+        lb2.matches == 4,
+        lb2.byes == 0
+      )
+    },
+    test("5-player classic DE cascades LB byes into round 2") {
+      val preview = BracketPreview(5, 2)
+      val winners = section(preview, RaceToScopes.Section.Winners).get
+      val losers = section(preview, RaceToScopes.Section.Losers).get
+
+      assertTrue(
+        winners.rounds.head == BracketPreview.RoundCounts(1, 5, 1, 3),
+        losers.rounds.head == BracketPreview.RoundCounts(1, 1, 0, 2),
+        losers.rounds(1) == BracketPreview.RoundCounts(2, 3, 1, 1),
+        losers.rounds(2) == BracketPreview.RoundCounts(3, 2, 1, 0)
       )
     },
     test("Top 8 on roster 12 shows DE until cut then single elimination") {
