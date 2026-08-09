@@ -7,6 +7,7 @@ import ph.samson.atbp.liga.js.api.Models.BracketMatch
 import ph.samson.atbp.liga.js.api.Models.BracketMatchState
 import ph.samson.atbp.liga.js.api.Models.PlayerRating
 import ph.samson.atbp.liga.js.api.Models.TournamentResponse
+import ph.samson.atbp.liga.js.audience.AudienceRoute
 
 /** Director-facing copy for match setup and API error translation. */
 object DirectorGuidance {
@@ -17,8 +18,14 @@ object DirectorGuidance {
       s"Example: Bob spotted 2, board reads $raceTo–$exampleLoser → enter $raceTo and $exampleLoser."
   }
 
-  val localhostNote: String =
-    "Director controls are localhost-only. Open /audience on the club TV."
+  val audienceListPath: String = "/audience"
+
+  val audienceBracketPath: String = AudienceRoute.SpatialBracketPath
+
+  val localhostOnlyNote: String =
+    "Director controls are localhost-only."
+
+  val clubTvSuffix: String = " on the club TV."
 
   def missingRaceToBugHint(scopeKey: String): String =
     s"Race-to missing for $scopeKey — please file a bug."

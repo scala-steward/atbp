@@ -94,10 +94,33 @@ Elapsed `HH:mm` chip from `waitStartedAt` (Ready + Pending-with-one) or
 Player rating subline (director + audience via `AppliedHandicapView`):
 `docs/intent/player-ratings-in-bracket.md`.
 
-## Audience UI
+## Audience UI (`liga-js`)
 
-- `audience/AudienceApp.scala`, `AudienceBracketView.scala`, `AudienceIdlePolicy.scala`
-- Separate entry (`MainAudience`); poll-based; read-only
+Separate entry (`MainAudience`); poll-based; read-only. Same SPA shell and
+`audience.js` bundle for both routes; `AudienceApp` branches on pathname.
+
+| Route | View | Role |
+|-------|------|------|
+| `/audience` | `AudienceBracketView` | **Default** list bracket (unchanged) |
+| `/audience/bracket` | `AudienceSpatialBracketView` | Opt-in chalkboard columns + section bands |
+
+Serve: `Routes.scala` serves `StaticAssets.audienceHtml` at both paths.
+Path constants: `AudienceRoute.SpatialBracketPath`; director footer reuses via
+`DirectorGuidance.audienceListPath` / `audienceBracketPath`.
+
+| File | Role |
+|------|------|
+| `audience/AudienceApp.scala` | Poll shell, pathname branch list vs spatial, `spatial-*` chalkboard CSS in `styleTag` |
+| `audience/AudienceRoute.scala` | Pathname normalize + `isSpatialBracket` |
+| `audience/AudienceBracketView.scala` | List view — `BracketLayout.groupMatches` order; ratings via `AppliedHandicapView` |
+| `audience/AudienceSpatialBracketView.scala` | Spatial bands/columns/cells; Club density (`showRatings = false`); subtle live/done classes |
+| `audience/AudienceSpatialLayout.scala` | Pure column/band geometry — unfinished left, completed right; WB/GF/SE above LB; seed order within column |
+| `audience/AudienceIdlePolicy.scala` | Idle / Latest Ratings (both routes) |
+
+Spatial layout reuses `BracketLayout.showInList` visibility (hide Pending with
+neither player); **ordering** is spatial-only (not `groupMatches`). Within a
+column, top→bottom = seed/match-id order. Intent:
+`docs/intent/spatial-bracket.md`, `docs/ideas/spatial-bracket.md`.
 
 ## Docs index
 
@@ -121,6 +144,8 @@ Player rating subline (director + audience via `AppliedHandicapView`):
 | `docs/intent/liga-match-forfeit.md` | Forfeit (no period scores) |
 | `docs/intent/liga-bracket-results.md` | Post-complete bracket results |
 | `docs/intent/liga-elimination-cut.md` | DE→SE cut / true DE (last N) |
+| `docs/intent/spatial-bracket.md` | Spatial audience bracket intent |
+| `docs/ideas/spatial-bracket.md` | Spatial bracket direction |
 | `docs/ideas/liga-match-forfeit.md` | Forfeit direction |
 | `docs/ideas/liga-bracket-results.md` | Bracket results direction |
 | `docs/ideas/liga-roll-call-roster-remove.md` | Roll-call remove direction |

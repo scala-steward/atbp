@@ -17,7 +17,9 @@ object AppliedHandicapView {
       handicapContext: BracketHandicapContext,
       resultsContext: BracketResultsContext,
       display: AppliedHandicapDisplay,
-      winner: Option[MatchWinnerSide]
+      winner: Option[MatchWinnerSide],
+      showRatings: Boolean,
+      inlineMiddle: Option[Node]
   ): HtmlElement = {
     val a = BracketLayout.playerLabel(matchDef.playerA)
     val b = BracketLayout.playerLabel(matchDef.playerB)
@@ -29,15 +31,17 @@ object AppliedHandicapView {
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.A)
+            winner.contains(MatchWinnerSide.A),
+            showRatings
           ),
-          " vs ",
+          playersSeparator(inlineMiddle, " vs "),
           playerCell(
             b,
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.B)
+            winner.contains(MatchWinnerSide.B),
+            showRatings
           )
         )
       case AppliedHandicapDisplay.Placed(
@@ -51,17 +55,19 @@ object AppliedHandicapView {
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.A)
+            winner.contains(MatchWinnerSide.A),
+            showRatings
           ),
           " ",
-          span(cls := "match-vs-handicap", s"(+$spot) vs"),
+          handicapSeparator(inlineMiddle, spot, AppliedHandicapSide.PlayerA),
           " ",
           playerCell(
             b,
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.B)
+            winner.contains(MatchWinnerSide.B),
+            showRatings
           )
         )
       case AppliedHandicapDisplay.Placed(
@@ -75,17 +81,19 @@ object AppliedHandicapView {
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.A)
+            winner.contains(MatchWinnerSide.A),
+            showRatings
           ),
           " ",
-          span(cls := "match-vs-handicap", s"vs (+$spot)"),
+          handicapSeparator(inlineMiddle, spot, AppliedHandicapSide.PlayerB),
           " ",
           playerCell(
             b,
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.B)
+            winner.contains(MatchWinnerSide.B),
+            showRatings
           )
         )
       case AppliedHandicapDisplay.Unresolved(spot) =>
@@ -95,7 +103,8 @@ object AppliedHandicapView {
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.A)
+            winner.contains(MatchWinnerSide.A),
+            showRatings
           ),
           " ",
           span(cls := "race-to-error", s"(+$spot) unresolved"),
@@ -105,42 +114,115 @@ object AppliedHandicapView {
             handicapContext,
             resultsContext,
             matchDef.id,
-            winner.contains(MatchWinnerSide.B)
+            winner.contains(MatchWinnerSide.B),
+            showRatings
           )
         )
     }
   }
+
+  def playerLabelText(
+      name: String,
+      cellDisplay: ResultsCellDisplay,
+      showRatings: Boolean
+  ): String =
+    cellDisplay match {
+      case ResultsCellDisplay.Annotate(wins, losses, _) if showRatings =>
+        s"$name ($wins-$losses)"
+      case ResultsCellDisplay.Annotate(_, _, _) | ResultsCellDisplay.Skip =>
+        name
+    }
+
+  def includesRatingSubline(
+      cellDisplay: ResultsCellDisplay,
+      frozenLabel: Option[PlayerRatingLabel],
+      showRatings: Boolean
+  ): Boolean =
+    showRatings && (cellDisplay match {
+      case ResultsCellDisplay.Annotate(_, _, _) => true
+      case ResultsCellDisplay.Skip              => frozenLabel.isDefined
+    })
+
+  private def playersSeparator(
+      inlineMiddle: Option[Node],
+      vsText: String
+  ): Node =
+    inlineMiddle match {
+      case Some(middle) => span(" ", middle, " ")
+      case None         => vsText
+    }
+
+  private def handicapSeparator(
+      inlineMiddle: Option[Node],
+      spot: Int,
+      side: AppliedHandicapSide
+  ): Node =
+    inlineMiddle match {
+      case Some(middle) =>
+        side match {
+          case AppliedHandicapSide.PlayerA =>
+            span(
+              span(cls := "match-vs-handicap", s"(+$spot)"),
+              " ",
+              middle
+            )
+          case AppliedHandicapSide.PlayerB =>
+            span(
+              middle,
+              " ",
+              span(cls := "match-vs-handicap", s"(+$spot)")
+            )
+        }
+      case None =>
+        side match {
+          case AppliedHandicapSide.PlayerA =>
+            span(cls := "match-vs-handicap", s"(+$spot) vs")
+          case AppliedHandicapSide.PlayerB =>
+            span(cls := "match-vs-handicap", s"vs (+$spot)")
+        }
+    }
 
   private def playerCell(
       name: String,
       handicapContext: BracketHandicapContext,
       resultsContext: BracketResultsContext,
       matchId: String,
-      isWinner: Boolean
+      isWinner: Boolean,
+      showRatings: Boolean
   ): HtmlElement = {
     val frozenLabel = handicapContext.ratingLabelFor(name)
     val emphasis = resultsContext.nameEmphasis(name, matchId)
     val nameCls = BracketResults.nameClasses(emphasis, isWinner)
-    resultsContext.cellDisplay(name, matchId, frozenLabel) match {
-      case ResultsCellDisplay.Annotate(wins, losses, movement) =>
-        val nameWithRecord = s"$name ($wins-$losses)"
-        val earned = resultsContext.earnedFor(name, matchId)
+    val cellDisplay = resultsContext.cellDisplay(name, matchId, frozenLabel)
+    val displayName = playerLabelText(name, cellDisplay, showRatings)
+    cellDisplay match {
+      case ResultsCellDisplay.Annotate(_, _, movement) =>
         span(
           cls := "player-cell",
-          if (nameCls.nonEmpty) span(cls := nameCls, nameWithRecord)
-          else span(nameWithRecord),
-          ratingMovementElement(movement, earned)
+          if (nameCls.nonEmpty) span(cls := nameCls, displayName)
+          else span(displayName),
+          if (includesRatingSubline(cellDisplay, frozenLabel, showRatings)) {
+            ratingMovementElement(
+              movement,
+              resultsContext.earnedFor(name, matchId)
+            )
+          } else {
+            emptyNode
+          }
         )
       case ResultsCellDisplay.Skip =>
         span(
           cls := "player-cell",
-          if (nameCls.nonEmpty) span(cls := nameCls, name) else span(name),
-          frozenLabel.map(label =>
+          if (nameCls.nonEmpty) span(cls := nameCls, displayName)
+          else span(displayName),
+          if (includesRatingSubline(cellDisplay, frozenLabel, showRatings)) {
             liveRatingElement(
-              label,
+              frozenLabel.get,
               resultsContext.earnedFor(name, matchId)
             )
-          )
+          } else {
+            emptyNode
+          }
         )
     }
   }

@@ -35,6 +35,9 @@ object Routes {
       },
       Method.GET / "audience" -> handler(
         htmlResponse(StaticAssets.audienceHtml)
+      ),
+      Method.GET / "audience" / "bracket" -> handler(
+        htmlResponse(StaticAssets.audienceHtml)
       )
     )
 

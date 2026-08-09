@@ -292,6 +292,22 @@ object DirectorGuidanceSpec extends ZIOSpecDefault {
           "Each match: Ready (compute spot) → Apply handicap →"
         )
       )
-    }
+    },
+    suite("director footer audience links")(
+      test("exposes list and spatial bracket paths") {
+        assertTrue(
+          DirectorGuidance.audienceListPath == "/audience",
+          DirectorGuidance.audienceBracketPath == "/audience/bracket"
+        )
+      },
+      test("preserves localhost-only director controls message") {
+        assertTrue(
+          DirectorGuidance.localhostOnlyNote.toLowerCase.contains(
+            "localhost-only"
+          ),
+          DirectorGuidance.clubTvSuffix.contains("club TV")
+        )
+      }
+    )
   )
 }

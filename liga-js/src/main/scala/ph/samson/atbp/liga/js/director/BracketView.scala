@@ -159,7 +159,9 @@ object BracketView {
           handicapContext,
           resultsContext,
           AppliedHandicapLabels.forMatch(handicapContext, matchDef),
-          BracketLayout.winnerSide(matchDef)
+          BracketLayout.winnerSide(matchDef),
+          showRatings = true,
+          inlineMiddle = None
         )
       ),
       child <-- timingChips.map { chips =>

@@ -78,7 +78,9 @@ object BracketLayout {
   def roundOf(matchId: String, bracketSize: Int): Int =
     bracketRound(matchId, bracketSize).getOrElse(0)
 
-  private def showInList(m: BracketMatch): Boolean =
+  /** Whether a match should appear on audience list or spatial bracket views.
+    */
+  def showForAudience(m: BracketMatch): Boolean =
     if (
       m.state == BracketMatchState.Completed && m.isBye &&
       m.playerA.isEmpty && m.playerB.isEmpty
@@ -89,6 +91,8 @@ object BracketLayout {
       m.playerA.isDefined || m.playerB.isDefined
     }
 
+  private def showInList(m: BracketMatch): Boolean = showForAudience(m)
+
   private def statusSortKey(m: BracketMatch): Int =
     m.state match {
       case BracketMatchState.Ready     => 0
@@ -97,7 +101,7 @@ object BracketLayout {
       case BracketMatchState.Completed => 3
     }
 
-  private def matchSeedIndex(matchId: String): Int =
+  def matchSeedIndex(matchId: String): Int =
     matchId match {
       case s"wb-$_-$index" => index.toIntOption.getOrElse(0)
       case s"lb-$_-$index" => index.toIntOption.getOrElse(0)

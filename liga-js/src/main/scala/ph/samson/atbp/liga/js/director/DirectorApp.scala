@@ -201,7 +201,25 @@ object DirectorApp {
               )
           }
         },
-      p(cls := "footer-note", DirectorGuidance.localhostNote)
+      p(
+        cls := "footer-note",
+        DirectorGuidance.localhostOnlyNote,
+        " Open ",
+        a(
+          href := DirectorGuidance.audienceListPath,
+          target := "_blank",
+          rel := "noopener noreferrer",
+          DirectorGuidance.audienceListPath
+        ),
+        " or ",
+        a(
+          href := DirectorGuidance.audienceBracketPath,
+          target := "_blank",
+          rel := "noopener noreferrer",
+          DirectorGuidance.audienceBracketPath
+        ),
+        DirectorGuidance.clubTvSuffix
+      )
     )
   }
 

@@ -75,7 +75,9 @@ object AudienceBracketView {
           handicapContext,
           resultsContext,
           AppliedHandicapLabels.forMatch(handicapContext, matchDef),
-          BracketLayout.winnerSide(matchDef)
+          BracketLayout.winnerSide(matchDef),
+          showRatings = true,
+          inlineMiddle = None
         )
       ),
       span(cls := "match-state", BracketLayout.stateLabel(matchDef.state)),

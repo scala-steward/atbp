@@ -51,6 +51,22 @@ object ServerSpec extends ZIOSpecDefault {
         body.contains("/assets/js/")
       )
     },
+    test("GET /audience/bracket returns audience SPA shell HTML") {
+      for {
+        response <- LigaServer
+          .routes(ctx, BindConfig())
+          .runZIO(Request.get("/audience/bracket"))
+        body <- response.body.asString
+      } yield assertTrue(
+        response.status == Status.Ok,
+        body.contains("Liga Audience"),
+        body.contains("id=\"app\""),
+        body.contains("/assets/js/"),
+        response
+          .header(Header.ContentType)
+          .exists(_.mediaType == MediaType.text.html)
+      )
+    },
     test("default BindConfig binds localhost:5442") {
       val httpConfig = LigaServer.httpConfig(BindConfig())
       assertTrue(

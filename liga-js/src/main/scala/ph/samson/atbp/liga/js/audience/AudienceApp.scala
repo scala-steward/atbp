@@ -1,6 +1,7 @@
 package ph.samson.atbp.liga.js.audience
 
 import com.raquo.laminar.api.L.*
+import org.scalajs.dom
 import ph.samson.atbp.liga.bracket.BracketFormat
 import ph.samson.atbp.liga.js.LatestRatingsView
 import ph.samson.atbp.liga.js.api.ApiClient
@@ -105,6 +106,28 @@ object AudienceApp {
                 .getOrElse(BracketResultsContext.inactive(t))
               t.bracket match {
                 case Some(bracket) =>
+                  val seRounds =
+                    BracketFormat.forBracket(bracket.size, t.topN).seRounds
+                  val handicapContext = BracketHandicapContext.fromTournament(t)
+                  val bracketView =
+                    if (
+                      AudienceRoute
+                        .isSpatialBracket(dom.window.location.pathname)
+                    ) {
+                      AudienceSpatialBracketView(
+                        bracket,
+                        seRounds,
+                        handicapContext,
+                        resultsContext
+                      )
+                    } else {
+                      AudienceBracketView(
+                        bracket,
+                        seRounds,
+                        handicapContext,
+                        resultsContext
+                      )
+                    }
                   div(
                     cls := "bracket-container",
                     if (t.completed) {
@@ -112,12 +135,7 @@ object AudienceApp {
                     } else {
                       emptyNode
                     },
-                    AudienceBracketView(
-                      bracket,
-                      BracketFormat.forBracket(bracket.size, t.topN).seRounds,
-                      BracketHandicapContext.fromTournament(t),
-                      resultsContext
-                    )
+                    bracketView
                   )
                 case None =>
                   div(p("Bracket not seeded yet."))
@@ -210,5 +228,86 @@ object AudienceApp {
       |}
       |.match-bye { font-style: italic; opacity: 0.75; }
       |.match-forfeit { font-style: italic; opacity: 0.75; }
+      |
+      |/* Spatial bracket — namespaced; list selectors above unchanged */
+      |.audience-app:has(.spatial-bracket) {
+      |  max-width: none;
+      |}
+      |.spatial-bracket {
+      |  margin-top: 0.5rem;
+      |}
+      |.spatial-band + .spatial-band {
+      |  margin-top: 1.75rem;
+      |  padding-top: 1.5rem;
+      |  border-top: 1px solid #ddd;
+      |}
+      |.spatial-band h2 {
+      |  margin: 0 0 1rem;
+      |  font-size: 1.1rem;
+      |  font-weight: 600;
+      |  color: #333;
+      |}
+      |.spatial-columns {
+      |  display: flex;
+      |  flex-direction: row;
+      |  align-items: stretch;
+      |  gap: 2.5rem;
+      |}
+      |.spatial-column {
+      |  flex: 0 0 auto;
+      |  min-width: 11rem;
+      |  display: flex;
+      |  flex-direction: column;
+      |  gap: 1.25rem;
+      |}
+      |.spatial-column h3 {
+      |  margin: 0;
+      |  font-size: 0.95rem;
+      |  font-weight: 600;
+      |  color: #333;
+      |  white-space: nowrap;
+      |}
+      |.spatial-cell {
+      |  position: relative;
+      |  display: flex;
+      |  flex-direction: row;
+      |  align-items: baseline;
+      |  padding: 0.3rem 0.6rem;
+      |  border: 1px solid #ddd;
+      |  border-radius: 6px;
+      |  background: #fafafa;
+      |  font-size: 1rem;
+      |  line-height: 1.2;
+      |  white-space: nowrap;
+      |}
+      |.spatial-column:not(:last-child) .spatial-cell::after {
+      |  content: "";
+      |  position: absolute;
+      |  top: 50%;
+      |  right: -1.35rem;
+      |  width: 1.1rem;
+      |  height: 2px;
+      |  background: #ddd;
+      |  transform: translateY(-50%);
+      |}
+      |.spatial-players {
+      |  font-weight: 500;
+      |}
+      |.spatial-cell .match-score {
+      |  font-weight: 600;
+      |  font-size: 1.05rem;
+      |  font-variant-numeric: tabular-nums;
+      |}
+      |.spatial-cell-live {
+      |  border-left: 4px solid #c62828;
+      |  background: #fff5f5;
+      |}
+      |.spatial-cell-ready {
+      |  border-left: 4px solid #f9a825;
+      |}
+      |.spatial-cell-done .spatial-players {
+      |  color: #888;
+      |  opacity: 0.75;
+      |}
       |""".stripMargin
 }
