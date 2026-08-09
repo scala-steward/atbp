@@ -64,12 +64,13 @@ object AudienceSpatialLayout {
       )
       .toList
       .map { case ((section, round), grouped) =>
+        val roundVisible = grouped.exists(BracketLayout.showForAudience)
         PreparedColumn(
           section = section,
           round = round,
           allMatches = grouped,
           shownMatches = grouped
-            .filter(BracketLayout.showForAudience)
+            .filter(m => BracketLayout.showInVisibleRound(m, roundVisible))
             .sortBy(m => BracketLayout.matchSeedIndex(m.id))
         )
       }

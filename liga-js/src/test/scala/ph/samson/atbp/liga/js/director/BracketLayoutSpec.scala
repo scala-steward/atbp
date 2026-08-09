@@ -62,7 +62,9 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         groups.head.round == 3
       )
     },
-    test("groupMatches omits empty Pending matches with neither player") {
+    test(
+      "groupMatches shows empty Pending in a round that is already visible"
+    ) {
       val hidden = BracketMatch(
         id = "wb-1-1",
         playerA = None,
@@ -82,7 +84,7 @@ object BracketLayoutSpec extends ZIOSpecDefault {
         )
       assertTrue(
         groups.length == 1,
-        groups.head.matches.map(_.id) == List("wb-1-2")
+        groups.head.matches.map(_.id) == List("wb-1-1", "wb-1-2")
       )
     },
     test(
@@ -326,7 +328,7 @@ object BracketLayoutSpec extends ZIOSpecDefault {
             (BracketLayout.Section.Winners, 2),
             (BracketLayout.Section.Winners, 3)
           ),
-        groups.head.matches.map(_.id) == List("wb-2-1")
+        groups.head.matches.map(_.id) == List("wb-2-2", "wb-2-1")
       )
     },
     test(

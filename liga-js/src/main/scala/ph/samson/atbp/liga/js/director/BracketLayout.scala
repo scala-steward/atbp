@@ -78,6 +78,11 @@ object BracketLayout {
   def roundOf(matchId: String, bracketSize: Int): Int =
     bracketRound(matchId, bracketSize).getOrElse(0)
 
+  private def isEmptyPending(m: BracketMatch): Boolean =
+    m.state == BracketMatchState.Pending &&
+      m.playerA.isEmpty &&
+      m.playerB.isEmpty
+
   /** Whether a match should appear on audience list or spatial bracket views.
     */
   def showForAudience(m: BracketMatch): Boolean =
@@ -87,9 +92,12 @@ object BracketLayout {
     ) {
       false
     } else {
-      m.state != BracketMatchState.Pending ||
-      m.playerA.isDefined || m.playerB.isDefined
+      !isEmptyPending(m)
     }
+
+  /** Per-match visibility once its round is already on screen. */
+  def showInVisibleRound(m: BracketMatch, roundVisible: Boolean): Boolean =
+    showForAudience(m) || (roundVisible && isEmptyPending(m))
 
   private def showInList(m: BracketMatch): Boolean = showForAudience(m)
 
@@ -151,11 +159,14 @@ object BracketLayout {
       .groupBy(m => (sectionOf(m.id), roundOf(m.id, bracketSize)))
       .toList
       .map { case ((section, round), grouped) =>
+        val roundVisible = grouped.exists(showInList)
         PreparedGroup(
           section = section,
           round = round,
           allMatches = grouped,
-          shownMatches = grouped.filter(showInList).sortBy(matchSortKey)
+          shownMatches = grouped
+            .filter(m => showInVisibleRound(m, roundVisible))
+            .sortBy(matchSortKey)
         )
       }
       .filter(_.shownMatches.nonEmpty)
