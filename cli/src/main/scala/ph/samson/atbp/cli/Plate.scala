@@ -19,7 +19,8 @@ import zio.cli.Options
 import zio.http.ZClient
 
 case class Plate(action: Action) extends ToolCommand {
-  override def run(conf: Conf): ZIO[Any, Throwable, Unit] = action.run(conf)
+  override def run(conf: Conf): ZIO[Any, Throwable, Unit] =
+    action.run(conf).withParallelism(100)
 }
 
 object Plate {
