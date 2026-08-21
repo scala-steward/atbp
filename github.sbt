@@ -6,6 +6,8 @@ ThisBuild / githubWorkflowPublishTargetBranches := Seq(
   RefPredicate.Equals(Ref.Branch("main"))
 )
 
+ThisBuild / githubWorkflowEnv += "SBT_OPTS" -> "-Xmx12G"
+
 ThisBuild / githubWorkflowGeneratedCI := (ThisBuild / githubWorkflowGeneratedCI).value
   .map {
     case publish if publish.id == "publish" && publish.permissions.isEmpty =>
