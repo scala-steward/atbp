@@ -59,6 +59,10 @@ lazy val cli = atbpModule("cli")
         Nil
       }
     },
+    // Multi-arch publish via `docker buildx build --push`. Each platform
+    // runs the Dockerfile RUN layers under that arch, so the pinned d2
+    // install below picks amd64 vs arm64 via `dpkg --print-architecture`.
+    dockerBuildxPlatforms := Seq("linux/amd64", "linux/arm64"),
     dockerCommands ++= Seq(
       Cmd("USER", "root"),
       Cmd(

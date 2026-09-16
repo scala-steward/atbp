@@ -26,6 +26,14 @@ ThisBuild / githubWorkflowGeneratedCI := (ThisBuild / githubWorkflowGeneratedCI)
   }
 
 ThisBuild / githubWorkflowPublishPreamble := Seq(
+  WorkflowStep.Use(
+    UseRef.Public("docker", "setup-qemu-action", "v4"),
+    name = Some("Set up QEMU")
+  ),
+  WorkflowStep.Use(
+    UseRef.Public("docker", "setup-buildx-action", "v4"),
+    name = Some("Set up Docker Buildx")
+  ),
   WorkflowStep.Run(
     commands = List(
       """echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin"""
