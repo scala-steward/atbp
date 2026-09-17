@@ -36,13 +36,20 @@ object Parser {
       FrontMatter(Some(title))
   }
 
-  def parse(source: File) = {
+  def parse(source: File): Task[Parsed] = parse(source, Map.empty)
+
+  def parse(source: File, pages: Map[File, String]): Task[Parsed] = {
     val p = for {
       content <- ZIO.attemptBlockingIO(source.contentAsString)
       (frontMatter, markdown) = splitFrontMatter(content)
       fm <- parseFrontMatter(frontMatter)
-      doc <- parseMarkdown(markdown)
-      contentHash <- computeHash(markdown)
+      (doc, links) <-
+        if (pages.isEmpty) parseMarkdown(markdown).map(_ -> Nil)
+        else ZIO.attempt(DocumentLinks.parse(markdown, source, pages))
+      markdownHash <- computeHash(markdown)
+      contentHash <-
+        if (links.isEmpty) ZIO.succeed(markdownHash)
+        else computeHash((markdownHash :: links).mkString("\n"))
     } yield {
       Parsed(fm, doc, contentHash)
     }

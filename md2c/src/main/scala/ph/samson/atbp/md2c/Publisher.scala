@@ -13,6 +13,7 @@ import ph.samson.atbp.confluence.model.PageBodyWrite
 import ph.samson.atbp.confluence.model.PageSingle
 import ph.samson.atbp.confluence.model.Space
 import ph.samson.atbp.confluence.model.UpdatePageRequest
+import ph.samson.atbp.md2c.SourceTree.Node
 import ph.samson.atbp.md2c.StagedTree.Page
 import zio.Task
 import zio.ZIO
@@ -30,53 +31,71 @@ object Publisher {
 
   private class LiveImpl(client: Client, conf: Conf) extends Publisher {
 
+    private case class PreparedPage(
+        source: File,
+        current: PageSingle,
+        currentChildren: List[ChildPage],
+        children: List[PreparedPage]
+    ) {
+      def allPages: List[PreparedPage] = this :: children.flatMap(_.allPages)
+    }
+
     override def publish(source: SourceTree): Task[PageSingle] =
       ZIO.scoped(ZIO.logSpan("publish") {
         for {
-          staged <- StagedTree.from(source)
           finalConf <- conf.finalConf(source.conf)
           given Conf.Final = finalConf
           given Space <- client.getSpace(finalConf.spaceKey)
           rootPage <- client.getPage(finalConf.pageId)
+          // Reserve every ID before resolving links, including forward references.
+          prepared <- preparePage(source.root, rootPage)
+          pageUrls = prepared.allPages.map { page =>
+            page.source -> client.resolveUrl(page.current._links.webui).encode
+          }.toMap
+          staged <- StagedTree.from(source, pageUrls)
           baseDir =
             if (staged.root.source.isDirectory) staged.root.source
             else staged.root.source.parent
-          published <- publishPage(staged.root, rootPage, baseDir)
+          published <- publishPage(staged.root, prepared, baseDir)
         } yield published
       })
 
-    def publishPage(
-        page: Page,
-        parentId: String,
-        currentPages: List[ChildPage],
-        baseDir: File
-    )(using
-        conf: Conf.Final,
-        space: Space
-    ): Task[PageSingle] = {
-
+    private def preparePage(node: Node, current: PageSingle)(using
+        Space
+    ): Task[PreparedPage] =
       for {
-        current <- currentPage(page, parentId, currentPages)
-        published <- publishPage(page, current, baseDir)
-      } yield published
-    }
+        currentChildren <- client.getChildPages(current.id)
+        children <- ZIO.foreachPar(Page.children(node)) { child =>
+          for {
+            parsed <- Page.parse(child)
+            title = parsed.frontMatter.title.getOrElse(child.name)
+            page <- currentChildren.find(_.title == title) match {
+              case Some(existing) => client.getPage(existing.id)
+              case None           => createDraft(title, parsed.doc, current.id)
+            }
+            prepared <- preparePage(child, page)
+          } yield prepared
+        }
+      } yield PreparedPage(node.source, current, currentChildren, children)
 
-    def publishPage(
+    private def publishPage(
         page: Page,
-        current: PageSingle,
+        prepared: PreparedPage,
         baseDir: File
     )(using
         conf: Conf.Final,
         space: Space
     ): Task[PageSingle] = {
+      val current = prepared.current
       val sourceName =
         if (baseDir == page.source) baseDir.name
         else baseDir.relativize(page.source)
       val publish = for {
-        currentChildren <- client.getChildPages(current.id)
-        publishedChildren <- ZIO.foreachPar(page.children)(
-          publishPage(_, current.id, currentChildren, baseDir)
-        )
+        publishedChildren <- ZIO.foreachPar(
+          page.children.zip(prepared.children)
+        ) { case (child, preparedChild) =>
+          publishPage(child, preparedChild, baseDir)
+        }
         currentAttachments <- client.getPageAttachments(current.id)
         attachmentsAreUpToDate = {
           val hashes = currentAttachments.map(_.comment)
@@ -113,7 +132,7 @@ object Publisher {
 
         extraChildren = {
           val publishedIds = published.id :: publishedChildren.map(_.id)
-          currentChildren.map(_.id).filterNot(publishedIds.contains)
+          prepared.currentChildren.map(_.id).filterNot(publishedIds.contains)
         }
         _ <- deletePages(extraChildren)
       } yield published
@@ -121,32 +140,17 @@ object Publisher {
       publish.mapError(cause => PublishingFailed(page, cause))
     }
 
-    def currentPage(
-        page: Page,
-        parentId: String,
-        currentPages: List[ChildPage]
-    )(using space: Space) = {
-      currentPages.find(_.title == page.title).map(_.id) match {
-        case Some(id) => getPage(id)
-        case None     => createDraft(page, parentId)
-      }
-    }
-
-    def getPage(id: String) = {
-      for {
-        result <- client.getPage(id)
-      } yield result
-    }
-
-    def createDraft(page: Page, parentId: String)(using space: Space) = {
+    def createDraft(title: String, doc: Doc, parentId: String)(using
+        space: Space
+    ) = {
       for {
         result <- client.createPage(
           CreatePageRequest(
             spaceId = space.id,
             status = "draft",
-            title = page.title,
+            title = title,
             parentId = parentId,
-            body = PageBodyWrite(page.adf)
+            body = PageBodyWrite(doc)
           )
         )
       } yield result

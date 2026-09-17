@@ -51,13 +51,18 @@ object StagedTree {
     }
   }
 
-  def from(source: SourceTree) = for {
-    root <- Page.convert(source.root)
+  def from(source: SourceTree): ZIO[Any & Scope, Throwable, StagedTree] =
+    from(source, Map.empty)
+
+  def from(source: SourceTree, pages: Map[File, String]) = for {
+    root <- Page.convert(source.root, pages)
   } yield StagedTree(root)
 
   object Page {
 
-    def parse(node: Node): Task[Parsed] = node match {
+    def parse(node: Node): Task[Parsed] = parse(node, Map.empty)
+
+    def parse(node: Node, pages: Map[File, String]): Task[Parsed] = node match {
       case Directory(name, _, _) =>
         ZIO.succeed(
           Parsed(
@@ -66,8 +71,8 @@ object StagedTree {
             "directory listing"
           )
         )
-      case MarkdownBranch(_, content, _) => Parser.parse(content)
-      case MarkdownLeaf(_, content)      => Parser.parse(content)
+      case MarkdownBranch(_, content, _) => Parser.parse(content, pages)
+      case MarkdownLeaf(_, content)      => Parser.parse(content, pages)
       case unhandled                     =>
         ZIO.fail(
           new IllegalArgumentException(s"No ADF Doc for content: $unhandled")
@@ -93,14 +98,20 @@ object StagedTree {
       case Node.Data(_, _)                => true
     }
 
-    def convert(node: Node): ZIO[Any & Scope, Throwable, Page] = {
+    def convert(node: Node): ZIO[Any & Scope, Throwable, Page] =
+      convert(node, Map.empty)
+
+    def convert(
+        node: Node,
+        pages: Map[File, String]
+    ): ZIO[Any & Scope, Throwable, Page] = {
       for {
-        Parsed(frontMatter, sourceDoc, contentHash) <- parse(node)
+        Parsed(frontMatter, sourceDoc, contentHash) <- parse(node, pages)
         plantUmlRendered <- PlantUml.transform(sourceDoc)
         mermaidRendered <- Mermaid.transform(plantUmlRendered)
         d2Rendered <- D2.transform(mermaidRendered)
         extensionsRendered = Extensions.transform(d2Rendered)
-        children <- ZIO.foreachPar(children(node))(convert)
+        children <- ZIO.foreachPar(children(node))(convert(_, pages))
       } yield Page(
         node.name,
         node.source,

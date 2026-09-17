@@ -42,12 +42,13 @@ distinguishing "D2 verified" from "D2 not verified" on a given run.
 
 ## Pipeline
 
-`SourceTree` → `StagedTree` → `Publisher`
+`SourceTree` → reserve page IDs → `StagedTree` → publish content
 
 1. Walk up from the given dir until `.md2c.conf` (HOCON `spaceKey`, `pageId`)
-2. Parse MD → ADF, then PlantUML, then Mermaid, then D2, then Extensions; drop
+2. Match existing pages / create drafts for the whole tree to resolve page IDs
+3. Resolve document links, then parse MD → ADF, then PlantUML, then Mermaid, then D2, then Extensions; drop
    Data nodes and empty dirs
-3. Create drafts / update pages; attach media; skip if up to date
+4. Update pages; attach media; skip if up to date
 
 `spaceKey`: source conf, else user `md2c.Conf`. `pageId`: source conf only.
 
@@ -57,8 +58,14 @@ distinguishing "D2 verified" from "D2 not verified" on a given run.
 - Dotfiles skipped in the walk (`.md2c.conf` is loaded separately, not a page)
 - Title = YAML `title:` else node name; strip a leading H1 that duplicates title
 - Front matter must start at byte 0 with `---\n`
-- Content hash is SHA-1 of the markdown **body** (stored in version.message);
-  a title-only front-matter change does **not** republish
+- Content hash is SHA-1 of the markdown **body** (stored in version.message),
+  combined with resolved document-link URLs when present; a destination page ID
+  change republishes incoming links. A title-only front-matter change does **not**
+  republish the page itself
+- `DocumentLinks` resolves relative links to source paths in the published tree,
+  before ADF conversion (which drops relative links). It uses CommonMark's AST
+  with adf-builder's extensions, then `MarkdownParser.children` for ADF conversion.
+  Link text, title, formatting, query and fragment are preserved
 - Directory-only pages get `Extensions.childPages`; extra Confluence children
   and attachments not in the source tree are deleted
 - New pages are created as `draft`; existing pages matched by title
