@@ -3,6 +3,7 @@ package ph.samson.atbp.cli
 import better.files.File
 import ph.samson.atbp.cli.Plate.Action
 import ph.samson.atbp.jira.Client
+import ph.samson.atbp.plate.CookingExclude
 import ph.samson.atbp.plate.Inspector
 import ph.samson.atbp.plate.Labeler
 import ph.samson.atbp.plate.RadarScanner
@@ -89,16 +90,29 @@ object Plate {
     }
   }
 
-  private case class Check(source: File, target: Option[File], status: Status)
-      extends Action {
+  private case class Check(
+      source: File,
+      target: Option[File],
+      status: Status,
+      exclude: List[String]
+  ) extends Action {
     override def run(conf: Conf): ZIO[Any, Throwable, Unit] = {
       conf.jiraConf match {
         case None       => ZIO.fail(new Exception("No jira config."))
         case Some(jira) =>
+          val statusName = status match {
+            case Check.Cooking => "cooking"
+            case Check.Stale   => "stale"
+            case Check.Done    => "done"
+          }
           val check = for {
+            _ <- ZIO
+              .fromOption(CookingExclude.rejectedStatus(statusName, exclude))
+              .flip
+              .mapError(msg => new Exception(msg))
             inspector <- ZIO.service[Inspector]
             result <- status match {
-              case Check.Cooking => inspector.cooking(source, target)
+              case Check.Cooking => inspector.cooking(source, target, exclude)
               case Check.Stale   => inspector.stale(source, target)
               case Check.Done    => inspector.done(source, target)
             }
@@ -122,9 +136,14 @@ object Plate {
       "done" -> Done
     )
 
-    val command = Command("check", status ++ target, source).map {
-      case ((status, target), source) =>
-        Check(source, target.map(File(_)), status)
+    val exclude = Options
+      .text("exclude")
+      .map(_.split(',').toList.map(_.trim).filter(_.nonEmpty))
+      .withDefault(Nil) ?? "Projects to exclude"
+
+    val command = Command("check", status ++ target ++ exclude, source).map {
+      case ((status, target, exclude), source) =>
+        Check(source, target.map(File(_)), status, exclude)
     }
   }
 

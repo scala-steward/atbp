@@ -21,7 +21,11 @@ import scala.annotation.tailrec
 import scala.util.control.NoStackTrace
 
 trait Inspector {
-  def cooking(source: File, target: Option[File]): Task[File]
+  def cooking(
+      source: File,
+      target: Option[File],
+      excludeProjects: List[String]
+  ): Task[File]
   def stale(source: File, target: Option[File]): Task[File]
   def done(source: File, target: Option[File]): Task[File]
 }
@@ -31,6 +35,9 @@ object Inspector {
   val JiraLink = """.*\(https://.*/browse/([A-Z]+-\d+)\).*""".r
   val CookingProgressDays = 14
   val StaleProgressDays = 28
+
+  private def excludeKey(key: String, excludeProjects: List[String]): Boolean =
+    excludeProjects.contains(key.substring(0, key.indexOf('-')))
 
   private def includeLine(
       check: String => Task[Boolean]
@@ -313,7 +320,11 @@ object Inspector {
 
     case class FatTree(issue: FatIssue, descendants: List[FatIssue])
 
-    override def cooking(source: File, target: Option[File]): Task[File] = {
+    override def cooking(
+        source: File,
+        target: Option[File],
+        excludeProjects: List[String]
+    ): Task[File] = {
       val enrichLine: String => Task[Enriched[FatTree]] = enrichKey { key =>
         for {
           issueReq <- client.getIssue(key).fork
@@ -321,7 +332,11 @@ object Inspector {
           issue <- issueReq.join
           fatIssueReq <- FatIssue.of(issue).fork
           descendants <- descendantsReq.join
-          fatDescendantsReq <- ZIO.foreachPar(descendants)(FatIssue.of).fork
+          includedDescendants =
+            descendants.filterNot(d => excludeKey(d.key, excludeProjects))
+          fatDescendantsReq <- ZIO
+            .foreachPar(includedDescendants)(FatIssue.of)
+            .fork
           (fatIssue, fatDescendants) <- fatIssueReq.join.zipPar(
             fatDescendantsReq.join
           )
