@@ -25,10 +25,13 @@ import zio.http.Header.UserAgent
 import zio.http.Header.UserAgent.ProductOrComment
 import zio.http.Headers
 import zio.http.MediaType
+import zio.http.Method
+import zio.http.Request
 import zio.http.Status
 import zio.http.URL
 import zio.http.ZClient
 import zio.http.ZClientAspect
+import zio.schema.codec.BinaryCodec
 
 import scala.annotation.tailrec
 
@@ -70,6 +73,19 @@ object Client {
 
     val platformClient = client.addPath("/rest/api/3")
     val softwareClient = client.addPath("/rest/agile/1.0")
+
+    private def decoded[A: BinaryCodec](
+        requestClient: HttpClient,
+        method: Method,
+        expected: String,
+        body: Body,
+        context: String
+    ): ZIO[Scope, Throwable, A] =
+      requestClient.batched(Request(method = method, body = body)).flatMap {
+        response =>
+          ResponseDecoding
+            .decode[A](response, method, requestClient.url, expected, context)
+      }
 
     override def getChangelogs(key: String): Task[List[Changelog]] = {
       def tail(head: PageBean[Changelog]) = {
@@ -118,12 +134,18 @@ object Client {
         _ <- ZIO.logDebug(
           s"Requesting changelogs ${startAt + 1} to ${startAt + maxResults}"
         )
-        res <- platformClient
-          .addHeader(ContentType(MediaType.application.json))
-          .addPath("issue")
-          .addPath(issueIdOrKey)
-          .get("/changelog")
-        results <- res.body.to[PageBean[Changelog]]
+        results <- decoded[PageBean[Changelog]](
+          platformClient
+            .addHeader(ContentType(MediaType.application.json))
+            .addPath("issue")
+            .addPath(issueIdOrKey)
+            .addPath("changelog"),
+          Method.GET,
+          "PageBean[Changelog]",
+          Body.empty,
+          context =
+            s"getChangelogs($issueIdOrKey), startAt=$startAt, maxResults=$maxResults"
+        )
         _ <- ZIO.logDebug(
           s"Got changelogs ${results.startAt + 1} to ${results.startAt + results.values.length}"
         )
@@ -180,13 +202,19 @@ object Client {
         _ <- ZIO.logDebug(
           s"Requesting comments ${startAt + 1} to ${startAt + maxResults}"
         )
-        res <- platformClient
-          .addHeader(ContentType(MediaType.application.json))
-          .addPath("issue")
-          .addPath(issueIdOrKey)
-          .addQueryParam("expand", "renderedBody")
-          .get("/comment")
-        results <- res.body.to[PageOfComments]
+        results <- decoded[PageOfComments](
+          platformClient
+            .addHeader(ContentType(MediaType.application.json))
+            .addPath("issue")
+            .addPath(issueIdOrKey)
+            .addQueryParam("expand", "renderedBody")
+            .addPath("comment"),
+          Method.GET,
+          "PageOfComments",
+          Body.empty,
+          context =
+            s"getComments($issueIdOrKey), startAt=$startAt, maxResults=$maxResults"
+        )
         _ <- ZIO.logDebug(
           s"Got comments ${results.startAt + 1} to ${results.startAt + results.comments.length}"
         )
@@ -216,10 +244,16 @@ object Client {
         page: Int
     ): ZIO[Scope, Throwable, List[Issue]] = ZIO.logSpan(s"page $page") {
       for {
-        res <- platformClient
-          .addHeader(ContentType(MediaType.application.json))
-          .post("/search/jql")(Body.from(request))
-        results <- res.body.to[SearchResults]
+        results <- decoded[SearchResults](
+          platformClient
+            .addHeader(ContentType(MediaType.application.json))
+            .addPath("search/jql"),
+          Method.POST,
+          "SearchResults",
+          Body.from(request),
+          context =
+            s"search page=$page, maxResults=${request.maxResults}, jql=${request.jql}"
+        )
         _ <- ZIO.logDebug(
           s"Got ${results.length} results in page $page."
         )
@@ -234,10 +268,13 @@ object Client {
 
     override def getIssue(key: String): Task[Issue] =
       ZIO.scoped(ZIO.logSpan(s"getIssue($key)") {
-        for {
-          response <- platformClient.addPath("issue").get(key)
-          result <- response.body.to[Issue]
-        } yield result
+        decoded[Issue](
+          platformClient.addPath("issue").addPath(key),
+          Method.GET,
+          "Issue",
+          Body.empty,
+          s"getIssue($key)"
+        )
       })
 
     override def addLabel(key: String, label: String): Task[Unit] =
