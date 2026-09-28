@@ -241,7 +241,7 @@ object Inspector {
             } yield {
               s"    * ${item.field} -> $toValue"
             }
-            s"* <small>🚧</small> $created change by [${author.displayName}]" :: details
+            s"* <small>🚧</small> $created change by [${author.map(_.displayName).getOrElse("Unknown")}]" :: details
         }
 
         val progressComments = comments.filter {

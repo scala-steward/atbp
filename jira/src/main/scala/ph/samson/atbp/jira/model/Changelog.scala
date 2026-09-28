@@ -12,7 +12,7 @@ import Changelog.*
 
 case class Changelog(
     id: String,
-    author: UserDetails,
+    author: Option[UserDetails],
     created: ZonedDateTime,
     items: List[ChangeDetails],
     historyMetadata: Option[HistoryMetadata]

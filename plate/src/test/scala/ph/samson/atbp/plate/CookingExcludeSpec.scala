@@ -160,7 +160,7 @@ object CookingExcludeSpec extends ZIOSpecDefault {
     )
     Changelog(
       id = "1",
-      author = author,
+      author = Some(author),
       created = testTime,
       items = List(
         ChangeDetails(
@@ -192,7 +192,9 @@ object CookingExcludeSpec extends ZIOSpecDefault {
     test("rejectedStatus allows stale with empty exclude") {
       assertTrue(CookingExclude.rejectedStatus("stale", Nil).isEmpty)
     },
-    test("empty exclude still reports cooking") {
+    test(
+      "empty exclude still reports cooking with an unknown changelog author"
+    ) {
       val key = "ABC-123"
       val plateLine =
         s"- [ABC-123 Summary](https://example.atlassian.net/browse/$key)"
@@ -215,6 +217,8 @@ object CookingExcludeSpec extends ZIOSpecDefault {
       } yield assertTrue(
         result.path == expected.path,
         content.contains(plateLine),
+        content.contains("change by [Unknown]"),
+        content.contains("status -> In Progress"),
         getIssueKeys == List(key)
       )
     },
@@ -475,7 +479,7 @@ object CookingExcludeSpec extends ZIOSpecDefault {
         "INC-5" -> List(cookingIssue("INC-2"), cookingIssue("EXC-3"))
       ),
       changelogs = Map(
-        "ABC-123" -> List(progressChangelog),
+        "ABC-123" -> List(progressChangelog.copy(author = None)),
         "ABC-1" -> List(progressChangelog),
         "ABC-2" -> List(progressChangelog),
         "ABC-4" -> List(progressChangelog),

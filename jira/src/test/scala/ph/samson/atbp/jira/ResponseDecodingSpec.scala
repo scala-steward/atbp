@@ -46,13 +46,30 @@ object ResponseDecodingSpec extends ZIOSpecDefault {
   }
 
   override def spec = suite("Jira response decoding")(
+    test("decodes changelogs with missing, null and present authors") {
+      val body =
+        """{"self":"page","startAt":0,"maxResults":100,"total":3,"isLast":true,"values":[
+          |{"id":"missing","created":"2026-09-28T00:00:00.000+0000","items":[]},
+          |{"id":"null","author":null,"created":"2026-09-28T00:00:00.000+0000","items":[]},
+          |{"id":"present","author":{"self":"user","accountId":"123","displayName":"Test","active":true,"timeZone":"UTC","accountType":"atlassian"},"created":"2026-09-28T00:00:00.000+0000","items":[]}
+          |]}""".stripMargin
+      for {
+        changelogs <- ZIO
+          .serviceWithZIO[Client](_.getChangelogs("TEST-42"))
+          .provide(clientLayer(Response.json(body)))
+      } yield assertTrue(
+        changelogs.map(_.id) == List("missing", "null", "present"),
+        changelogs
+          .map(_.author.map(_.displayName)) == List(None, None, Some("Test"))
+      )
+    },
     test(
       "identifies the request, type and failing object beyond the response prefix"
     ) {
       val valid =
         """{"id":"earlier","author":{"self":"user","accountId":"123","displayName":"Test","active":true,"timeZone":"UTC","accountType":"atlassian"},"created":"2026-09-28T00:00:00.000+0000","items":[]}"""
       val invalid =
-        """{"id":"bad-history-73","created":"2026-09-28T00:00:00.000+0000","items":[]}"""
+        """{"id":"bad-history-73","items":[]}"""
       val values = (List.fill(73)(valid) :+ invalid).mkString(",")
       val body =
         s"""{"self":"page","startAt":0,"maxResults":100,"total":74,"isLast":true,"values":[$values]}"""
@@ -74,7 +91,7 @@ object ResponseDecodingSpec extends ZIOSpecDefault {
             ),
             message.contains("PageBean[Changelog]"),
             message.contains("200"),
-            message.contains(".values[73].author(missing)"),
+            message.contains(".values[73].created(missing)"),
             message.contains("bad-history-73"),
             message.contains("request-123"),
             message.contains("\"startAt\":0"),
