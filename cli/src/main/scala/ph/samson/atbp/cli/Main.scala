@@ -115,7 +115,7 @@ object Main extends ZIOCliDefault {
   lazy val quietLogger = {
     val configProvider = TypesafeConfigProvider.fromHoconString(
       """logger {
-        |  format = "%message"
+        |  format = "%message%cause"
         |  filter {
         |    rootLevel = WARN
         |  }
@@ -130,7 +130,7 @@ object Main extends ZIOCliDefault {
   lazy val regularLogger = {
     val configProvider = TypesafeConfigProvider.fromHoconString(
       """logger {
-        |  format = "%message"
+        |  format = "%message%cause"
         |  filter {
         |    rootLevel = INFO
         |  }

@@ -2,6 +2,7 @@ package ph.samson.atbp.http
 
 import io.netty.channel.unix.Errors.NativeIoException
 import io.netty.handler.codec.PrematureChannelClosureException
+import io.netty.handler.timeout.TimeoutException
 import zio.Schedule
 import zio.ZIO
 import zio.durationInt
@@ -17,7 +18,9 @@ object ConnectionRetry {
 
   def isRetryable(t: Throwable): ZIO[Any, Nothing, Boolean] = t match {
     case _: PrematureChannelClosureException => ZIO.succeed(true)
-    case nie: NativeIoException              =>
+    case timeout: TimeoutException           =>
+      ZIO.logWarning(s"retrying Netty timeout: $timeout") *> ZIO.succeed(true)
+    case nie: NativeIoException =>
       ZIO.logWarning(s"retrying NativeIoException: $nie") *> ZIO.succeed(true)
     case ioe: IOException =>
       ZIO.logWarning(s"retrying IOException: $ioe") *> ZIO.succeed(true)

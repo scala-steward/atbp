@@ -1,5 +1,8 @@
 package ph.samson.atbp.http
 
+import io.netty.handler.timeout.ReadTimeoutException
+import io.netty.handler.timeout.WriteTimeoutException
+import zio.Promise
 import zio.Ref
 import zio.Scope
 import zio.ZIO
@@ -24,7 +27,7 @@ object StatusCheckSpec extends ZIOSpecDefault {
   private def failFirstRequest(
       client: Client,
       first: Ref[Boolean],
-      err: Throwable
+      failure: ZIO[Any, Throwable, Nothing]
   ): Client = {
     val oldDriver = client.driver
     val newDriver = new ZClient.Driver[Any, Scope, Throwable] {
@@ -38,7 +41,7 @@ object StatusCheckSpec extends ZIOSpecDefault {
           proxy: Option[Proxy]
       )(implicit trace: zio.Trace): ZIO[Any & Scope, Throwable, Response] =
         first.getAndSet(false).flatMap {
-          case true  => ZIO.fail(err)
+          case true  => failure
           case false =>
             oldDriver.request(
               version,
@@ -179,7 +182,7 @@ object StatusCheckSpec extends ZIOSpecDefault {
         failing = failFirstRequest(
           client,
           first,
-          new IOException("connection reset")
+          ZIO.fail(new IOException("connection reset"))
         )
         fiber <- checked(failing, StatusCheck.SafeMethods)
           .batched(Request.put(URL.root / "item", Body.fromString("{}")))
@@ -188,6 +191,149 @@ object StatusCheckSpec extends ZIOSpecDefault {
         res <- fiber.join
         n <- hits.get
       } yield assertTrue(res.status.isSuccess, n == 1)
+    },
+    test("retries a Netty read timeout before receiving a status") {
+      for {
+        first <- Ref.make(true)
+        _ <- TestClient.addRoute(
+          Method.GET / "item" -> handler(Response.ok)
+        )
+        client <- ZIO.service[Client]
+        failing = failFirstRequest(
+          client,
+          first,
+          ZIO.fail(ReadTimeoutException.INSTANCE)
+        )
+        fiber <- checked(failing, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .either
+          .fork
+        _ <- TestClock.adjust(1.hour)
+        result <- fiber.join
+      } yield assertTrue(result.exists(_.status.isSuccess))
+    },
+    test("retries a Netty write timeout before receiving a status") {
+      for {
+        first <- Ref.make(true)
+        _ <- TestClient.addRoute(
+          Method.GET / "item" -> handler(Response.ok)
+        )
+        client <- ZIO.service[Client]
+        failing = failFirstRequest(
+          client,
+          first,
+          ZIO.fail(WriteTimeoutException.INSTANCE)
+        )
+        fiber <- checked(failing, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .exit
+          .fork
+        _ <- TestClock.adjust(1.hour)
+        result <- fiber.join
+      } yield assertTrue(result.exists(_.status.isSuccess))
+    },
+    test("retries GET when the response body reports a read timeout") {
+      for {
+        hits <- Ref.make(0)
+        _ <- TestClient.addRoute(
+          Method.GET / "item" -> handler { (_: Request) =>
+            hits.updateAndGet(_ + 1).map {
+              case 1 =>
+                Response.ok.copy(
+                  body = Body.fromStreamChunked(
+                    ZStream.fail(ReadTimeoutException.INSTANCE)
+                  )
+                )
+              case _ => Response.text("recovered")
+            }
+          }
+        )
+        client <- ZIO.service[Client]
+        fiber <- checked(client, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .flatMap(_.body.asString)
+          .exit
+          .fork
+        _ <- TestClock.adjust(1.hour)
+        result <- fiber.join
+        n <- hits.get
+      } yield assertTrue(result.exists(_ == "recovered"), n == 2)
+    },
+    test("does not treat an InterruptedException as a transport failure") {
+      for {
+        first <- Ref.make(true)
+        _ <- TestClient.addRoute(Method.GET / "item" -> handler(Response.ok))
+        client <- ZIO.service[Client]
+        err = new InterruptedException("request interrupted")
+        failing = failFirstRequest(client, first, ZIO.fail(err))
+        fiber <- checked(failing, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .either
+          .fork
+        _ <- TestClock.adjust(1.hour)
+        result <- fiber.join
+      } yield assertTrue(result == Left(err))
+    },
+    test("preserves an interruption reported by the HTTP driver") {
+      for {
+        first <- Ref.make(true)
+        _ <- TestClient.addRoute(Method.GET / "item" -> handler(Response.ok))
+        client <- ZIO.service[Client]
+        failing = failFirstRequest(client, first, ZIO.interrupt)
+        fiber <- checked(failing, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .exit
+          .fork
+        _ <- TestClock.adjust(1.hour)
+        result <- fiber.join
+      } yield assertTrue(result.isInterrupted)
+    },
+    test("does not replay PUT after its successful body is interrupted") {
+      for {
+        hits <- Ref.make(0)
+        _ <- TestClient.addRoute(
+          Method.PUT / "item" -> handler { (_: Request) =>
+            hits
+              .update(_ + 1)
+              .as(
+                Response.ok.copy(
+                  body = Body.fromStreamChunked(ZStream.fromZIO(ZIO.interrupt))
+                )
+              )
+          }
+        )
+        client <- ZIO.service[Client]
+        result <- checked(client, StatusCheck.SafeMethods)
+          .batched(Request.put(URL.root / "item", Body.fromString("{}")))
+          .exit
+        n <- hits.get
+      } yield assertTrue(result.isFailure, n == 1)
+    },
+    test(
+      "external cancellation stops an in-flight request without replaying it"
+    ) {
+      for {
+        hits <- Ref.make(0)
+        first <- Ref.make(true)
+        started <- Promise.make[Nothing, Unit]
+        _ <- TestClient.addRoute(
+          Method.GET / "item" -> handler { (_: Request) =>
+            hits.update(_ + 1).as(Response.ok)
+          }
+        )
+        client <- ZIO.service[Client]
+        failing = failFirstRequest(
+          client,
+          first,
+          started.succeed(()) *> ZIO.never
+        )
+        fiber <- checked(failing, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .fork
+        _ <- started.await
+        result <- fiber.interrupt
+        n <- hits.get
+      } yield assertTrue(result.isInterrupted, n == 0)
     },
     test("replays POST when the caller opts in") {
       for {
@@ -209,6 +355,32 @@ object StatusCheckSpec extends ZIOSpecDefault {
         body <- fiber.join
         n <- hits.get
       } yield assertTrue(body == "hits", n == 2)
+    },
+    test("caps response timeout retries at ten recurrences") {
+      for {
+        hits <- Ref.make(0)
+        _ <- TestClient.addRoute(
+          Method.GET / "item" -> handler { (_: Request) =>
+            hits
+              .update(_ + 1)
+              .as(
+                Response.ok.copy(
+                  body = Body.fromStreamChunked(
+                    ZStream.fail(ReadTimeoutException.INSTANCE)
+                  )
+                )
+              )
+          }
+        )
+        client <- ZIO.service[Client]
+        fiber <- checked(client, StatusCheck.SafeMethods)
+          .batched(Request.get(URL.root / "item"))
+          .exit
+          .fork
+        _ <- TestClock.adjust(1.hour)
+        result <- fiber.join
+        n <- hits.get
+      } yield assertTrue(n == 11, result.isFailure)
     },
     test("caps connection retries at ten recurrences") {
       for {
