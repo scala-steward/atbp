@@ -32,7 +32,7 @@ object Publisher {
   private class LiveImpl(client: Client, conf: Conf) extends Publisher {
 
     private case class PreparedPage(
-        source: File,
+        node: Node,
         current: PageSingle,
         currentChildren: List[ChildPage],
         children: List[PreparedPage]
@@ -40,62 +40,80 @@ object Publisher {
       def allPages: List[PreparedPage] = this :: children.flatMap(_.allPages)
     }
 
+    // Bound the renderers and attachment operations within each page as well.
     override def publish(source: SourceTree): Task[PageSingle] =
-      ZIO.scoped(ZIO.logSpan("publish") {
-        for {
-          finalConf <- conf.finalConf(source.conf)
-          given Conf.Final = finalConf
-          given Space <- client.getSpace(finalConf.spaceKey)
-          rootPage <- client.getPage(finalConf.pageId)
-          // Reserve every ID before resolving links, including forward references.
-          prepared <- preparePage(source.root, rootPage)
-          pageUrls = prepared.allPages.map { page =>
-            page.source -> client.resolveUrl(page.current._links.webui).encode
-          }.toMap
-          staged <- StagedTree.from(source, pageUrls)
-          baseDir =
-            if (staged.root.source.isDirectory) staged.root.source
-            else staged.root.source.parent
-          published <- publishPage(staged.root, prepared, baseDir)
-        } yield published
-      })
+      ZIO
+        .logSpan("publish") {
+          for {
+            finalConf <- conf.finalConf(source.conf)
+            given Space <- client.getSpace(finalConf.spaceKey)
+            rootPage <- client.getPage(finalConf.pageId).map(withoutBody)
+            // Reserve every ID before resolving links, including forward references.
+            prepared <- preparePage(source.root, rootPage)
+            pageUrls = prepared.allPages.map { page =>
+              page.node.source -> client
+                .resolveUrl(page.current._links.webui)
+                .encode
+            }.toMap
+            baseDir =
+              if (source.root.source.isDirectory) source.root.source
+              else source.root.source.parent
+            published <- publishTree(prepared, pageUrls, baseDir)
+          } yield published
+        }
+        .withParallelism(1)
+
+    // Responses can include large bodies. Only metadata is needed after each
+    // request; retaining the bodies here would grow heap with the whole tree.
+    private def withoutBody(page: PageSingle): PageSingle =
+      page.copy(body = PageSingle.BodySingle(None, None, None))
 
     private def preparePage(node: Node, current: PageSingle)(using
         Space
     ): Task[PreparedPage] =
       for {
         currentChildren <- client.getChildPages(current.id)
-        children <- ZIO.foreachPar(Page.children(node)) { child =>
+        children <- ZIO.foreach(Page.children(node)) { child =>
           for {
-            parsed <- Page.parse(child)
-            title = parsed.frontMatter.title.getOrElse(child.name)
+            frontMatter <- child match {
+              case _: Node.Directory => ZIO.succeed(Parser.FrontMatter.Empty)
+              case _                 => Parser.readFrontMatter(child.source)
+            }
+            title = frontMatter.title.getOrElse(child.name)
             page <- currentChildren.find(_.title == title) match {
-              case Some(existing) => client.getPage(existing.id)
-              case None           => createDraft(title, parsed.doc, current.id)
+              case Some(existing) =>
+                client.getPage(existing.id).map(withoutBody)
+              case None => createDraft(title, current.id).map(withoutBody)
             }
             prepared <- preparePage(child, page)
           } yield prepared
         }
-      } yield PreparedPage(node.source, current, currentChildren, children)
+      } yield PreparedPage(node, current, currentChildren, children)
+
+    private def publishTree(
+        prepared: PreparedPage,
+        pageUrls: Map[File, String],
+        baseDir: File
+    ): Task[PageSingle] = for {
+      // Finish children before rendering their parent, and discard responses
+      // immediately. Neither wide nor deep trees retain completed page bodies.
+      _ <- ZIO.foreachDiscard(prepared.children)(
+        publishTree(_, pageUrls, baseDir)
+      )
+      page <- Page.convertPage(prepared.node, pageUrls)
+      published <- publishPage(page, prepared, baseDir)
+    } yield published
 
     private def publishPage(
         page: Page,
         prepared: PreparedPage,
         baseDir: File
-    )(using
-        conf: Conf.Final,
-        space: Space
     ): Task[PageSingle] = {
       val current = prepared.current
       val sourceName =
         if (baseDir == page.source) baseDir.name
         else baseDir.relativize(page.source)
       val publish = for {
-        publishedChildren <- ZIO.foreachPar(
-          page.children.zip(prepared.children)
-        ) { case (child, preparedChild) =>
-          publishPage(child, preparedChild, baseDir)
-        }
         currentAttachments <- client.getPageAttachments(current.id)
         attachmentsAreUpToDate = {
           val hashes = currentAttachments.map(_.comment)
@@ -131,7 +149,7 @@ object Publisher {
           }
 
         extraChildren = {
-          val publishedIds = published.id :: publishedChildren.map(_.id)
+          val publishedIds = published.id :: prepared.children.map(_.current.id)
           prepared.currentChildren.map(_.id).filterNot(publishedIds.contains)
         }
         _ <- deletePages(extraChildren)
@@ -140,7 +158,7 @@ object Publisher {
       publish.mapError(cause => PublishingFailed(page, cause))
     }
 
-    def createDraft(title: String, doc: Doc, parentId: String)(using
+    def createDraft(title: String, parentId: String)(using
         space: Space
     ) = {
       for {
@@ -150,7 +168,7 @@ object Publisher {
             status = "draft",
             title = title,
             parentId = parentId,
-            body = PageBodyWrite(doc)
+            body = PageBodyWrite(Doc.doc())
           )
         )
       } yield result

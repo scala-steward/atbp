@@ -38,6 +38,13 @@ object Parser {
 
   def parse(source: File): Task[Parsed] = parse(source, Map.empty)
 
+  /** Reserving page IDs only needs titles, not Markdown ASTs or ADF bodies. */
+  def readFrontMatter(source: File): Task[FrontMatter] =
+    ZIO
+      .attemptBlockingIO(splitFrontMatter(source.contentAsString)._1)
+      .flatMap(parseFrontMatter)
+      .mapError(cause => ParsingFailed(source, cause))
+
   def parse(source: File, pages: Map[File, String]): Task[Parsed] = {
     val p = for {
       content <- ZIO.attemptBlockingIO(source.contentAsString)

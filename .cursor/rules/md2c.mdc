@@ -42,13 +42,18 @@ distinguishing "D2 verified" from "D2 not verified" on a given run.
 
 ## Pipeline
 
-`SourceTree` → reserve page IDs → `StagedTree` → publish content
+`SourceTree` → reserve page IDs → convert and publish one page at a time
 
 1. Walk up from the given dir until `.md2c.conf` (HOCON `spaceKey`, `pageId`)
-2. Match existing pages / create drafts for the whole tree to resolve page IDs
-3. Resolve document links, then parse MD → ADF, then PlantUML, then Mermaid, then D2, then Extensions; drop
-   Data nodes and empty dirs
-4. Update pages; attach media; skip if up to date
+2. Match existing pages / create empty drafts for the whole tree to resolve page
+   IDs; read titles without converting Markdown and retain metadata without bodies
+3. Visit children before parents, converting only the current page via
+   `StagedTree.Page.convertPage`: resolve document links, parse MD → ADF, then
+   PlantUML, Mermaid, D2, and Extensions; drop Data nodes and empty dirs
+4. Update pages; attach media; skip if up to date; discard completed bodies.
+   Publishing uses `withParallelism(1)` to bound per-page renderers and uploads too.
+   `StagedTree.from` still materializes a whole tree for callers that need one;
+   do not use it in the publisher
 
 `spaceKey`: source conf, else user `md2c.Conf`. `pageId`: source conf only.
 

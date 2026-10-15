@@ -104,21 +104,26 @@ object StagedTree {
     def convert(
         node: Node,
         pages: Map[File, String]
-    ): ZIO[Any & Scope, Throwable, Page] = {
+    ): ZIO[Any & Scope, Throwable, Page] = for {
+      page <- convertPage(node, pages)
+      children <- ZIO.foreachPar(children(node))(convert(_, pages))
+    } yield page.copy(children = children)
+
+    /** Convert only this page so publishing can discard it before the next. */
+    def convertPage(node: Node, pages: Map[File, String]): Task[Page] = {
       for {
         Parsed(frontMatter, sourceDoc, contentHash) <- parse(node, pages)
         plantUmlRendered <- PlantUml.transform(sourceDoc)
         mermaidRendered <- Mermaid.transform(plantUmlRendered)
         d2Rendered <- D2.transform(mermaidRendered)
         extensionsRendered = Extensions.transform(d2Rendered)
-        children <- ZIO.foreachPar(children(node))(convert(_, pages))
       } yield Page(
         node.name,
         node.source,
         frontMatter,
         extensionsRendered,
         contentHash,
-        children
+        Nil
       )
     }
   }

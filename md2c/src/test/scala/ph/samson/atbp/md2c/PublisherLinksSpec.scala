@@ -31,7 +31,7 @@ object PublisherLinksSpec extends ZIOSpecDefault {
               |[back](../Alpha.md) and [home](../README.md)
               |""".stripMargin
         )
-        client <- FakeClient.make
+        client <- FakeClient.make()
         _ <- publish(source, client)
         pages <- client.pages.get
         alpha = pages.values.find(_.title == "Alpha").get
@@ -54,7 +54,7 @@ object PublisherLinksSpec extends ZIOSpecDefault {
           "Right/Right.md" -> "Right folder note",
           "Right/Topic.md" -> "Right topic"
         )
-        client <- FakeClient.make
+        client <- FakeClient.make()
         _ <- publish(source, client)
         pages <- client.pages.get
         left = pages.values.find(_.title == "Left").get
@@ -85,7 +85,7 @@ object PublisherLinksSpec extends ZIOSpecDefault {
           "Child.md" -> "Hello"
         )
         parsed <- Parser.parse(source.root.source)
-        client <- FakeClient.make
+        client <- FakeClient.make()
         _ <- client.pages.update(pages =>
           pages.updated(
             "root",
@@ -111,7 +111,7 @@ object PublisherLinksSpec extends ZIOSpecDefault {
           "README.md" -> "[child](Child.md)",
           "Child.md" -> "Hello"
         )
-        client <- FakeClient.make
+        client <- FakeClient.make()
         _ <- publish(source, client)
         first <- client.pages.get
         child = first.values.find(_.title == "Child").get
@@ -124,8 +124,77 @@ object PublisherLinksSpec extends ZIOSpecDefault {
         links(second("root")) == Map("child" -> pageUrl(replacement)),
         second("root").version.number == first("root").version.number + 1
       )
+    },
+    test("removes obsolete children after publishing the remaining tree") {
+      for {
+        source <- sourceTree(
+          "Keep.md" -> "Keep this page",
+          "Remove/Old.md" -> "Remove this subtree"
+        )
+        client <- FakeClient.make()
+        _ <- publish(source, client)
+        _ <- ZIO.attempt((source.root.source / "Remove").delete())
+        remaining <- SourceTree.from(source.root.source)
+        _ <- publish(remaining, client)
+        pages <- client.pages.get
+      } yield assertTrue(
+        pages.size == 2,
+        pages.values.map(_.title).toSet == Set("Existing root", "Keep")
+      )
+    },
+    test("reserves IDs with empty draft bodies") {
+      for {
+        source <- sourceTree("Child.md" -> "A large body " * 1000)
+        client <- FakeClient.make()
+        _ <- publish(source, client)
+        sizes <- client.draftBodySizes.get
+      } yield assertTrue(sizes.size == 1, sizes.forall(_ < 100))
+    },
+    test("converts siblings and ancestors only when ready to publish them") {
+      for {
+        source <- sourceTree(
+          "README.md" -> "Original root",
+          "A.md" -> "First child",
+          "B.md" -> "Original sibling"
+        )
+        client <- FakeClient.make(
+          onUpdate = request =>
+            ZIO.attempt {
+              if (request.title == "A") {
+                source.root.source.writeText("Updated root")
+                (source.root.source.parent / "B.md")
+                  .writeText("Updated sibling"): Unit
+              }
+            },
+          retainBodies = true
+        )
+        _ <- publish(source, client)
+        pages <- client.pages.get
+        sibling = pages.values.find(_.title == "B").get
+      } yield assertTrue(
+        pages("root").body.atlas_doc_format.get.value.contains("Updated root"),
+        sibling.body.atlas_doc_format.get.value.contains("Updated sibling")
+      )
+    },
+    test("publishes a large document set") {
+      largeDocumentSet(8).map(result => assertTrue(result))
     }
   )
+
+  private[md2c] def largeDocumentSet(count: Int) = {
+    val markdown = "```text\n" + ("large document body\n" * 14000) + "```\n"
+    for {
+      source <- sourceTree((1 to count).map(i => s"Page-$i.md" -> markdown)*)
+      // The remote server owns published bodies, not the test process.
+      client <- FakeClient.make(_ => ZIO.unit, retainBodies = false)
+      _ <- publish(source, client)
+      pages <- client.pages.get
+    } yield {
+      pages.size == count + 1 &&
+      pages.values.forall(_.status == "current") &&
+      pages.values.forall(_.version.message.nonEmpty)
+    }
+  }
 
   private def sourceTree(files: (String, String)*) = for {
     dir <- ZIO.acquireRelease(
@@ -200,8 +269,15 @@ object PublisherLinksSpec extends ZIOSpecDefault {
 
   private class FakeClient(
       val pages: Ref[Map[String, PageSingle]],
-      nextId: Ref[Int]
+      nextId: Ref[Int],
+      val draftBodySizes: Ref[List[Int]],
+      onUpdate: UpdatePageRequest => Task[Unit],
+      retainBodies: Boolean
   ) extends Client {
+    private def stored(page: PageSingle): PageSingle =
+      if (retainBodies) page
+      else page.copy(body = PageSingle.BodySingle(None, None, None))
+
     override def resolveUrl(path: String): URL =
       URL
         .decode("https://example.atlassian.net/wiki")
@@ -244,11 +320,12 @@ object PublisherLinksSpec extends ZIOSpecDefault {
         request.status,
         request.body
       )
-      _ <- pages.update(_ + (created.id -> created))
+      _ <- draftBodySizes.update(request.body.value.length :: _)
+      _ <- pages.update(_ + (created.id -> stored(created)))
     } yield created
 
     override def updatePage(request: UpdatePageRequest): Task[PageSingle] =
-      pages.modify { pages =>
+      onUpdate(request) *> pages.modify { pages =>
         val current = pages(request.id)
         val updated = current.copy(
           status = request.status,
@@ -265,7 +342,7 @@ object PublisherLinksSpec extends ZIOSpecDefault {
             None
           )
         )
-        updated -> pages.updated(updated.id, updated)
+        updated -> pages.updated(updated.id, stored(updated))
       }
 
     override def deletePage(id: String): Task[Boolean] =
@@ -288,7 +365,12 @@ object PublisherLinksSpec extends ZIOSpecDefault {
   }
 
   private object FakeClient {
-    def make = for {
+    def make(): Task[FakeClient] = make(_ => ZIO.unit, retainBodies = true)
+
+    def make(
+        onUpdate: UpdatePageRequest => Task[Unit],
+        retainBodies: Boolean
+    ) = for {
       doc <- Parser.parseMarkdown("Existing root")
       pages <- Ref.make(
         Map(
@@ -302,6 +384,13 @@ object PublisherLinksSpec extends ZIOSpecDefault {
         )
       )
       nextId <- Ref.make(0)
-    } yield new FakeClient(pages, nextId)
+      draftBodySizes <- Ref.make(List.empty[Int])
+    } yield new FakeClient(
+      pages,
+      nextId,
+      draftBodySizes,
+      onUpdate,
+      retainBodies
+    )
   }
 }
