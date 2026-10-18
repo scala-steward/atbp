@@ -6,7 +6,7 @@ object Dependencies {
 
   object Versions {
     val AdfBuilderJava = "2.6.0"
-    val CommonMark = "0.30.0"
+    val CommonMark = "0.30.1"
     val D2 = "v0.9.0"
     val Zio = "2.1.26"
     val ZioConfig = "4.1.0"
