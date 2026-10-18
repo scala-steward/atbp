@@ -81,11 +81,14 @@ object Client {
         body: Body,
         context: String
     ): ZIO[Scope, Throwable, A] =
-      requestClient.batched(Request(method = method, body = body)).flatMap {
-        response =>
+      requestClient
+        .batched(Request(method = method, body = body))
+        // Let raced requests release their HTTP resources in the background.
+        .disconnect
+        .flatMap { response =>
           ResponseDecoding
             .decode[A](response, method, requestClient.url, expected, context)
-      }
+        }
 
     override def getChangelogs(key: String): Task[List[Changelog]] = {
       def tail(head: PageBean[Changelog]) = {
