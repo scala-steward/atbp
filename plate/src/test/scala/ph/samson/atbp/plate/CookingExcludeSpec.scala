@@ -446,7 +446,11 @@ object CookingExcludeSpec extends ZIOSpecDefault {
         !content.contains(excludedDescendantKey),
         getIssueKeys == List(parentKey),
         searchJql.exists(_.contains(s"parent IN ($parentKey)")),
-        getChangelogKeys == List(parentKey, includedDescendantKey),
+        // Parent and descendant changelogs are fetched concurrently.
+        getChangelogKeys.sorted == List(
+          parentKey,
+          includedDescendantKey
+        ).sorted,
         !getChangelogKeys.contains(excludedDescendantKey),
         !getCommentKeys.contains(excludedDescendantKey)
       )
