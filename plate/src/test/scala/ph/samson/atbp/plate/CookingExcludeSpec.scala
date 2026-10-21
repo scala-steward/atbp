@@ -146,6 +146,61 @@ object CookingExcludeSpec extends ZIOSpecDefault {
     )
   }
 
+  private def doneIssue(key: String): Issue = {
+    val status = Issue.Status(
+      id = "10000",
+      name = "Done",
+      description = "",
+      statusCategory = Issue.Status.Category(
+        id = 3,
+        key = "done",
+        name = "Done"
+      )
+    )
+    val fields = Issue.Fields(
+      summary = "Summary",
+      statuscategorychangedate = testTime,
+      created = testTime.minusDays(30),
+      updated = testTime,
+      duedate = None,
+      resolution =
+        Some(Issue.Resolution(id = "1", name = "Done", description = "Done")),
+      versions = Nil,
+      fixVersions = Nil,
+      labels = Nil,
+      priority = None,
+      issuetype = Issue.IssueType(
+        self = "https://example.atlassian.net/rest/api/3/issuetype/1",
+        id = "1",
+        name = "Task",
+        hierarchyLevel = 0
+      ),
+      status = status,
+      parent = None
+    )
+    Issue(
+      id = "10002",
+      key = key,
+      self = "https://example.atlassian.net/rest/api/3/issue/10002",
+      fields = fields
+    )
+  }
+
+  private def doneChangelog: Changelog =
+    progressChangelog.copy(
+      items = List(
+        ChangeDetails(
+          field = "status",
+          fieldType = Some("jira"),
+          fieldId = Some("status"),
+          from = Some("3"),
+          fromString = Some("In Progress"),
+          to = Some("10000"),
+          toAsString = Some("Done")
+        )
+      )
+    )
+
   private def progressChangelog: Changelog = {
     val author = UserDetails(
       self = "https://example.atlassian.net/rest/api/3/user?accountId=x",
@@ -416,6 +471,31 @@ object CookingExcludeSpec extends ZIOSpecDefault {
         searchJql.exists(_.contains(s"parent IN ($parentKey)"))
       )
     },
+    test("descendant marked done counts as cooking progress") {
+      val parentKey = "DONE-1"
+      val descendantKey = "DONE-2"
+      val plateLine =
+        s"- [DONE-1 Parent](https://example.atlassian.net/browse/$parentKey)"
+      for {
+        _ <- TestClock.setTime(testInstant)
+        source <- ZIO.attemptBlockingIO {
+          val file = File.newTemporaryFile("plate", ".md").deleteOnExit()
+          file.overwrite(s"# Section\n$plateLine\n")
+          file
+        }
+        recording <- ZIO.service[RecordingClient]
+        result <- ZIO
+          .serviceWithZIO[Inspector](_.cooking(source, None, Nil))
+          .provideSome[RecordingClient](Inspector.layer())
+        getChangelogKeys <- recording.getChangelogKeys.get
+        content <- ZIO.attemptBlockingIO(result.contentAsString)
+      } yield assertTrue(
+        content.contains(plateLine),
+        content.contains(descendantKey),
+        content.contains("status -> Done"),
+        getChangelogKeys.sorted == List(parentKey, descendantKey).sorted
+      )
+    },
     test("included descendant keeps excluded plate line") {
       val parentKey = "ABC-5"
       val includedDescendantKey = "XYZ-3"
@@ -472,7 +552,9 @@ object CookingExcludeSpec extends ZIOSpecDefault {
         "ABC-6" -> cookingIssue("ABC-6"),
         "XYZ-3" -> cookingIssue("XYZ-3"),
         "EXC-2" -> cookingIssue("EXC-2"),
-        "EXC-3" -> cookingIssue("EXC-3")
+        "EXC-3" -> cookingIssue("EXC-3"),
+        "DONE-1" -> cookingIssue("DONE-1"),
+        "DONE-2" -> doneIssue("DONE-2")
       ),
       children = Map(
         "ABC-1" -> List(cookingIssue("ABC-2")),
@@ -480,7 +562,8 @@ object CookingExcludeSpec extends ZIOSpecDefault {
         "ABC-5" -> List(cookingIssue("XYZ-3"), cookingIssue("ABC-6")),
         "INC-1" -> List(cookingIssue("EXC-2")),
         "INC-3" -> List(cookingIssue("EXC-2")),
-        "INC-5" -> List(cookingIssue("INC-2"), cookingIssue("EXC-3"))
+        "INC-5" -> List(cookingIssue("INC-2"), cookingIssue("EXC-3")),
+        "DONE-1" -> List(doneIssue("DONE-2"))
       ),
       changelogs = Map(
         "ABC-123" -> List(progressChangelog.copy(author = None)),
@@ -493,7 +576,8 @@ object CookingExcludeSpec extends ZIOSpecDefault {
         "INC-1" -> List(progressChangelog),
         "INC-2" -> List(progressChangelog),
         "EXC-2" -> List(progressChangelog),
-        "EXC-3" -> List(progressChangelog)
+        "EXC-3" -> List(progressChangelog),
+        "DONE-2" -> List(doneChangelog)
       ),
       comments = Map.empty
     )

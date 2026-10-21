@@ -308,6 +308,29 @@ object Inspector {
 
         issue.inProgress && (hasNewLogs || hasNewComments)
       }
+
+      /** Cooking treats a recently completed issue as progress even though
+        * [[hasProgress]] requires the issue to still be in progress.
+        */
+      def hasCookingProgress(sinceDays: Int)(using now: Instant): Boolean =
+        hasProgress(sinceDays) || markedDoneRecently(sinceDays)
+
+      private def markedDoneRecently(
+          sinceDays: Int
+      )(using now: Instant): Boolean = {
+        if (!issue.isDone) false
+        else {
+          val limit = now
+            .atZone(ZoneId.systemDefault())
+            .minus(sinceDays, DAYS)
+            .`with`(LocalTime.MIDNIGHT)
+
+          changelogs.exists { case Changelog(_, _, created, items, _) =>
+            created.isAfter(limit) &&
+            items.exists(item => item.field == "status" && !nonProgress(item))
+          }
+        }
+      }
     }
 
     object FatIssue {
@@ -373,7 +396,9 @@ object Inspector {
                 if (
                   !fatIssue.issue.isDone && (fatIssue.hasProgress(
                     CookingProgressDays
-                  ) || descendants.exists(_.hasProgress(CookingProgressDays)))
+                  ) || descendants.exists(
+                    _.hasCookingProgress(CookingProgressDays)
+                  ))
                 ) {
                   val indent =
                     " ".repeat(line.takeWhile(_.isWhitespace).length + 4)
@@ -384,7 +409,7 @@ object Inspector {
                   }
                   val descendantDetails = for {
                     descendant <- descendants
-                    if descendant.hasProgress(CookingProgressDays)
+                    if descendant.hasCookingProgress(CookingProgressDays)
                   } yield {
                     val header =
                       s"$indent* <small>📌</small> [${descendant.issue.key} ${descendant.issue.fields.summary}](${descendant.issue.webUrl})"
