@@ -33,6 +33,7 @@ import zio.http.ZClient
 import zio.http.ZClientAspect
 import zio.schema.codec.BinaryCodec
 
+import java.io.IOException
 import scala.annotation.tailrec
 
 /** Jira REST API client.
@@ -88,6 +89,11 @@ object Client {
         .flatMap { response =>
           ResponseDecoding
             .decode[A](response, method, requestClient.url, expected, context)
+        }
+        .catchAll { cause =>
+          ZIO.logWarning(s"Client decode failed: $cause") *> ZIO.fail(
+            new IOException("Client decode failed", cause)
+          )
         }
 
     override def getChangelogs(key: String): Task[List[Changelog]] = {
