@@ -89,6 +89,9 @@ object Client {
           ResponseDecoding
             .decode[A](response, method, requestClient.url, expected, context)
         }
+        .tapErrorCause { cause =>
+          ZIO.logErrorCause(s"Jira request failed: $context", cause)
+        }
 
     override def getChangelogs(key: String): Task[List[Changelog]] = {
       def tail(head: PageBean[Changelog]) = {
