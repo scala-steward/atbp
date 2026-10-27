@@ -77,7 +77,9 @@ object Main extends ZIOCliDefault {
   ) { case ((verbose, quiet), toolCommand) =>
     val run = for {
       conf <- Conf.appConf
-      _ <- toolCommand.run(conf)
+      _ <- toolCommand.run(conf).tapErrorCause { cause =>
+        ZIO.logErrorCause(s"run failed: $toolCommand", cause)
+      }
     } yield ()
 
     val logger = if (quiet) {
