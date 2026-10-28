@@ -1,6 +1,5 @@
 package ph.samson.atbp.jira
 
-import ph.samson.atbp.http.ConcurrencyLimiter
 import ph.samson.atbp.http.StatusCheck
 import ph.samson.atbp.jira.model.Changelog
 import ph.samson.atbp.jira.model.Comment
@@ -13,6 +12,7 @@ import ph.samson.atbp.jira.model.SearchRequest
 import ph.samson.atbp.jira.model.SearchResults
 import zio.LogLevel
 import zio.Scope
+import zio.Semaphore
 import zio.Task
 import zio.ZIO
 import zio.ZLayer
@@ -69,7 +69,8 @@ object Client {
       issueIdOrKey: String
   )
 
-  private class LiveImpl(client: HttpClient) extends Client {
+  private class LiveImpl(client: HttpClient, limiter: Semaphore)
+      extends Client {
 
     val platformClient = client.addPath("/rest/api/3")
     val softwareClient = client.addPath("/rest/agile/1.0")
@@ -81,9 +82,16 @@ object Client {
         body: Body,
         context: String
     ): ZIO[Scope, Throwable, A] =
-      requestClient
-        .batched(Request(method = method, body = body))
-        // Let raced requests release their HTTP resources in the background.
+      limiter
+        .withPermit {
+          // Shield the read and its scoped cleanup: canceling pooled HTTP work
+          // can propagate interruption to an unrelated request. Waiting for a
+          // permit remains interruptible so canceled queued reads are skipped.
+          requestClient
+            .batched(Request(method = method, body = body))
+            .uninterruptible
+        }
+        // A losing race still returns promptly while that work finishes.
         .disconnect
         .flatMap { response =>
           ResponseDecoding
@@ -284,39 +292,43 @@ object Client {
       })
 
     override def addLabel(key: String, label: String): Task[Unit] =
-      ZIO.scoped(ZIO.logSpan("addLabel") {
+      limiter.withPermit(ZIO.scoped(ZIO.logSpan("addLabel") {
         for {
           _ <- platformClient
             .addHeader(ContentType(MediaType.application.json))
             .addPath("issue")
             .put(key)(Body.from(EditIssueRequest.addLabel(label)))
         } yield ()
-      })
+      }))
 
     override def removeLabel(key: String, label: String): Task[Unit] =
-      ZIO.scoped(ZIO.logSpan("removeLabel") {
+      limiter.withPermit(ZIO.scoped(ZIO.logSpan("removeLabel") {
         for {
           _ <- platformClient
             .addHeader(ContentType(MediaType.application.json))
             .addPath("issue")
             .put(key)(Body.from(EditIssueRequest.removeLabel(label)))
         } yield ()
-      })
+      }))
 
     private def rankIssues(
         keys: List[String],
         after: Option[String],
         before: Option[String],
         rankCustomFieldId: Option[Int]
-    ) = ZIO.scoped(
-      for {
-        _ <- softwareClient
-          .addHeader(ContentType(MediaType.application.json))
-          .addPath("issue")
-          .put("rank")(
-            Body.from(RankIssuesRequest(keys, after, before, rankCustomFieldId))
-          )
-      } yield ()
+    ) = limiter.withPermit(
+      ZIO.scoped(
+        for {
+          _ <- softwareClient
+            .addHeader(ContentType(MediaType.application.json))
+            .addPath("issue")
+            .put("rank")(
+              Body.from(
+                RankIssuesRequest(keys, after, before, rankCustomFieldId)
+              )
+            )
+        } yield ()
+      )
     )
 
     override def rankIssuesBefore(
@@ -360,7 +372,7 @@ object Client {
         Accept(MediaType.application.json)
       )
       url <- ZIO.fromEither(URL.decode(s"https://${conf.site}"))
-      limiter <- ConcurrencyLimiter(conf.concurrentRequests)
+      limiter <- Semaphore.make(conf.concurrentRequests)
       client <- ZIO.serviceWith[HttpClient](
         _.addHeaders(headers).url(
           url
@@ -368,10 +380,9 @@ object Client {
           // JQL search is the only POST on this client; SafePlusPost replays it
           // after a truncated 2xx. Do not add a mutating POST without revisiting.
           @@ StatusCheck.successOnly(StatusCheck.SafePlusPost)
-          @@ limiter
       )
     } yield {
-      LiveImpl(client): Client
+      LiveImpl(client, limiter): Client
     }
   }
 }
